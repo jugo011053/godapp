@@ -261,51 +261,78 @@ export function resolveConflicts(
   day: DayTimeline,
   newBlock: TimelineBlock
 ): { updatedDay: DayTimeline; summary: string } {
-  const conflicting = day.blocks.filter(block =>
-    timesOverlap(newBlock.startTime, newBlock.endTime, block.startTime, block.endTime) &&
-    !block.locked
+  const allOverlaps = day.blocks.filter(block =>
+    timesOverlap(newBlock.startTime, newBlock.endTime, block.startTime, block.endTime)
   );
 
-  // Keine Konflikte -> direkt einfügen
-  if (conflicting.length === 0) {
-    const updatedBlocks = [...day.blocks, newBlock].sort(
-      (a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime)
-    );
+  // Wenn gesperrte Blöcke kollidieren, darf nur ein Block mit höherer Priorität einfügen
+  const lockedConflicts = allOverlaps.filter(block => block.locked);
+  const blockedByLocked = lockedConflicts.filter(block => newBlock.priority >= block.priority);
+  if (blockedByLocked.length > 0) {
     return {
-      updatedDay: { ...day, blocks: updatedBlocks },
-      summary: 'Kein Konflikt – Block eingefügt.',
+      updatedDay: day,
+      summary: `Nicht eingefügt: kollidiert mit fixiertem Block (${blockedByLocked
+        .map(b => b.title)
+        .join(', ')}).`,
     };
   }
 
-  // Konflikte nach Priorität sortieren (höchste Prioritätsnummer = unwichtigster Block zuerst)
-  const sortedConflicts = [...conflicting].sort((a, b) => b.priority - a.priority);
-
-  const removedTitles: string[] = [];
   let updatedBlocks = [...day.blocks];
+  const notes: string[] = [];
 
-  for (const conflict of sortedConflicts) {
-    // Prüfen ob Konflikt immer noch besteht nach evtl. vorherigen Entfernungen
-    if (timesOverlap(newBlock.startTime, newBlock.endTime, conflict.startTime, conflict.endTime)) {
-      if (newBlock.priority <= conflict.priority) {
-        // Neuer Block ist wichtiger -> konfliktierenden entfernen
-        updatedBlocks = updatedBlocks.filter(b => b.id !== conflict.id);
-        removedTitles.push(conflict.title);
+  // Erst verschiebbare Konflikte behandeln (niedrige Priorität zuerst)
+  const movableConflicts = allOverlaps
+    .filter(block => !block.locked)
+    .sort((a, b) => b.priority - a.priority);
+
+  for (const conflict of movableConflicts) {
+    const stillOverlapping = updatedBlocks.some(
+      b =>
+        b.id === conflict.id &&
+        timesOverlap(newBlock.startTime, newBlock.endTime, b.startTime, b.endTime)
+    );
+    if (!stillOverlapping) continue;
+
+    // Höhere Priorität gewinnt: niedrigerer Block wird angepasst oder entfernt
+    if (newBlock.priority <= conflict.priority) {
+      // 1) Kurzmodus falls möglich
+      if (conflict.shortModeAvailable && conflict.shortModeDurationMin) {
+        const shortEnd = addMinutes(conflict.startTime, conflict.shortModeDurationMin);
+        if (!timesOverlap(newBlock.startTime, newBlock.endTime, conflict.startTime, shortEnd)) {
+          updatedBlocks = updatedBlocks.map(b =>
+            b.id === conflict.id
+              ? { ...b, endTime: shortEnd, status: 'shifted' as const, notes: `${b.notes} Kurzmodus aktiv.`.trim() }
+              : b
+          );
+          notes.push(`${conflict.title} auf Kurzmodus gesetzt`);
+          continue;
+        }
       }
+
+      // 2) Konfliktblock entfernen wenn Kurzmodus nicht reicht
+      updatedBlocks = updatedBlocks.filter(b => b.id !== conflict.id);
+      notes.push(`${conflict.title} entfernt`);
     }
   }
 
-  // Neuen Block einfügen
+  // Nach Bereinigung erneut prüfen, ob es noch blockierende Überlappungen gibt
+  const remainingConflict = updatedBlocks.some(block =>
+    timesOverlap(newBlock.startTime, newBlock.endTime, block.startTime, block.endTime)
+  );
+
+  if (remainingConflict) {
+    return {
+      updatedDay: { ...day, blocks: updatedBlocks },
+      summary: 'Nicht eingefügt: Zeitfenster bleibt blockiert.',
+    };
+  }
+
   updatedBlocks.push(newBlock);
   updatedBlocks.sort((a, b) => timeToMinutes(a.startTime) - timeToMinutes(b.startTime));
 
-  const summary =
-    removedTitles.length > 0
-      ? `Entfernt wegen Priorität: ${removedTitles.join(', ')}.`
-      : 'Block eingefügt ohne Entfernung (Prioritäten gleich oder niedriger).';
-
   return {
     updatedDay: { ...day, blocks: updatedBlocks },
-    summary,
+    summary: notes.length > 0 ? `Termin eingefügt. ${notes.join('. ')}.` : 'Kein Konflikt – Block eingefügt.',
   };
 }
 
