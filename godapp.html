@@ -221,6 +221,30 @@
   </div>
 </div>
 
+<!-- Recipe Modal -->
+<div class="modal-bg" id="modal-recipe">
+  <div class="modal" style="max-height:85vh;overflow-y:auto;">
+    <div style="display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:4px;">
+      <h2 id="recipe-name"></h2>
+      <button onclick="closeModal('modal-recipe')" style="background:none;border:none;color:var(--muted);font-size:22px;cursor:pointer;padding:0 0 0 12px;">✕</button>
+    </div>
+    <div id="recipe-meta" style="color:var(--muted);font-size:13px;margin-bottom:16px;"></div>
+    <div style="background:var(--card2);border-radius:10px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Zutaten (skaliert auf deinen Bedarf)</div>
+      <div id="recipe-ingredients"></div>
+    </div>
+    <div style="background:var(--card2);border-radius:10px;padding:12px;margin-bottom:14px;">
+      <div style="font-size:12px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;margin-bottom:10px;">Zubereitung</div>
+      <div id="recipe-steps" style="font-size:14px;line-height:1.7;color:var(--text);"></div>
+    </div>
+    <div style="display:flex;gap:10px;background:var(--card);border-radius:10px;padding:12px;text-align:center;">
+      <div style="flex:1;"><div id="recipe-kcal" style="font-size:20px;font-weight:800;color:var(--accent);"></div><div style="font-size:11px;color:var(--muted);">kcal</div></div>
+      <div style="flex:1;"><div id="recipe-prot" style="font-size:20px;font-weight:800;color:var(--success);"></div><div style="font-size:11px;color:var(--muted);">g Protein</div></div>
+      <div style="flex:1;"><div id="recipe-time" style="font-size:20px;font-weight:800;color:var(--warn);"></div><div style="font-size:11px;color:var(--muted);">Min Prep</div></div>
+    </div>
+  </div>
+</div>
+
 <!-- Add Block Modal -->
 <div class="modal-bg" id="modal-add">
   <div class="modal">
@@ -424,19 +448,26 @@ function buildMealCycle(today, profile) {
   };
 }
 
-function buildShoppingList(cycle) {
+function buildShoppingList(cycle, profile) {
   const items = {};
+  const cats = ['breakfast','lunch','dinner','snack'];
   [...cycle.blockA.meals, ...cycle.blockB.meals].forEach(day => {
-    [day.breakfast, day.lunch, day.dinner, day.snack].forEach(recipe => {
+    cats.forEach(cat => {
+      const recipe = day[cat];
       if (!recipe || !recipe.ingredients) return;
+      const factor = recipe.kcal > 0 ? ((profile.calorieTarget||2000) * (MEAL_SPLIT[cat]||0.25)) / recipe.kcal : 1;
       recipe.ingredients.forEach(ing => {
         const key = ing.n + '_' + ing.u;
-        if (items[key]) items[key].a += ing.a;
-        else items[key] = { name: ing.n, unit: ing.u, a: ing.a };
+        const scaledAmt = ing.a * factor;
+        if (items[key]) items[key].a += scaledAmt;
+        else items[key] = { name: ing.n, unit: ing.u, a: scaledAmt };
       });
     });
   });
-  return Object.values(items).map(i => ({ name: i.name, unit: i.unit, amount: Math.ceil(i.a * 10) / 10 }));
+  return Object.values(items).map(i => ({
+    name: i.name, unit: i.unit,
+    amount: i.unit === 'Stück' ? Math.ceil(i.a) : Math.ceil(i.a / 5) * 5,
+  }));
 }
 
 function buildTrainingWeek(weekStart, profile) {
@@ -466,57 +497,83 @@ function buildTrainingWeek(weekStart, profile) {
   return { weekStart, slots };
 }
 
+function t2m(t) { const [h,m] = t.split(':').map(Number); return h*60+m; }
+function m2t(m) { return `${String(Math.floor(m/60)).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`; }
+function addMinutes(t, mins) { return m2t(t2m(t)+mins); }
+
+function findFreeSlot(occupied, durationMin, earliest, latest) {
+  let start = earliest;
+  while (start + durationMin <= latest) {
+    const end = start + durationMin;
+    const hits = occupied.filter(r => start < r.end && end > r.start);
+    if (!hits.length) return { start, end };
+    start = Math.max(...hits.map(r => r.end));
+  }
+  return null;
+}
+
 function buildTimeline(weekStart, profile, mealCycle, trainingWeek) {
   const days = [];
+  const wakeMin  = t2m(profile.wakeTime  || '06:30');
+  const sleepMin = t2m(profile.sleepTime || '22:30');
+  const wsMin    = t2m(profile.workSchedule.startTime || '09:00');
+  const weMin    = t2m(profile.workSchedule.endTime   || '17:00');
+  const bufMin   = profile.bufferAfterWorkMin || 30;
+
   for (let i = 0; i < 7; i++) {
     const date = addDays(weekStart, i);
-    const dow = new Date(date + 'T00:00:00').getDay();
+    const dow  = new Date(date + 'T00:00:00').getDay();
+    const isWorkDay = profile.workSchedule.days.includes(dow);
     const blocks = [];
+    const occupied = [];
 
-    // Work blocks
-    if (profile.workSchedule.days.includes(dow)) {
-      blocks.push({
-        id: uid(), type: 'work', title: 'Arbeit',
-        startTime: profile.workSchedule.startTime,
-        endTime: profile.workSchedule.endTime,
-        status: 'planned', date, priority: 1,
-      });
+    // 1. Work
+    if (isWorkDay) {
+      occupied.push({ start: wsMin, end: weMin });
+      blocks.push({ id:uid(), type:'work', title:'Arbeit', startTime:m2t(wsMin), endTime:m2t(weMin), status:'planned', date, priority:1 });
     }
 
-    // Training blocks
+    // 2. Training – find a free slot respecting preference
     const slot = trainingWeek?.slots?.find(s => s.date === date);
     if (slot) {
-      const prefTime = profile.preferredTrainingTime;
-      const trainStart = prefTime === 'morning' ? '07:00' : prefTime === 'afterwork' ? '17:00' : '19:00';
-      const trainEnd = addMinutes(trainStart, 75);
-      blocks.push({
-        id: uid(), type: 'training', title: slot.name,
-        startTime: trainStart, endTime: trainEnd,
-        status: 'planned', date, priority: 2,
-      });
+      const TRAIN_DUR = 75;
+      let trainSlot = null;
+      const pref = profile.preferredTrainingTime;
+
+      if (pref === 'morning') {
+        // Before work (or from wake if no work day)
+        const latestForMorning = isWorkDay ? wsMin - 15 : sleepMin;
+        trainSlot = findFreeSlot(occupied, TRAIN_DUR, wakeMin, latestForMorning);
+      }
+      if (!trainSlot && pref === 'afterwork') {
+        trainSlot = findFreeSlot(occupied, TRAIN_DUR, isWorkDay ? weMin + bufMin : wakeMin, sleepMin - 30);
+      }
+      // Fallback: anywhere free
+      if (!trainSlot) {
+        trainSlot = findFreeSlot(occupied, TRAIN_DUR, isWorkDay ? weMin + bufMin : wakeMin, sleepMin - 30);
+      }
+      if (trainSlot) {
+        occupied.push(trainSlot);
+        blocks.push({ id:uid(), type:'training', title:slot.name, startTime:m2t(trainSlot.start), endTime:m2t(trainSlot.end), status:'planned', date, priority:2 });
+      }
     }
 
-    // Meal prep on block prep days
-    const isBlockAPrepDay = mealCycle?.blockA?.prepDate === date;
-    const isBlockBPrepDay = mealCycle?.blockB?.prepDate === date;
-    if (isBlockAPrepDay || isBlockBPrepDay) {
-      blocks.push({
-        id: uid(), type: 'prep', title: 'Meal Prep',
-        startTime: '10:00', endTime: '12:00',
-        status: 'planned', date, priority: 3,
-      });
+    // 3. Meal Prep – on prep days, find free slot after work/training
+    const isPrepDay = mealCycle?.blockA?.prepDate === date || mealCycle?.blockB?.prepDate === date;
+    if (isPrepDay) {
+      const PREP_DUR = 90;
+      const earliest = isWorkDay ? weMin + bufMin : wakeMin + 60;
+      const prepSlot = findFreeSlot(occupied, PREP_DUR, earliest, sleepMin - 30);
+      if (prepSlot) {
+        occupied.push(prepSlot);
+        blocks.push({ id:uid(), type:'prep', title:'Meal Prep', startTime:m2t(prepSlot.start), endTime:m2t(prepSlot.end), status:'planned', date, priority:3 });
+      }
     }
 
     blocks.sort((a,b) => a.startTime.localeCompare(b.startTime));
     days.push({ date, blocks });
   }
   return { weekStart, days };
-}
-
-function addMinutes(time, mins) {
-  const [h,m] = time.split(':').map(Number);
-  const total = h*60 + m + mins;
-  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
 }
 
 // ==================== ONBOARDING ====================
@@ -847,7 +904,7 @@ function renderMealsContent() {
   if (!mc) { el.innerHTML = `<div class="empty">Kein Mealplan vorhanden.</div>`; return; }
 
   if (mealTab === 'shop') {
-    renderShopping(el, mc);
+    renderShopping(el, mc, state.profile);
     return;
   }
   const block = mealTab === 'A' ? mc.blockA : mc.blockB;
@@ -860,6 +917,58 @@ function renderMealsContent() {
   `;
 }
 
+// Calorie split per meal category (of daily target)
+const MEAL_SPLIT = { breakfast:.25, lunch:.35, dinner:.30, snack:.10 };
+
+function scaledKcal(recipe, cat, profile) {
+  const target = (profile.calorieTarget || 2000) * (MEAL_SPLIT[cat] || 0.25);
+  return Math.round(target);
+}
+
+function scaleIngredients(recipe, cat, profile) {
+  const target = (profile.calorieTarget || 2000) * (MEAL_SPLIT[cat] || 0.25);
+  const factor = recipe.kcal > 0 ? target / recipe.kcal : 1;
+  return recipe.ingredients.map(ing => {
+    const raw = ing.a * factor;
+    const scaled = ing.u === 'Stück' || ing.u === 'EL' || ing.u === 'TL'
+      ? Math.round(raw * 2) / 2       // round to 0.5
+      : Math.round(raw / 5) * 5;      // round to 5g/ml
+    return { ...ing, scaled: Math.max(scaled, ing.u === 'Stück' ? 1 : 5) };
+  });
+}
+
+const RECIPE_STEPS = {
+  breakfast: [
+    '1. Alle Zutaten bereitstellen und abwiegen.',
+    '2. Zutaten nach Anleitung vorbereiten (Eier aufschlagen / Haferflocken einweichen etc.).',
+    '3. Bei Bedarf in der Pfanne oder Mikrowelle zubereiten.',
+    '4. Mit Salz, Pfeffer oder Gewürzen abschmecken.',
+    '5. Direkt servieren oder in einer Dose für den nächsten Tag aufbewahren.',
+  ],
+  lunch: [
+    '1. Zutaten abwiegen und waschen.',
+    '2. Protein (Fleisch/Hülsenfrüchte) würzen und in der Pfanne anbraten (ca. 5–8 Min).',
+    '3. Beilage (Reis/Nudeln/Kartoffeln) nach Packungsanweisung kochen.',
+    '4. Gemüse in der gleichen Pfanne kurz anbraten oder dämpfen.',
+    '5. Alles vermengen, mit Gewürzen abschmecken und in Meal-Prep-Boxen füllen.',
+    '6. Kühl aufbewahren – hält 3–4 Tage im Kühlschrank.',
+  ],
+  dinner: [
+    '1. Ofen auf 180 °C vorheizen (falls nötig).',
+    '2. Gemüse schälen, würfeln und auf ein Backblech legen.',
+    '3. Protein vorbereiten und würzen.',
+    '4. Gemüse 25–30 Min backen oder in der Pfanne garen.',
+    '5. Protein separat garen (Pfanne, Ofen oder Dampf).',
+    '6. Zusammenstellen, anrichten und warm servieren.',
+  ],
+  snack: [
+    '1. Zutaten abwiegen.',
+    '2. Alles zusammenmischen oder schichten.',
+    '3. Bei Bedarf kurz kühlen.',
+    '4. Direkt genießen oder für unterwegs in eine Box füllen.',
+  ],
+};
+
 function renderMealDay(day, idx, blockId) {
   const meals = [
     {cat:'breakfast',label:'Frühstück',r:day.breakfast},
@@ -867,27 +976,65 @@ function renderMealDay(day, idx, blockId) {
     {cat:'dinner',label:'Abend',r:day.dinner},
     {cat:'snack',label:'Snack',r:day.snack},
   ];
+  const profile = state.profile;
   return `
     <div class="card" style="margin-bottom:12px;">
       <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;">
         <div style="font-size:18px;font-weight:800;">Tag ${idx+1}</div>
         <div class="muted" style="font-size:13px;">${dayLabel(day.date)}</div>
       </div>
-      ${meals.map(m => `
-        <div class="card2" style="display:flex;align-items:center;margin-bottom:6px;">
-          <div style="flex:1;">
-            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${m.label}</div>
-            <div style="font-size:14px;font-weight:600;margin-top:2px;">${m.r ? m.r.name : '–'}</div>
-            ${m.r ? `<div class="muted" style="font-size:12px;margin-top:3px;">${m.r.kcal} kcal · ${m.r.protein}g Protein · ${m.r.time} Min</div>` : ''}
+      ${meals.map(m => {
+        if (!m.r) return '';
+        const targetKcal = scaledKcal(m.r, m.cat, profile);
+        const targetProt = Math.round(m.r.protein * (targetKcal / m.r.kcal));
+        return `
+        <div class="card2" style="margin-bottom:6px;">
+          <div style="display:flex;align-items:center;">
+            <div style="flex:1;">
+              <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${m.label}</div>
+              <div style="font-size:14px;font-weight:600;margin-top:2px;">${m.r.name}</div>
+              <div class="muted" style="font-size:12px;margin-top:3px;">${targetKcal} kcal · ${targetProt}g Protein · ${m.r.time} Min</div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:5px;margin-left:8px;">
+              <button class="btn btn-secondary btn-sm" onclick="showRecipe('${m.r.id}','${m.cat}')" style="color:var(--text);">📋 Rezept</button>
+              <button class="btn btn-secondary btn-sm" onclick="swapMeal('${blockId}',${idx},'${m.cat}')" style="color:var(--accent);">↺ Tausch</button>
+            </div>
           </div>
-          ${m.r ? `<button class="btn btn-secondary btn-sm" onclick="swapMeal('${blockId}',${idx},'${m.cat}')" style="color:var(--accent);">Tauschen</button>` : ''}
-        </div>
-      `).join('')}
+        </div>`;
+      }).join('')}
       <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:right;font-size:13px;font-weight:700;">
         Gesamt: ${day.totalKcal || 0} kcal · ${day.totalProt || 0}g Protein
       </div>
     </div>
   `;
+}
+
+function showRecipe(recipeId, cat) {
+  const recipe = RECIPES.find(r => r.id === recipeId);
+  if (!recipe) return;
+  const profile = state.profile;
+  const targetKcal = scaledKcal(recipe, cat, profile);
+  const factor = recipe.kcal > 0 ? targetKcal / recipe.kcal : 1;
+  const targetProt = Math.round(recipe.protein * factor);
+  const scaled = scaleIngredients(recipe, cat, profile);
+
+  document.getElementById('recipe-name').textContent = recipe.name;
+  document.getElementById('recipe-meta').textContent = `${['breakfast','lunch','dinner','snack'].indexOf(cat) >= 0 ? ['Frühstück','Mittagessen','Abendessen','Snack'][['breakfast','lunch','dinner','snack'].indexOf(cat)] : cat} · ${recipe.time} Min Zubereitung`;
+  document.getElementById('recipe-kcal').textContent = targetKcal;
+  document.getElementById('recipe-prot').textContent = targetProt;
+  document.getElementById('recipe-time').textContent = recipe.time;
+
+  document.getElementById('recipe-ingredients').innerHTML = scaled.map(ing =>
+    `<div style="display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--border);font-size:14px;">
+      <span>${ing.n}</span>
+      <span style="font-weight:700;color:var(--accent);">${ing.scaled} ${ing.u}</span>
+    </div>`
+  ).join('');
+
+  const steps = RECIPE_STEPS[cat] || RECIPE_STEPS.lunch;
+  document.getElementById('recipe-steps').innerHTML = steps.map(s => `<p style="margin-bottom:8px;">${s}</p>`).join('');
+
+  document.getElementById('modal-recipe').classList.add('open');
 }
 
 function swapMeal(blockId, dayIdx, cat) {
@@ -907,8 +1054,8 @@ function swapMeal(blockId, dayIdx, cat) {
   toast('Mahlzeit getauscht');
 }
 
-function renderShopping(el, mc) {
-  const items = buildShoppingList(mc);
+function renderShopping(el, mc, profile) {
+  const items = buildShoppingList(mc, profile || state.profile);
   if (!items.length) { el.innerHTML = `<div class="empty">Keine Artikel.</div>`; return; }
   el.innerHTML = `
     <div class="section-title">Einkaufsliste</div>
