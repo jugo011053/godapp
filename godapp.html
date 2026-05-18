@@ -210,7 +210,7 @@ h3{font-size:16px;font-weight:700;}
 <div class="screen active" id="screen-onboarding">
   <div style="padding:20px 16px 12px;">
     <div style="display:flex;justify-content:space-between;align-items:center;">
-      <div class="level-badge">✦ GodApp</div>
+      <div class="level-badge">GodApp</div>
       <span style="font-size:12px;color:var(--muted);font-weight:700;" id="ob-step-label">1 / 6</span>
     </div>
     <div class="progress-wrap"><div class="progress-fill" id="ob-progress" style="width:16%;"></div></div>
@@ -236,7 +236,7 @@ h3{font-size:16px;font-weight:700;}
           <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="tl-range"></div>
         </div>
         <div style="display:flex;gap:8px;align-items:center;">
-          <div class="streak-badge" id="streak-display">🔥 0</div>
+          <div class="streak-badge" id="streak-display">0 Tage</div>
           <button class="btn btn-secondary btn-sm" onclick="jumpToToday()">Heute</button>
         </div>
       </div>
@@ -259,7 +259,7 @@ h3{font-size:16px;font-weight:700;}
     <div class="sub-tabs" style="margin-top:4px;">
       <div class="sub-tab active" id="meal-tab-A" onclick="setMealTab('A')">Block A</div>
       <div class="sub-tab" id="meal-tab-B" onclick="setMealTab('B')">Block B</div>
-      <div class="sub-tab" id="meal-tab-shop" onclick="setMealTab('shop')">🛒 Einkauf</div>
+      <div class="sub-tab" id="meal-tab-shop" onclick="setMealTab('shop')">Einkauf</div>
     </div>
     <div class="content" id="meal-content"></div>
   </div>
@@ -287,10 +287,10 @@ h3{font-size:16px;font-weight:700;}
   </div>
 
   <nav class="tabs">
-    <button class="tab active" id="tab-timeline" onclick="showView('timeline')"><span>📅</span><span>Timeline</span></button>
-    <button class="tab" id="tab-meals" onclick="showView('meals')"><span>🍽</span><span>Essen</span></button>
-    <button class="tab" id="tab-training" onclick="showView('training')"><span>💪</span><span>Training</span></button>
-    <button class="tab" id="tab-profile" onclick="showView('profile')"><span>⚙️</span><span>Profil</span></button>
+    <button class="tab active" id="tab-timeline" onclick="showView('timeline')"><span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg></span><span>Timeline</span></button>
+    <button class="tab" id="tab-meals" onclick="showView('meals')"><span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 8h1a4 4 0 0 1 0 8h-1"/><path d="M2 8h16v9a4 4 0 0 1-4 4H6a4 4 0 0 1-4-4V8z"/><line x1="6" y1="1" x2="6" y2="4"/><line x1="10" y1="1" x2="10" y2="4"/><line x1="14" y1="1" x2="14" y2="4"/></svg></span><span>Essen</span></button>
+    <button class="tab" id="tab-training" onclick="showView('training')"><span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6.5 6.5h11M6.5 17.5h11M4 4v4M4 16v4M20 4v4M20 16v4"/><rect x="2" y="8" width="4" height="8" rx="1"/><rect x="18" y="8" width="4" height="8" rx="1"/><rect x="6" y="10" width="12" height="4" rx="1"/></svg></span><span>Training</span></button>
+    <button class="tab" id="tab-profile" onclick="showView('profile')"><span><svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></span><span>Profil</span></button>
   </nav>
 </div>
 </div>
@@ -302,15 +302,15 @@ h3{font-size:16px;font-weight:700;}
     <h2 id="modal-block-title" style="margin-bottom:4px;"></h2>
     <div id="modal-block-time" style="color:var(--muted);font-size:13px;margin-bottom:16px;"></div>
     <div class="action-item" onclick="editBlockTime()">
-      <div class="action-icon" style="background:rgba(37,99,235,.15);">⏰</div>
+      <div class="action-icon" style="background:rgba(37,99,235,.15);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#2563eb" stroke-width="2.2" stroke-linecap="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg></div>
       <div><div class="action-title">Uhrzeit ändern</div><div class="action-sub">Start- und Endzeit anpassen</div></div>
     </div>
     <div class="action-item" onclick="editBlockDuration()">
-      <div class="action-icon" style="background:rgba(124,58,237,.15);">↔️</div>
+      <div class="action-icon" style="background:rgba(124,58,237,.15);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg></div>
       <div><div class="action-title">Dauer anpassen</div><div class="action-sub">Block verlängern oder kürzen</div></div>
     </div>
     <div class="action-item" onclick="deleteBlock()">
-      <div class="action-icon" style="background:rgba(239,68,68,.15);">🗑</div>
+      <div class="action-icon" style="background:rgba(239,68,68,.15);"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2.2" stroke-linecap="round"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2"/></svg></div>
       <div><div class="action-title" style="color:var(--danger);">Block löschen</div><div class="action-sub">Diesen Eintrag entfernen</div></div>
     </div>
     <button class="btn btn-secondary" style="margin-top:8px;" onclick="closeModal('modal-block')">Abbrechen</button>
@@ -396,7 +396,7 @@ h3{font-size:16px;font-weight:700;}
 </div>
 
 <div id="toast"></div>
-<div class="achievement" id="achievement-toast"><span id="ach-icon"></span><span id="ach-text"></span></div>
+<div class="achievement" id="achievement-toast"><span id="ach-icon" style="background:rgba(255,255,255,.18);border-radius:8px;padding:2px 7px;font-size:11px;font-weight:900;letter-spacing:.5px;"></span><span id="ach-text"></span></div>
 
 <script>
 // ══════════════════════════════════════════════
@@ -561,8 +561,8 @@ function load(){
 function addXP(amount,label=''){
   state.xp+=amount;
   const needed=state.level*500;
-  if(state.xp>=needed){state.level++;state.xp-=needed;showAchievement('⚡','Level '+state.level+' erreicht!');}
-  else if(label) showAchievement('✦','+'+amount+' XP – '+label);
+  if(state.xp>=needed){state.level++;state.xp-=needed;showAchievement('LV','Level '+state.level+' erreicht!');}
+  else if(label) showAchievement('XP','+'+amount+' XP – '+label);
   updateStreak();
   save();
 }
@@ -574,7 +574,7 @@ function updateStreak(){
   if(state.lastActive===yesterday)state.streak++;
   else if(state.lastActive!==today)state.streak=1;
   state.lastActive=today;
-  if(state.streak>0&&state.streak%7===0)showAchievement('🔥',''+state.streak+'-Tage-Streak!');
+  if(state.streak>0&&state.streak%7===0)showAchievement(''+state.streak,'Tage Streak!');
 }
 
 function showAchievement(icon,text){
@@ -654,11 +654,16 @@ function buildTrainingWeek(weekStart,profile){
   });
 
   // Complementary sessions
-  const templates=isBoxer?BOXING_STRENGTH:getTemplate(goal,level);
+  const boxingTemplates=[
+    {name:'Box-Kraft A',exs:['Liegestütze','Turkish Get-Up','Plank-Variationen','Seilspringen']},
+    {name:'Box-Kraft B',exs:['Klimmzüge / Rudern','Bulgarian Split Squat','Medizinball-Rotationen','Explosive Liegestütze']},
+    {name:'Box-Kraft C',exs:['Farmer\'s Walk','Schattenboxen','Plank-Variationen','Seilspringen']},
+  ];
+  const templates=isBoxer?boxingTemplates:getTemplate(goal,level);
   trainingDays.forEach((dow,i)=>{
     const date=addDays(weekStart,dow===0?6:dow-1);
     const tpl=templates[i%templates.length];
-    slots.push({id:uid(),date,name:isBoxer?'Box-Kraft '+( i+1):tpl.name,type:'training',
+    slots.push({id:uid(),date,name:tpl.name,type:'training',
       exercises:tpl.exs.map(n=>{
         const ex=BOXING_STRENGTH.find(e=>e.name===n)||{name:n,sets:'3×10',muscle:''};
         return{name:ex.name,sets:ex.sets,muscle:ex.muscle};
@@ -758,10 +763,10 @@ let obData={
 };
 
 const OB_STEPS=[
-  {title:'Hey 👋',sub:'Lass uns deinen persönlichen Plan erstellen.',
+  {title:'Willkommen',sub:'Lass uns deinen persönlichen Plan erstellen.',
    render(){return`
     <div style="text-align:center;padding:20px 0 10px;">
-      <div style="font-size:60px;margin-bottom:16px;">⚡</div>
+      <div style="width:72px;height:72px;border-radius:20px;background:var(--grad);margin:0 auto 20px;display:flex;align-items:center;justify-content:center;box-shadow:0 8px 32px rgba(124,58,237,.4);"><svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg></div>
       <h1 class="grad-text" style="font-size:32px;margin-bottom:8px;">GodApp</h1>
       <p style="color:var(--muted);font-size:15px;line-height:1.6;max-width:280px;margin:0 auto 24px;">Dein intelligenter Planner für Training, Ernährung und deinen Alltag.</p>
     </div>
@@ -777,7 +782,7 @@ const OB_STEPS=[
 
   {title:'Deine Ziele',sub:'Mehrfachauswahl möglich.',
    render(){
-    const opts=[{v:'weightloss',l:'🔥 Abnehmen'},{v:'muscle',l:'💪 Muskelaufbau'},{v:'fitness',l:'⚡ Fitness'},{v:'energy',l:'☀️ Energie'},{v:'boxing',l:'🥊 Boxen'},{v:'structure',l:'📋 Struktur'},{v:'rehab',l:'🩹 Rehab'},{v:'mobility',l:'🧘 Mobility'}];
+    const opts=[{v:'weightloss',l:'Abnehmen'},{v:'muscle',l:'Muskelaufbau'},{v:'fitness',l:'Fitness'},{v:'energy',l:'Energie'},{v:'boxing',l:'Boxen'},{v:'structure',l:'Struktur'},{v:'rehab',l:'Rehab'},{v:'mobility',l:'Mobility'}];
     return`<h1 class="grad-text">${this.title}</h1><p style="color:var(--muted);margin:6px 0 20px;">${this.sub}</p>
     <div class="chips">${opts.map(o=>`<div class="chip${obData.goals.includes(o.v)?' sel':''}" onclick="toggleArr(obData,'goals','${o.v}');renderOb()">${o.l}</div>`).join('')}</div>`;
    },valid(){return obData.goals.length>0;}},
@@ -785,7 +790,7 @@ const OB_STEPS=[
   {title:'Dein Alltag',sub:'Damit wir deinen Tag intelligent planen.',
    render(){
     const days=['So','Mo','Di','Mi','Do','Fr','Sa'];
-    const times=[{v:'morning',l:'🌅 Morgens'},{v:'afterwork',l:'🏃 Nach Arbeit'},{v:'evening',l:'🌙 Abends'}];
+    const times=[{v:'morning',l:'Morgens'},{v:'afterwork',l:'Nach Arbeit'},{v:'evening',l:'Abends'}];
     return`<h1 class="grad-text">${this.title}</h1><p style="color:var(--muted);margin:6px 0 20px;">${this.sub}</p>
     <div class="row"><div><label>Aufstehen</label><input type="time" value="${obData.wakeTime}" oninput="obData.wakeTime=this.value"></div>
     <div><label>Schlafen</label><input type="time" value="${obData.sleepTime}" oninput="obData.sleepTime=this.value"></div></div>
@@ -800,22 +805,22 @@ const OB_STEPS=[
 
   {title:'Ernährung',sub:'Wie sollen deine Mahlzeiten aussehen?',
    render(){
-    const diets=[{v:'normal',l:'🍽 Normal'},{v:'vegetarian',l:'🥗 Vegetarisch'},{v:'nofish',l:'🚫🐟 Kein Fisch'},{v:'nopork',l:'🚫🐷 Kein Schwein'}];
-    const modes=[{v:'general',l:'⚖️ Standard'},{v:'diet',l:'📉 Diät'},{v:'mass',l:'📈 Masse'}];
+    const diets=[{v:'normal',l:'Normal'},{v:'vegetarian',l:'Vegetarisch'},{v:'nofish',l:'Kein Fisch'},{v:'nopork',l:'Kein Schwein'}];
+    const modes=[{v:'general',l:'Standard'},{v:'diet',l:'Diät'},{v:'mass',l:'Masse'}];
     return`<h1 class="grad-text">${this.title}</h1><p style="color:var(--muted);margin:6px 0 20px;">${this.sub}</p>
     <label>Ernährungsstil</label><div class="chips">${diets.map(d=>`<div class="chip${obData.dietStyle===d.v?' sel':''}" onclick="obData.dietStyle='${d.v}';renderOb()">${d.l}</div>`).join('')}</div>
     <label>Modus</label><div class="chips">${modes.map(m=>`<div class="chip${obData.mealMode===m.v?' sel':''}" onclick="obData.mealMode='${m.v}';renderOb()">${m.l}</div>`).join('')}</div>
     <label>Proteinshake</label><div class="chips">
-      <div class="chip${obData.shakeEnabled?' sel':''}" onclick="obData.shakeEnabled=true;renderOb()">✅ Ja</div>
-      <div class="chip${!obData.shakeEnabled?' sel':''}" onclick="obData.shakeEnabled=false;renderOb()">❌ Nein</div></div>
+      <div class="chip${obData.shakeEnabled?' sel':''}" onclick="obData.shakeEnabled=true;renderOb()">Ja</div>
+      <div class="chip${!obData.shakeEnabled?' sel':''}" onclick="obData.shakeEnabled=false;renderOb()">Nein</div></div>
     <label>Allergien (kommagetrennt)</label><input value="${obData.allergies}" placeholder="z.B. Nüsse, Laktose" oninput="obData.allergies=this.value">`;
    },valid(){return true;}},
 
   {title:'Training',sub:'Dein Fitnesshintergrund.',
    render(){
-    const levels=[{v:'beginner',l:'🌱 Anfänger'},{v:'intermediate',l:'⚡ Fortgeschritten'},{v:'advanced',l:'🔥 Profi'}];
-    const equips=[{v:'gym',l:'🏋️ Studio'},{v:'home',l:'🏠 Zuhause'},{v:'bodyweight',l:'🤸 Körpergewicht'},{v:'dumbbells',l:'🏋️ Hanteln'},{v:'running',l:'🏃 Laufen'}];
-    const injs=[{v:'knee',l:'🦵 Knie'},{v:'shoulder',l:'💪 Schulter'},{v:'back',l:'🫁 Rücken'},{v:'hip',l:'🦴 Hüfte'}];
+    const levels=[{v:'beginner',l:'Anfänger'},{v:'intermediate',l:'Fortgeschritten'},{v:'advanced',l:'Profi'}];
+    const equips=[{v:'gym',l:'Studio'},{v:'home',l:'Zuhause'},{v:'bodyweight',l:'Körpergewicht'},{v:'dumbbells',l:'Hanteln'},{v:'running',l:'Laufen'}];
+    const injs=[{v:'knee',l:'Knie'},{v:'shoulder',l:'Schulter'},{v:'back',l:'Rücken'},{v:'hip',l:'Hüfte'}];
     return`<h1 class="grad-text">${this.title}</h1><p style="color:var(--muted);margin:6px 0 20px;">${this.sub}</p>
     <label>Fitness-Level</label><div class="chips">${levels.map(l=>`<div class="chip${obData.fitnessLevel===l.v?' sel':''}" onclick="obData.fitnessLevel='${l.v}';renderOb()">${l.l}</div>`).join('')}</div>
     <label>Equipment</label><div class="chips">${equips.map(e=>`<div class="chip${obData.equipment.includes(e.v)?' sel':''}" onclick="toggleArr(obData,'equipment','${e.v}');renderOb()">${e.l}</div>`).join('')}</div>
@@ -848,8 +853,8 @@ const OB_STEPS=[
     }
     return`<h1 class="grad-text">${this.title}</h1><p style="color:var(--muted);margin:6px 0 20px;">${this.sub}</p>
     <div class="chips">
-      <div class="chip${obData.hasExternalTraining?' sel':''}" onclick="obData.hasExternalTraining=true;renderOb()">✅ Ja (z.B. Boxen, Fußball…)</div>
-      <div class="chip${!obData.hasExternalTraining?' sel':''}" onclick="obData.hasExternalTraining=false;obData.externalTraining=[];renderOb()">❌ Nein</div>
+      <div class="chip${obData.hasExternalTraining?' sel':''}" onclick="obData.hasExternalTraining=true;renderOb()">Ja (z.B. Boxen, Fußball)</div>
+      <div class="chip${!obData.hasExternalTraining?' sel':''}" onclick="obData.hasExternalTraining=false;obData.externalTraining=[];renderOb()">Nein</div>
     </div>
     ${extHTML}`;
    },valid(){return true;}},
@@ -877,7 +882,7 @@ function renderOb(){
   document.getElementById('ob-step-label').textContent=(obStep+1)+' / '+OB_STEPS.length;
   document.getElementById('ob-progress').style.width=((obStep+1)/OB_STEPS.length*100)+'%';
   document.getElementById('ob-back').style.display=obStep>0?'':'none';
-  document.getElementById('ob-next').textContent=obStep===OB_STEPS.length-1?'Plan erstellen ✦':'Weiter →';
+  document.getElementById('ob-next').textContent=obStep===OB_STEPS.length-1?'Plan erstellen':'Weiter';
   obValidate();
 }
 function obValidate(){document.getElementById('ob-next').disabled=!OB_STEPS[obStep].valid();}
@@ -911,7 +916,7 @@ function finishOnboarding(){
   addXP(100,'Profil erstellt');
   save();
   showMainApp();
-  setTimeout(()=>showAchievement('🏆','Willkommen, '+profile.name+'!'),600);
+  setTimeout(()=>showAchievement('Hi','Willkommen, '+profile.name+'!'),600);
 }
 
 // ══════════════════════════════════════════════
@@ -943,7 +948,7 @@ function renderCurrentView(){
 }
 
 function updateStreakDisplay(){
-  document.getElementById('streak-display').textContent='🔥 '+state.streak;
+  document.getElementById('streak-display').textContent=state.streak+' Tage';
 }
 
 // ══════════════════════════════════════════════
@@ -984,7 +989,7 @@ function renderDayView(days,today){
   const day=days.find(d=>d.date===state.selectedDate);
   const el=document.getElementById('tl-content');
   if(!day||!day.blocks.length){
-    el.innerHTML=`<div class="card" style="text-align:center;padding:24px;"><div style="font-size:40px;margin-bottom:8px;">😴</div><p class="muted">Ruhetag – nichts geplant</p></div>`;
+    el.innerHTML=`<div class="card" style="text-align:center;padding:32px;"><div style="width:48px;height:48px;border-radius:50%;background:var(--card2);margin:0 auto 12px;display:flex;align-items:center;justify-content:center;"><svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="var(--muted)" stroke-width="2" stroke-linecap="round"><path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/></svg></div><p class="muted">Ruhetag – nichts geplant</p></div>`;
     return;
   }
   el.innerHTML='<div class="fade-up">'+day.blocks.map(b=>`
@@ -1163,7 +1168,7 @@ function renderMealsContent(){
 
 function renderMealDay(day,idx,blockId){
   const p=state.profile;
-  const meals=[{cat:'breakfast',label:'🌅 Frühstück',r:day.breakfast},{cat:'lunch',label:'☀️ Mittag',r:day.lunch},{cat:'dinner',label:'🌙 Abend',r:day.dinner},{cat:'snack',label:'⚡ Snack',r:day.snack}];
+  const meals=[{cat:'breakfast',label:'Frühstück',r:day.breakfast},{cat:'lunch',label:'Mittagessen',r:day.lunch},{cat:'dinner',label:'Abendessen',r:day.dinner},{cat:'snack',label:'Snack',r:day.snack}];
   return`<div class="card" style="margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
       <div style="font-size:20px;font-weight:800;">Tag ${idx+1}</div>
@@ -1181,7 +1186,7 @@ function renderMealDay(day,idx,blockId){
             <div style="font-size:11px;color:var(--muted);margin-top:3px;">${tk} kcal · ${tp}g Protein · ${m.r.time} Min</div>
           </div>
           <div style="display:flex;flex-direction:column;gap:4px;flex-shrink:0;">
-            <button class="btn btn-secondary btn-sm" onclick="showRecipe('${m.r.id}','${m.cat}')" style="font-size:11px;">📋 Rezept</button>
+            <button class="btn btn-secondary btn-sm" onclick="showRecipe('${m.r.id}','${m.cat}')" style="font-size:11px;">Rezept</button>
             <button class="btn btn-secondary btn-sm" onclick="swapMeal('${blockId}',${idx},'${m.cat}')" style="font-size:11px;color:var(--purple);">↺ Tausch</button>
           </div>
         </div>
@@ -1282,14 +1287,14 @@ function renderTraining(){
   </div>`;
 
   if(isBoxer){
-    html+=`<div class="grad-card"><div class="grad-card-inner"><div style="font-size:12px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">🥊 Boxer-Plan</div><div style="font-size:13px;color:var(--muted);">Externes Boxtraining + komplementäres Krafttraining</div></div></div>`;
+    html+=`<div class="grad-card"><div class="grad-card-inner"><div style="font-size:12px;font-weight:700;color:#a78bfa;text-transform:uppercase;letter-spacing:.5px;margin-bottom:4px;">Boxer-Plan</div><div style="font-size:13px;color:var(--muted);">Externes Boxtraining + komplementäres Krafttraining</div></div></div>`;
   }
 
   weekDays.forEach(date=>{
     const slots=tw.slots.filter(s=>s.date===date);
     const{name,num}=shortDay(date);
     if(!slots.length){
-      html+=`<div class="rest-badge">${name} ${num} – Ruhetag 💤</div>`;
+      html+=`<div class="rest-badge">${name} ${num} – Ruhetag</div>`;
     } else {
       slots.forEach(slot=>{
         const isBoxing=slot.type==='boxing';
@@ -1299,7 +1304,7 @@ function renderTraining(){
               <div style="font-size:17px;font-weight:800;">${slot.name}</div>
               <div style="font-size:12px;color:var(--muted);margin-top:2px;">${dayLabel(date)} · ${slot.durationMin} Min</div>
             </div>
-            <div style="font-size:26px;">${isBoxing?'🥊':'💪'}</div>
+            <div style="width:32px;height:32px;border-radius:8px;background:${isBoxing?'rgba(249,115,22,.15)':'rgba(124,58,237,.15)'};display:flex;align-items:center;justify-content:center;">${isBoxing?`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#f97316" stroke-width="2.2" stroke-linecap="round"><path d="M18 8h2a2 2 0 0 1 2 2v1a7 7 0 0 1-7 7H9a7 7 0 0 1-7-7V6a2 2 0 0 1 2-2h1"/><path d="M14 2H8a2 2 0 0 0-2 2v8"/></svg>`:`<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#7c3aed" stroke-width="2.2" stroke-linecap="round"><path d="M6.5 6.5h11M6.5 17.5h11M4 4v4M4 16v4M20 4v4M20 16v4"/><rect x="2" y="8" width="4" height="8" rx="1"/><rect x="18" y="8" width="4" height="8" rx="1"/><rect x="6" y="10" width="12" height="4" rx="1"/></svg>`}</div>
           </div>
           ${slot.exercises.map(ex=>`
             <div class="ex-row">
@@ -1347,7 +1352,7 @@ function renderProfile(){
             <div style="font-size:28px;font-weight:800;">${p.name}</div>
           </div>
           <div style="text-align:right;">
-            <div class="streak-badge">🔥 ${state.streak} Tage</div>
+            <div class="streak-badge">${state.streak} Tage Streak</div>
             <div style="font-size:11px;color:var(--muted);margin-top:6px;">${state.xp} / ${xpNeeded} XP</div>
           </div>
         </div>
