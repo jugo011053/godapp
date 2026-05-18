@@ -1,0 +1,1084 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GodApp – Planner</title>
+<style>
+  :root {
+    --bg: #0f1419; --card: #1a2332; --card2: #1e2a3a;
+    --text: #e8edf2; --muted: #6b7a8d; --accent: #3b82f6;
+    --border: #2a3a50; --warn: #f59e0b; --danger: #ef4444;
+    --success: #22c55e; --purple: #a855f7; --info: #06b6d4;
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body { background: var(--bg); color: var(--text); font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; max-width: 480px; margin: 0 auto; min-height: 100vh; }
+  h1 { font-size: 26px; font-weight: 800; }
+  h2 { font-size: 20px; font-weight: 700; }
+  h3 { font-size: 16px; font-weight: 700; }
+
+  /* Layout */
+  #app { display: flex; flex-direction: column; min-height: 100vh; }
+  .screen { flex: 1; display: none; flex-direction: column; }
+  .screen.active { display: flex; }
+  .content { flex: 1; overflow-y: auto; padding: 16px; padding-bottom: 90px; }
+  .header { padding: 16px; border-bottom: 1px solid var(--border); }
+  .header-row { display: flex; align-items: center; justify-content: space-between; }
+
+  /* Bottom Tabs */
+  .tabs { position: fixed; bottom: 0; left: 50%; transform: translateX(-50%); width: 100%; max-width: 480px; background: var(--card); border-top: 1px solid var(--border); display: flex; z-index: 100; }
+  .tab { flex: 1; padding: 10px 4px 8px; text-align: center; cursor: pointer; border: none; background: none; color: var(--muted); font-size: 11px; display: flex; flex-direction: column; align-items: center; gap: 2px; transition: color .15s; }
+  .tab.active { color: var(--accent); }
+  .tab span:first-child { font-size: 22px; }
+
+  /* Cards */
+  .card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 12px; }
+  .card2 { background: var(--card2); border-radius: 8px; padding: 12px; margin-bottom: 8px; }
+
+  /* Buttons */
+  .btn { border: none; border-radius: 10px; padding: 14px 20px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; transition: opacity .15s; }
+  .btn:active { opacity: .75; }
+  .btn-primary { background: var(--accent); color: #fff; }
+  .btn-secondary { background: var(--card2); color: var(--text); border: 1px solid var(--border); }
+  .btn-sm { padding: 8px 14px; font-size: 12px; border-radius: 20px; width: auto; }
+  .btn:disabled { opacity: .4; cursor: not-allowed; }
+  .btn-row { display: flex; gap: 10px; margin-top: 16px; }
+  .btn-row .btn { flex: 1; }
+
+  /* Form */
+  label { display: block; color: var(--muted); font-size: 12px; font-weight: 600; margin: 14px 0 6px; text-transform: uppercase; letter-spacing: .4px; }
+  input, select { width: 100%; background: var(--card); border: 1px solid var(--border); border-radius: 10px; padding: 12px 14px; color: var(--text); font-size: 15px; }
+  input:focus, select:focus { outline: none; border-color: var(--accent); }
+  input::placeholder { color: var(--muted); }
+  select option { background: var(--card); }
+
+  /* Chips */
+  .chips { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 6px; }
+  .chip { padding: 7px 14px; border-radius: 20px; background: var(--card2); border: 1px solid var(--border); color: var(--muted); font-size: 13px; font-weight: 600; cursor: pointer; transition: all .15s; user-select: none; }
+  .chip.sel { background: var(--accent); border-color: var(--accent); color: #fff; }
+
+  /* Progress bar */
+  .progress-wrap { height: 4px; background: var(--card2); border-radius: 10px; overflow: hidden; margin-top: 8px; }
+  .progress-fill { height: 100%; background: var(--accent); transition: width .3s; }
+
+  /* Timeline blocks */
+  .block-card { display: flex; background: var(--card); border-radius: 12px; margin-bottom: 10px; overflow: hidden; }
+  .block-bar { width: 6px; flex-shrink: 0; }
+  .block-body { flex: 1; padding: 12px 14px; }
+  .block-time { font-size: 17px; font-weight: 800; }
+  .block-title { font-size: 14px; color: var(--text); margin-top: 2px; }
+  .block-meta { display: flex; align-items: center; gap: 8px; margin-top: 6px; }
+  .pill { padding: 2px 8px; border-radius: 10px; font-size: 11px; font-weight: 700; background: var(--card2); color: var(--text); }
+
+  /* Day picker */
+  .day-picker { display: flex; gap: 8px; overflow-x: auto; padding: 10px 16px; scrollbar-width: none; }
+  .day-picker::-webkit-scrollbar { display: none; }
+  .day-chip { min-width: 52px; height: 62px; border-radius: 10px; background: var(--card); border: 1px solid var(--border); display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; flex-shrink: 0; transition: all .15s; }
+  .day-chip.active { background: var(--accent); border-color: var(--accent); }
+  .day-chip.active .dc-name, .day-chip.active .dc-num { color: #fff; }
+  .day-chip.today { border-color: var(--accent); }
+  .dc-name { font-size: 11px; font-weight: 700; color: var(--muted); }
+  .dc-num { font-size: 20px; font-weight: 800; margin-top: 1px; }
+
+  /* Sub tabs */
+  .sub-tabs { display: flex; border-bottom: 1px solid var(--border); margin-bottom: 12px; }
+  .sub-tab { flex: 1; padding: 10px; text-align: center; cursor: pointer; color: var(--muted); font-weight: 700; font-size: 14px; border-bottom: 2px solid transparent; transition: all .15s; }
+  .sub-tab.active { color: var(--text); border-bottom-color: var(--accent); }
+
+  /* Shopping */
+  .shop-row { display: flex; align-items: center; gap: 12px; background: var(--card); padding: 12px 14px; border-radius: 10px; margin-bottom: 6px; cursor: pointer; }
+  .checkbox { width: 22px; height: 22px; border-radius: 5px; border: 2px solid var(--border); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+  .checkbox.checked { background: var(--accent); border-color: var(--accent); }
+  .shop-name { flex: 1; font-size: 14px; }
+  .shop-name.done { text-decoration: line-through; color: var(--muted); }
+  .shop-amount { color: var(--muted); font-size: 13px; font-weight: 600; }
+
+  /* FAB */
+  .fab { position: fixed; bottom: 75px; right: max(16px, calc(50vw - 240px + 16px)); width: 52px; height: 52px; border-radius: 26px; background: var(--accent); border: none; color: #fff; font-size: 26px; font-weight: 800; cursor: pointer; box-shadow: 0 4px 14px rgba(59,130,246,.4); display: flex; align-items: center; justify-content: center; z-index: 99; }
+
+  /* Modal */
+  .modal-bg { position: fixed; inset: 0; background: rgba(0,0,0,.6); z-index: 200; display: none; align-items: flex-end; justify-content: center; }
+  .modal-bg.open { display: flex; }
+  .modal { background: var(--bg); border-radius: 18px 18px 0 0; padding: 20px 16px 36px; width: 100%; max-width: 480px; }
+  .modal h2 { margin-bottom: 4px; }
+  .modal-sub { color: var(--muted); font-size: 13px; margin-bottom: 12px; }
+
+  /* Training */
+  .workout-card { background: var(--card); border-radius: 12px; padding: 14px; margin-bottom: 10px; }
+  .workout-header { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 10px; }
+  .workout-day { font-size: 13px; color: var(--muted); margin-top: 2px; }
+  .exercise-row { display: flex; justify-content: space-between; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--border); }
+  .exercise-row:last-child { border-bottom: none; }
+  .ex-name { font-size: 14px; font-weight: 600; }
+  .ex-sets { font-size: 13px; color: var(--muted); }
+  .rest-tag { background: var(--card2); border-radius: 10px; padding: 18px; text-align: center; color: var(--muted); margin-bottom: 10px; }
+
+  /* Profile */
+  .profile-row { display: flex; justify-content: space-between; align-items: center; padding: 12px 0; border-bottom: 1px solid var(--border); }
+  .profile-key { color: var(--muted); font-size: 13px; }
+  .profile-val { font-size: 14px; font-weight: 600; }
+  .stat-row { display: flex; gap: 10px; margin-bottom: 14px; }
+  .stat-box { flex: 1; background: var(--card); border-radius: 10px; padding: 12px; text-align: center; }
+  .stat-val { font-size: 22px; font-weight: 800; color: var(--accent); }
+  .stat-lbl { font-size: 11px; color: var(--muted); margin-top: 2px; }
+
+  /* Toast */
+  #toast { position: fixed; bottom: 90px; left: 50%; transform: translateX(-50%); background: var(--card); border: 1px solid var(--border); color: var(--text); padding: 10px 20px; border-radius: 20px; font-size: 13px; font-weight: 600; z-index: 300; opacity: 0; transition: opacity .3s; pointer-events: none; white-space: nowrap; }
+  #toast.show { opacity: 1; }
+
+  /* Misc */
+  .muted { color: var(--muted); }
+  .accent { color: var(--accent); }
+  .empty { text-align: center; padding: 40px 20px; color: var(--muted); font-size: 14px; }
+  .section-title { font-size: 17px; font-weight: 700; margin: 16px 0 8px; }
+  .row { display: flex; gap: 10px; }
+  .row > * { flex: 1; }
+</style>
+</head>
+<body>
+<div id="app">
+  <!-- ONBOARDING -->
+  <div class="screen active" id="screen-onboarding">
+    <div class="header">
+      <div class="header-row">
+        <span style="font-size:13px;font-weight:700;">Onboarding</span>
+        <span class="muted" id="ob-step-label" style="font-size:12px;">Schritt 1 von 5</span>
+      </div>
+      <div class="progress-wrap" style="margin-top:8px;">
+        <div class="progress-fill" id="ob-progress" style="width:20%;"></div>
+      </div>
+    </div>
+    <div class="content" id="ob-content"></div>
+    <div style="padding:16px;border-top:1px solid var(--border);">
+      <div class="btn-row">
+        <button class="btn btn-secondary" id="ob-back" onclick="obBack()" style="display:none;">Zurück</button>
+        <button class="btn btn-primary" id="ob-next" onclick="obNext()">Weiter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MAIN APP -->
+  <div class="screen" id="screen-main">
+    <!-- Timeline -->
+    <div id="view-timeline" style="display:flex;flex-direction:column;height:100%;">
+      <div class="header">
+        <div class="header-row">
+          <div>
+            <h1>Timeline</h1>
+            <div class="muted" id="tl-range" style="font-size:13px;margin-top:2px;"></div>
+          </div>
+          <button class="btn btn-secondary btn-sm" onclick="jumpToToday()">Heute</button>
+        </div>
+      </div>
+      <div class="day-picker" id="tl-day-picker"></div>
+      <div class="content" id="tl-content"></div>
+      <button class="fab" onclick="openAddBlock()">+</button>
+    </div>
+
+    <!-- Meals -->
+    <div id="view-meals" style="display:none;flex-direction:column;height:100%;">
+      <div class="header">
+        <h1>Essen</h1>
+        <div class="muted" id="meal-sub" style="font-size:13px;margin-top:2px;"></div>
+      </div>
+      <div class="sub-tabs">
+        <div class="sub-tab active" id="meal-tab-A" onclick="setMealTab('A')">Block A</div>
+        <div class="sub-tab" id="meal-tab-B" onclick="setMealTab('B')">Block B</div>
+        <div class="sub-tab" id="meal-tab-shop" onclick="setMealTab('shop')">Einkauf</div>
+      </div>
+      <div class="content" id="meal-content"></div>
+    </div>
+
+    <!-- Training -->
+    <div id="view-training" style="display:none;flex-direction:column;height:100%;">
+      <div class="header">
+        <div class="header-row">
+          <h1>Training</h1>
+          <button class="btn btn-secondary btn-sm" onclick="regenerateAll()">Neu</button>
+        </div>
+      </div>
+      <div class="content" id="training-content"></div>
+    </div>
+
+    <!-- Profile -->
+    <div id="view-profile" style="display:none;flex-direction:column;height:100%;">
+      <div class="header">
+        <div class="header-row">
+          <h1>Profil</h1>
+          <button class="btn btn-secondary btn-sm" onclick="resetApp()" style="color:var(--danger);border-color:var(--danger);">Reset</button>
+        </div>
+      </div>
+      <div class="content" id="profile-content"></div>
+    </div>
+
+    <!-- Tabs -->
+    <nav class="tabs">
+      <button class="tab active" id="tab-timeline" onclick="showView('timeline')"><span>📅</span><span>Timeline</span></button>
+      <button class="tab" id="tab-meals" onclick="showView('meals')"><span>🍽️</span><span>Essen</span></button>
+      <button class="tab" id="tab-training" onclick="showView('training')"><span>💪</span><span>Training</span></button>
+      <button class="tab" id="tab-profile" onclick="showView('profile')"><span>⚙️</span><span>Profil</span></button>
+    </nav>
+  </div>
+</div>
+
+<!-- Add Block Modal -->
+<div class="modal-bg" id="modal-add">
+  <div class="modal">
+    <h2>Neuer Block</h2>
+    <div class="modal-sub" id="modal-add-date"></div>
+    <label>Typ</label>
+    <div class="chips" id="modal-type-chips"></div>
+    <label>Titel</label>
+    <input id="modal-title" placeholder="z.B. Arzttermin">
+    <div class="row" style="margin-top:12px;">
+      <div><label>Start</label><input id="modal-start" value="12:00"></div>
+      <div><label>Ende</label><input id="modal-end" value="13:00"></div>
+    </div>
+    <div class="btn-row" style="margin-top:16px;">
+      <button class="btn btn-secondary" onclick="closeModal('modal-add')">Abbrechen</button>
+      <button class="btn btn-primary" onclick="submitAddBlock()">Hinzufügen</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+// ==================== DATA ====================
+
+const RECIPES = [
+  { id:'ruehrei', name:'Rührei mit Champignons', cat:'breakfast', kcal:340, protein:26, time:10, tags:['vegetarian','nofish','nopork'], ingredients:[{n:'Eier',a:3,u:'Stück'},{n:'Champignons',a:150,u:'g'},{n:'Olivenöl',a:1,u:'EL'},{n:'Schnittlauch',a:10,u:'g'}] },
+  { id:'oats', name:'Overnight Oats mit Beeren', cat:'breakfast', kcal:380, protein:22, time:5, tags:['diet','vegetarian','nofish','nopork'], ingredients:[{n:'Haferflocken',a:80,u:'g'},{n:'Magerquark',a:100,u:'g'},{n:'Milch',a:150,u:'ml'},{n:'Beerenmix',a:100,u:'g'}] },
+  { id:'haehnchen_reis', name:'Hähnchen mit Reis & Brokkoli', cat:'lunch', kcal:520, protein:48, time:30, tags:['nofish','nopork'], ingredients:[{n:'Hähnchenbrust',a:200,u:'g'},{n:'Basmatireis',a:80,u:'g'},{n:'Brokkoli',a:200,u:'g'},{n:'Olivenöl',a:1,u:'EL'}] },
+  { id:'lachs', name:'Lachs mit Süßkartoffel', cat:'dinner', kcal:480, protein:40, time:35, tags:['diet','nopork'], ingredients:[{n:'Lachsfilet',a:180,u:'g'},{n:'Süßkartoffel',a:250,u:'g'},{n:'Babyspinat',a:100,u:'g'},{n:'Olivenöl',a:1.5,u:'EL'}] },
+  { id:'bowl', name:'Quinoa Power Bowl', cat:'lunch', kcal:440, protein:28, time:25, tags:['diet','vegetarian','nofish','nopork'], ingredients:[{n:'Quinoa',a:80,u:'g'},{n:'Kichererbsen',a:120,u:'g'},{n:'Paprika',a:150,u:'g'},{n:'Avocado',a:0.5,u:'Stück'}] },
+  { id:'rind', name:'Rindfleisch mit Kartoffeln', cat:'dinner', kcal:560, protein:46, time:40, tags:['mass','nofish'], ingredients:[{n:'Rindergeschnetzeltes',a:200,u:'g'},{n:'Kartoffeln',a:300,u:'g'},{n:'Zwiebeln',a:1,u:'Stück'},{n:'Olivenöl',a:2,u:'EL'}] },
+  { id:'protein_shake', name:'Proteinshake', cat:'snack', kcal:160, protein:30, time:2, tags:['general','vegetarian','nofish','nopork'], ingredients:[{n:'Proteinpulver',a:30,u:'g'},{n:'Milch',a:300,u:'ml'}] },
+  { id:'quark', name:'Magerquark mit Obst', cat:'snack', kcal:220, protein:24, time:3, tags:['diet','vegetarian','nofish','nopork'], ingredients:[{n:'Magerquark',a:200,u:'g'},{n:'Banane',a:1,u:'Stück'},{n:'Honig',a:1,u:'TL'}] },
+  { id:'pasta', name:'Vollkornnudeln mit Hackfleisch', cat:'lunch', kcal:610, protein:42, time:25, tags:['mass','nofish'], ingredients:[{n:'Vollkornnudeln',a:120,u:'g'},{n:'Hackfleisch (gemischt)',a:200,u:'g'},{n:'Tomatensauce',a:200,u:'g'},{n:'Parmesan',a:20,u:'g'}] },
+  { id:'veg_curry', name:'Gemüse-Curry mit Linsen', cat:'dinner', kcal:420, protein:22, time:30, tags:['diet','vegetarian','nofish','nopork'], ingredients:[{n:'Rote Linsen',a:100,u:'g'},{n:'Kokosmilch',a:200,u:'ml'},{n:'Curry-Gemüse-Mix',a:300,u:'g'},{n:'Currypulver',a:2,u:'TL'}] },
+];
+
+const EXERCISES = {
+  upper: [
+    {n:'Bankdrücken', s:'4×8', m:'Brust'}, {n:'Klimmzüge', s:'4×6', m:'Rücken'},
+    {n:'Schulterdrücken', s:'3×10', m:'Schulter'}, {n:'Bizepscurls', s:'3×12', m:'Bizeps'},
+    {n:'Trizepsstrecken', s:'3×12', m:'Trizeps'}, {n:'Rudern', s:'4×10', m:'Rücken'},
+  ],
+  lower: [
+    {n:'Kniebeugen', s:'4×8', m:'Beine'}, {n:'Kreuzheben', s:'3×6', m:'Rücken/Beine'},
+    {n:'Ausfallschritte', s:'3×12', m:'Beine'}, {n:'Wadenheben', s:'4×15', m:'Waden'},
+    {n:'Beinpresse', s:'3×12', m:'Beine'}, {n:'Rumänisches Kreuzheben', s:'3×10', m:'Hintern'},
+  ],
+  core: [
+    {n:'Plank', s:'3×45s', m:'Core'}, {n:'Crunches', s:'3×20', m:'Bauch'},
+    {n:'Russian Twist', s:'3×16', m:'Schrägbauch'}, {n:'Beinheben', s:'3×15', m:'Bauch'},
+  ],
+  cardio: [
+    {n:'Laufen 30 Min', s:'1×30min', m:'Ausdauer'}, {n:'Intervall-Sprints', s:'8×200m', m:'Ausdauer'},
+    {n:'Seilspringen', s:'3×5min', m:'Ausdauer'}, {n:'Radfahren', s:'1×45min', m:'Ausdauer'},
+  ],
+};
+
+const WORKOUT_TEMPLATES = {
+  PPL: [
+    {name:'Push', exs:['Bankdrücken','Schulterdrücken','Trizepsstrecken'], type:'upper'},
+    {name:'Pull', exs:['Klimmzüge','Rudern','Bizepscurls'], type:'upper'},
+    {name:'Legs', exs:['Kniebeugen','Ausfallschritte','Wadenheben'], type:'lower'},
+  ],
+  UL: [
+    {name:'Upper A', exs:['Bankdrücken','Rudern','Schulterdrücken'], type:'upper'},
+    {name:'Lower A', exs:['Kniebeugen','Rumänisches Kreuzheben','Wadenheben'], type:'lower'},
+    {name:'Upper B', exs:['Klimmzüge','Bizepscurls','Trizepsstrecken'], type:'upper'},
+  ],
+  Cardio: [
+    {name:'Cardio', exs:['Laufen 30 Min','Intervall-Sprints'], type:'cardio'},
+    {name:'Core', exs:['Plank','Crunches','Russian Twist'], type:'core'},
+    {name:'Kraft', exs:['Kniebeugen','Bankdrücken','Kreuzheben'], type:'full'},
+  ],
+  Boxing: [
+    {name:'Technik', exs:['Schattenboxen 3×5min','Seilspringen','Intervall-Sprints'], type:'cardio'},
+    {name:'Kraft', exs:['Bankdrücken','Klimmzüge','Kniebeugen'], type:'upper'},
+    {name:'Ausdauer', exs:['Laufen 30 Min','Seilspringen'], type:'cardio'},
+  ],
+};
+
+const TYPE_COLORS = {
+  work:'#6b7280', training:'#3b82f6', prep:'#f59e0b',
+  shopping:'#06b6d4', appointment:'#ef4444', mobility:'#a855f7',
+  yoga:'#a855f7', other:'#6b7a8d'
+};
+const TYPE_LABELS = {
+  work:'Arbeit', training:'Training', prep:'Meal Prep',
+  shopping:'Einkauf', appointment:'Termin', mobility:'Mobility',
+  yoga:'Yoga', other:'Sonstiges'
+};
+const BLOCK_TYPES = ['appointment','training','shopping','prep','mobility','other'];
+
+const DAYS_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+const MONTHS = ['Jan','Feb','Mrz','Apr','Mai','Jun','Jul','Aug','Sep','Okt','Nov','Dez'];
+
+// ==================== STATE ====================
+
+let state = {
+  profile: null,
+  mealCycle: null,
+  trainingWeek: null,
+  timeline: null,
+  selectedDate: null,
+  currentMealTab: 'A',
+  currentView: 'timeline',
+  shopChecked: new Set(),
+  modalBlockType: 'appointment',
+};
+
+// ==================== UTILS ====================
+
+function addDays(dateStr, n) {
+  const d = new Date(dateStr); d.setDate(d.getDate() + n);
+  return d.toISOString().split('T')[0];
+}
+function todayISO() { return new Date().toISOString().split('T')[0]; }
+function getMondayISO(d = new Date()) {
+  const dt = new Date(d); const dow = dt.getDay();
+  dt.setDate(dt.getDate() + (dow === 0 ? -6 : 1 - dow));
+  return dt.toISOString().split('T')[0];
+}
+function dayLabel(s) {
+  const d = new Date(s + 'T00:00:00');
+  return `${DAYS_SHORT[d.getDay()]} ${d.getDate()}. ${MONTHS[d.getMonth()]}`;
+}
+function shortDay(s) {
+  const d = new Date(s + 'T00:00:00');
+  return { name: DAYS_SHORT[d.getDay()], num: d.getDate() };
+}
+function timeDiff(t1, t2) {
+  const [h1,m1] = t1.split(':').map(Number);
+  const [h2,m2] = t2.split(':').map(Number);
+  return (h2*60+m2) - (h1*60+m1);
+}
+function uid() { return 'id_' + Date.now() + '_' + Math.random().toString(36).slice(2,7); }
+
+function calcCalories(weight, goal) {
+  const base = weight * 24;
+  const factor = {weightloss:.85, muscle:1.15, mass:1.2, diet:.82}.hasOwnProperty(goal)
+    ? {weightloss:.85, muscle:1.15, mass:1.2, diet:.82}[goal] : 1;
+  return Math.round(base * factor / 50) * 50;
+}
+function calcProtein(weight) { return Math.round(weight * 1.8); }
+
+// ==================== STORAGE ====================
+
+function save() {
+  try {
+    localStorage.setItem('godapp_profile', JSON.stringify(state.profile));
+    localStorage.setItem('godapp_meal', JSON.stringify(state.mealCycle));
+    localStorage.setItem('godapp_training', JSON.stringify(state.trainingWeek));
+    localStorage.setItem('godapp_timeline', JSON.stringify(state.timeline));
+  } catch(e) {}
+}
+function load() {
+  try {
+    state.profile = JSON.parse(localStorage.getItem('godapp_profile') || 'null');
+    state.mealCycle = JSON.parse(localStorage.getItem('godapp_meal') || 'null');
+    state.trainingWeek = JSON.parse(localStorage.getItem('godapp_training') || 'null');
+    state.timeline = JSON.parse(localStorage.getItem('godapp_timeline') || 'null');
+  } catch(e) {}
+}
+
+// ==================== ENGINES ====================
+
+function pickRecipe(cat, profile, used) {
+  const ok = RECIPES.filter(r => {
+    if (r.cat !== cat) return false;
+    if (used.has(r.id)) return false;
+    const d = profile.dietStyle;
+    if (d === 'vegetarian' && !r.tags.includes('vegetarian')) return false;
+    if (d === 'nofish' && !r.tags.includes('nofish')) return false;
+    if (d === 'nopork' && !r.tags.includes('nopork')) return false;
+    return true;
+  });
+  if (!ok.length) return RECIPES.filter(r => r.cat === cat)[0];
+  return ok[Math.floor(Math.random() * ok.length)];
+}
+
+function buildMealDay(date, profile, used) {
+  const bf = pickRecipe('breakfast', profile, used); used.add(bf.id);
+  const lu = pickRecipe('lunch', profile, used); used.add(lu.id);
+  const di = pickRecipe('dinner', profile, used); used.add(di.id);
+  const sn = profile.shakeEnabled ? pickRecipe('snack', profile, new Set()) : pickRecipe('snack', profile, used);
+  const totalKcal = bf.kcal + lu.kcal + di.kcal + sn.kcal;
+  const totalProt = bf.protein + lu.protein + di.protein + sn.protein;
+  return { date, breakfast: bf, lunch: lu, dinner: di, snack: sn, totalKcal, totalProt };
+}
+
+function buildMealCycle(today, profile) {
+  const used = new Set();
+  const days = [0,1,2,3].map(i => buildMealDay(addDays(today, i), profile, used));
+  const usedB = new Set();
+  const daysB = [0,1,2,3].map(i => buildMealDay(addDays(today, i+4), profile, usedB));
+  return {
+    cycleStart: today,
+    blockA: { prepDate: today, coversDay1: today, coversDay2: addDays(today,1), meals: days.slice(0,2) },
+    blockB: { prepDate: addDays(today,2), coversDay1: addDays(today,2), coversDay2: addDays(today,3), meals: daysB.slice(0,2) },
+  };
+}
+
+function buildShoppingList(cycle) {
+  const items = {};
+  [...cycle.blockA.meals, ...cycle.blockB.meals].forEach(day => {
+    [day.breakfast, day.lunch, day.dinner, day.snack].forEach(recipe => {
+      if (!recipe || !recipe.ingredients) return;
+      recipe.ingredients.forEach(ing => {
+        const key = ing.n + '_' + ing.u;
+        if (items[key]) items[key].a += ing.a;
+        else items[key] = { name: ing.n, unit: ing.u, a: ing.a };
+      });
+    });
+  });
+  return Object.values(items).map(i => ({ name: i.name, unit: i.unit, amount: Math.ceil(i.a * 10) / 10 }));
+}
+
+function buildTrainingWeek(weekStart, profile) {
+  const goal = profile.goals[0] || 'fitness';
+  let tpl;
+  if (goal === 'boxing') tpl = WORKOUT_TEMPLATES.Boxing;
+  else if (goal === 'muscle' || goal === 'mass') tpl = WORKOUT_TEMPLATES.PPL;
+  else if (goal === 'weightloss' || goal === 'fitness') tpl = WORKOUT_TEMPLATES.Cardio;
+  else tpl = WORKOUT_TEMPLATES.UL;
+
+  const workDays = [1,3,5]; // Mo, Mi, Fr
+  const slots = [];
+  workDays.forEach((dayOffset, i) => {
+    const tmpl = tpl[i % tpl.length];
+    slots.push({
+      id: uid(),
+      date: addDays(weekStart, dayOffset),
+      name: tmpl.name,
+      exercises: tmpl.exs.map(name => {
+        const allEx = [...EXERCISES.upper, ...EXERCISES.lower, ...EXERCISES.core, ...EXERCISES.cardio];
+        const ex = allEx.find(e => e.n === name) || { n: name, s: '3×10', m: '' };
+        return { name: ex.n, sets: ex.s, muscle: ex.m };
+      }),
+      durationMin: 60,
+    });
+  });
+  return { weekStart, slots };
+}
+
+function buildTimeline(weekStart, profile, mealCycle, trainingWeek) {
+  const days = [];
+  for (let i = 0; i < 7; i++) {
+    const date = addDays(weekStart, i);
+    const dow = new Date(date + 'T00:00:00').getDay();
+    const blocks = [];
+
+    // Work blocks
+    if (profile.workSchedule.days.includes(dow)) {
+      blocks.push({
+        id: uid(), type: 'work', title: 'Arbeit',
+        startTime: profile.workSchedule.startTime,
+        endTime: profile.workSchedule.endTime,
+        status: 'planned', date, priority: 1,
+      });
+    }
+
+    // Training blocks
+    const slot = trainingWeek?.slots?.find(s => s.date === date);
+    if (slot) {
+      const prefTime = profile.preferredTrainingTime;
+      const trainStart = prefTime === 'morning' ? '07:00' : prefTime === 'afterwork' ? '17:00' : '19:00';
+      const trainEnd = addMinutes(trainStart, 75);
+      blocks.push({
+        id: uid(), type: 'training', title: slot.name,
+        startTime: trainStart, endTime: trainEnd,
+        status: 'planned', date, priority: 2,
+      });
+    }
+
+    // Meal prep on block prep days
+    const isBlockAPrepDay = mealCycle?.blockA?.prepDate === date;
+    const isBlockBPrepDay = mealCycle?.blockB?.prepDate === date;
+    if (isBlockAPrepDay || isBlockBPrepDay) {
+      blocks.push({
+        id: uid(), type: 'prep', title: 'Meal Prep',
+        startTime: '10:00', endTime: '12:00',
+        status: 'planned', date, priority: 3,
+      });
+    }
+
+    blocks.sort((a,b) => a.startTime.localeCompare(b.startTime));
+    days.push({ date, blocks });
+  }
+  return { weekStart, days };
+}
+
+function addMinutes(time, mins) {
+  const [h,m] = time.split(':').map(Number);
+  const total = h*60 + m + mins;
+  return `${String(Math.floor(total/60)).padStart(2,'0')}:${String(total%60).padStart(2,'0')}`;
+}
+
+// ==================== ONBOARDING ====================
+
+let obStep = 0;
+let obData = {
+  name:'', age:'30', height:'180', weight:'80',
+  goals:['fitness'],
+  wakeTime:'06:30', sleepTime:'22:30',
+  workDays:[1,2,3,4,5], workStart:'08:00', workEnd:'17:00',
+  trainingTime:'afterwork', buffer:'30',
+  dietStyle:'normal', mealMode:'general',
+  shakeEnabled: true, snacksEnabled: true, allergies:'',
+  fitnessLevel:'intermediate', equipment:['gym'], injuries:[],
+};
+
+const OB_STEPS = [
+  {
+    title:'Basisdaten', sub:'Erzähl uns kurz von dir.',
+    render() {
+      return `
+        <h1>${this.title}</h1><p class="muted" style="margin:6px 0 20px;">${this.sub}</p>
+        <label>Name</label><input id="f-name" value="${obData.name}" placeholder="Dein Name" oninput="obData.name=this.value;obValidate()">
+        <label>Alter</label><input id="f-age" type="number" value="${obData.age}" oninput="obData.age=this.value">
+        <label>Größe (cm)</label><input id="f-height" type="number" value="${obData.height}" oninput="obData.height=this.value">
+        <label>Gewicht (kg)</label><input id="f-weight" type="number" value="${obData.weight}" oninput="obData.weight=this.value">
+      `;
+    },
+    valid() { return obData.name.trim().length > 0; }
+  },
+  {
+    title:'Deine Ziele', sub:'Wähle alles was passt.',
+    render() {
+      const opts = [
+        {v:'weightloss',l:'Abnehmen'},{v:'muscle',l:'Muskelaufbau'},{v:'fitness',l:'Fitness'},
+        {v:'energy',l:'Energie'},{v:'structure',l:'Struktur'},{v:'boxing',l:'Boxen'},
+        {v:'rehab',l:'Rehab'},{v:'mobility',l:'Mobility'},
+      ];
+      return `
+        <h1>${this.title}</h1><p class="muted" style="margin:6px 0 20px;">${this.sub}</p>
+        <div class="chips">${opts.map(o=>`<div class="chip${obData.goals.includes(o.v)?' sel':''}" onclick="toggleArr(obData,'goals','${o.v}');renderOb()">${o.l}</div>`).join('')}</div>
+      `;
+    },
+    valid() { return obData.goals.length > 0; }
+  },
+  {
+    title:'Dein Alltag', sub:'Wann arbeitest du, wann schläfst du?',
+    render() {
+      const days = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+      const times = [{v:'morning',l:'Morgens'},{v:'afterwork',l:'Nach der Arbeit'},{v:'evening',l:'Abends'}];
+      return `
+        <h1>${this.title}</h1><p class="muted" style="margin:6px 0 20px;">${this.sub}</p>
+        <label>Aufstehzeit</label><input type="time" value="${obData.wakeTime}" oninput="obData.wakeTime=this.value">
+        <label>Schlafenszeit</label><input type="time" value="${obData.sleepTime}" oninput="obData.sleepTime=this.value">
+        <label>Arbeitstage</label>
+        <div class="chips">${days.map((d,i)=>`<div class="chip${obData.workDays.includes(i)?' sel':''}" onclick="toggleArr(obData,'workDays',${i});renderOb()">${d}</div>`).join('')}</div>
+        <label>Arbeitsstart</label><input type="time" value="${obData.workStart}" oninput="obData.workStart=this.value">
+        <label>Arbeitsende</label><input type="time" value="${obData.workEnd}" oninput="obData.workEnd=this.value">
+        <label>Trainingszeit</label>
+        <div class="chips">${times.map(t=>`<div class="chip${obData.trainingTime===t.v?' sel':''}" onclick="obData.trainingTime='${t.v}';renderOb()">${t.l}</div>`).join('')}</div>
+        <label>Puffer nach Arbeit (Min)</label><input type="number" value="${obData.buffer}" oninput="obData.buffer=this.value">
+      `;
+    },
+    valid() { return true; }
+  },
+  {
+    title:'Ernährung', sub:'Wie sollen deine Mahlzeiten sein?',
+    render() {
+      const diets = [{v:'normal',l:'Normal'},{v:'vegetarian',l:'Vegetarisch'},{v:'nofish',l:'Kein Fisch'},{v:'nopork',l:'Kein Schwein'}];
+      const modes = [{v:'general',l:'Standard'},{v:'diet',l:'Diät'},{v:'mass',l:'Masse'}];
+      return `
+        <h1>${this.title}</h1><p class="muted" style="margin:6px 0 20px;">${this.sub}</p>
+        <label>Ernährungsstil</label>
+        <div class="chips">${diets.map(d=>`<div class="chip${obData.dietStyle===d.v?' sel':''}" onclick="obData.dietStyle='${d.v}';renderOb()">${d.l}</div>`).join('')}</div>
+        <label>Modus</label>
+        <div class="chips">${modes.map(m=>`<div class="chip${obData.mealMode===m.v?' sel':''}" onclick="obData.mealMode='${m.v}';renderOb()">${m.l}</div>`).join('')}</div>
+        <label>Proteinshake</label>
+        <div class="chips">
+          <div class="chip${obData.shakeEnabled?' sel':''}" onclick="obData.shakeEnabled=true;renderOb()">Ja</div>
+          <div class="chip${!obData.shakeEnabled?' sel':''}" onclick="obData.shakeEnabled=false;renderOb()">Nein</div>
+        </div>
+        <label>Snacks erlaubt</label>
+        <div class="chips">
+          <div class="chip${obData.snacksEnabled?' sel':''}" onclick="obData.snacksEnabled=true;renderOb()">Ja</div>
+          <div class="chip${!obData.snacksEnabled?' sel':''}" onclick="obData.snacksEnabled=false;renderOb()">Nein</div>
+        </div>
+        <label>Allergien (kommagetrennt)</label>
+        <input value="${obData.allergies}" placeholder="z.B. Nüsse, Laktose" oninput="obData.allergies=this.value">
+      `;
+    },
+    valid() { return true; }
+  },
+  {
+    title:'Training', sub:'Letzter Schritt!',
+    render() {
+      const levels = [{v:'beginner',l:'Anfänger'},{v:'intermediate',l:'Fortgeschritten'},{v:'advanced',l:'Profi'}];
+      const equips = [{v:'gym',l:'Studio'},{v:'home',l:'Zuhause'},{v:'bodyweight',l:'Körpergewicht'},{v:'dumbbells',l:'Hanteln'},{v:'running',l:'Laufen'}];
+      const injs = [{v:'knee',l:'Knie'},{v:'shoulder',l:'Schulter'},{v:'back',l:'Rücken'},{v:'hip',l:'Hüfte'}];
+      return `
+        <h1>${this.title}</h1><p class="muted" style="margin:6px 0 20px;">${this.sub}</p>
+        <label>Fitness-Level</label>
+        <div class="chips">${levels.map(l=>`<div class="chip${obData.fitnessLevel===l.v?' sel':''}" onclick="obData.fitnessLevel='${l.v}';renderOb()">${l.l}</div>`).join('')}</div>
+        <label>Equipment</label>
+        <div class="chips">${equips.map(e=>`<div class="chip${obData.equipment.includes(e.v)?' sel':''}" onclick="toggleArr(obData,'equipment','${e.v}');renderOb()">${e.l}</div>`).join('')}</div>
+        <label>Verletzungen</label>
+        <div class="chips">${injs.map(i=>`<div class="chip${obData.injuries.includes(i.v)?' sel':''}" onclick="toggleArr(obData,'injuries','${i.v}');renderOb()">${i.l}</div>`).join('')}</div>
+      `;
+    },
+    valid() { return obData.equipment.length > 0; }
+  },
+];
+
+function toggleArr(obj, key, val) {
+  if (Array.isArray(obj[key])) {
+    if (obj[key].includes(val)) obj[key] = obj[key].filter(v => v !== val);
+    else obj[key] = [...obj[key], val];
+  }
+}
+
+function renderOb() {
+  document.getElementById('ob-content').innerHTML = OB_STEPS[obStep].render();
+  document.getElementById('ob-step-label').textContent = `Schritt ${obStep+1} von 5`;
+  document.getElementById('ob-progress').style.width = `${(obStep+1)/5*100}%`;
+  document.getElementById('ob-back').style.display = obStep > 0 ? '' : 'none';
+  const nextBtn = document.getElementById('ob-next');
+  nextBtn.textContent = obStep === 4 ? 'Plan erstellen' : 'Weiter';
+  obValidate();
+}
+
+function obValidate() {
+  document.getElementById('ob-next').disabled = !OB_STEPS[obStep].valid();
+}
+
+function obBack() {
+  if (obStep > 0) { obStep--; renderOb(); }
+}
+
+function obNext() {
+  if (!OB_STEPS[obStep].valid()) return;
+  if (obStep < 4) { obStep++; renderOb(); return; }
+  finishOnboarding();
+}
+
+function finishOnboarding() {
+  const profile = {
+    id: 'user_' + Date.now(),
+    name: obData.name.trim() || 'Du',
+    age: parseInt(obData.age) || 30,
+    heightCm: parseInt(obData.height) || 180,
+    weightKg: parseFloat(obData.weight) || 80,
+    goals: obData.goals,
+    fitnessLevel: obData.fitnessLevel,
+    equipment: obData.equipment,
+    injuries: obData.injuries,
+    dietStyle: obData.dietStyle,
+    mealMode: obData.mealMode,
+    allergies: obData.allergies.split(',').map(a=>a.trim()).filter(Boolean),
+    calorieTarget: calcCalories(parseFloat(obData.weight), obData.goals[0]),
+    proteinTargetG: calcProtein(parseFloat(obData.weight)),
+    shakeEnabled: obData.shakeEnabled,
+    snacksEnabled: obData.snacksEnabled,
+    wakeTime: obData.wakeTime,
+    sleepTime: obData.sleepTime,
+    preferredTrainingTime: obData.trainingTime,
+    workSchedule: { days: obData.workDays, startTime: obData.workStart, endTime: obData.workEnd },
+    bufferAfterWorkMin: parseInt(obData.buffer) || 30,
+    createdAt: new Date().toISOString(),
+  };
+  state.profile = profile;
+  const today = todayISO();
+  const weekStart = getMondayISO();
+  state.mealCycle = buildMealCycle(today, profile);
+  state.trainingWeek = buildTrainingWeek(weekStart, profile);
+  state.timeline = buildTimeline(weekStart, profile, state.mealCycle, state.trainingWeek);
+  state.selectedDate = today;
+  save();
+  showMainApp();
+  toast('Plan erstellt! Willkommen, ' + profile.name + ' 🎉');
+}
+
+// ==================== MAIN APP ====================
+
+function showMainApp() {
+  document.getElementById('screen-onboarding').classList.remove('active');
+  document.getElementById('screen-main').classList.add('active');
+  renderCurrentView();
+}
+
+function showView(view) {
+  state.currentView = view;
+  ['timeline','meals','training','profile'].forEach(v => {
+    document.getElementById('view-'+v).style.display = v === view ? 'flex' : 'none';
+    document.getElementById('tab-'+v).classList.toggle('active', v === view);
+  });
+  renderCurrentView();
+}
+
+function renderCurrentView() {
+  const v = state.currentView;
+  if (v === 'timeline') renderTimeline();
+  else if (v === 'meals') renderMeals();
+  else if (v === 'training') renderTraining();
+  else if (v === 'profile') renderProfile();
+}
+
+// ==================== TIMELINE ====================
+
+function renderTimeline() {
+  const tl = state.timeline;
+  if (!tl) return;
+  const days = tl.days;
+  // Range label
+  document.getElementById('tl-range').textContent =
+    days.length ? `${dayLabel(days[0].date)} – ${dayLabel(days[days.length-1].date)}` : '';
+
+  // Day picker
+  const today = todayISO();
+  document.getElementById('tl-day-picker').innerHTML = days.map(d => {
+    const { name, num } = shortDay(d.date);
+    const isActive = d.date === state.selectedDate;
+    const isToday = d.date === today;
+    return `<div class="day-chip${isActive?' active':''}${!isActive&&isToday?' today':''}" onclick="selectDay('${d.date}')">
+      <div class="dc-name">${name}</div><div class="dc-num">${num}</div>
+    </div>`;
+  }).join('');
+
+  // Blocks
+  if (!state.selectedDate) state.selectedDate = today;
+  const day = days.find(d => d.date === state.selectedDate);
+  const content = document.getElementById('tl-content');
+  if (!day || day.blocks.length === 0) {
+    content.innerHTML = `<div class="card" style="text-align:center;padding:24px;"><p class="muted">Ruhetag – nichts geplant</p></div>`;
+    return;
+  }
+  content.innerHTML = day.blocks.map(b => `
+    <div class="block-card">
+      <div class="block-bar" style="background:${TYPE_COLORS[b.type]||'#6b7a8d'}"></div>
+      <div class="block-body">
+        <div class="block-time">${b.startTime} – ${b.endTime}</div>
+        <div class="block-title">${b.title}</div>
+        <div class="block-meta">
+          <span class="muted" style="font-size:12px;">${timeDiff(b.startTime,b.endTime)} Min · ${TYPE_LABELS[b.type]||b.type}</span>
+          ${b.status !== 'planned' ? `<span class="pill">${b.status}</span>` : ''}
+        </div>
+      </div>
+    </div>
+  `).join('');
+}
+
+function selectDay(date) {
+  state.selectedDate = date;
+  renderTimeline();
+}
+
+function jumpToToday() {
+  const t = todayISO();
+  if (state.timeline?.days.some(d => d.date === t)) {
+    state.selectedDate = t;
+    renderTimeline();
+  }
+}
+
+function openAddBlock() {
+  const d = state.selectedDate || todayISO();
+  document.getElementById('modal-add-date').textContent = 'für ' + dayLabel(d);
+  document.getElementById('modal-title').value = '';
+  document.getElementById('modal-start').value = '12:00';
+  document.getElementById('modal-end').value = '13:00';
+  state.modalBlockType = 'appointment';
+  document.getElementById('modal-type-chips').innerHTML = BLOCK_TYPES.map(t =>
+    `<div class="chip${t===state.modalBlockType?' sel':''}" onclick="setModalType('${t}')">${TYPE_LABELS[t]}</div>`
+  ).join('');
+  document.getElementById('modal-add').classList.add('open');
+}
+
+function setModalType(t) {
+  state.modalBlockType = t;
+  document.getElementById('modal-type-chips').innerHTML = BLOCK_TYPES.map(bt =>
+    `<div class="chip${bt===t?' sel':''}" onclick="setModalType('${bt}')">${TYPE_LABELS[bt]}</div>`
+  ).join('');
+}
+
+function submitAddBlock() {
+  const title = document.getElementById('modal-title').value.trim();
+  if (!title) { toast('Bitte Titel eingeben'); return; }
+  const start = document.getElementById('modal-start').value;
+  const end = document.getElementById('modal-end').value;
+  const date = state.selectedDate || todayISO();
+  const block = { id: uid(), type: state.modalBlockType, title, startTime: start, endTime: end, status: 'planned', date, priority: 5 };
+  const tl = state.timeline;
+  if (!tl) return;
+  const dayIdx = tl.days.findIndex(d => d.date === date);
+  if (dayIdx >= 0) {
+    tl.days[dayIdx].blocks.push(block);
+    tl.days[dayIdx].blocks.sort((a,b) => a.startTime.localeCompare(b.startTime));
+  }
+  save();
+  closeModal('modal-add');
+  renderTimeline();
+  toast('Block hinzugefügt');
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('open');
+}
+
+// ==================== MEALS ====================
+
+let mealTab = 'A';
+
+function setMealTab(tab) {
+  mealTab = tab;
+  ['A','B','shop'].forEach(t => {
+    document.getElementById('meal-tab-'+t).classList.toggle('active', t === tab);
+  });
+  renderMealsContent();
+}
+
+function renderMeals() {
+  const mc = state.mealCycle;
+  document.getElementById('meal-sub').textContent = mc ? `Zyklus ab ${dayLabel(mc.cycleStart)}` : '';
+  renderMealsContent();
+}
+
+function renderMealsContent() {
+  const mc = state.mealCycle;
+  const el = document.getElementById('meal-content');
+  if (!mc) { el.innerHTML = `<div class="empty">Kein Mealplan vorhanden.</div>`; return; }
+
+  if (mealTab === 'shop') {
+    renderShopping(el, mc);
+    return;
+  }
+  const block = mealTab === 'A' ? mc.blockA : mc.blockB;
+  el.innerHTML = `
+    <div class="card2" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px;">
+      <div><span class="muted" style="font-size:12px;">Prep am</span><div style="font-size:13px;font-weight:700;">${dayLabel(block.prepDate)}</div></div>
+      <div><span class="muted" style="font-size:12px;">deckt ab</span><div style="font-size:13px;font-weight:700;">${dayLabel(block.coversDay1)} & ${dayLabel(block.coversDay2)}</div></div>
+    </div>
+    ${block.meals.map((day, idx) => renderMealDay(day, idx, mealTab)).join('')}
+  `;
+}
+
+function renderMealDay(day, idx, blockId) {
+  const meals = [
+    {cat:'breakfast',label:'Frühstück',r:day.breakfast},
+    {cat:'lunch',label:'Mittag',r:day.lunch},
+    {cat:'dinner',label:'Abend',r:day.dinner},
+    {cat:'snack',label:'Snack',r:day.snack},
+  ];
+  return `
+    <div class="card" style="margin-bottom:12px;">
+      <div style="display:flex;justify-content:space-between;align-items:flex-end;margin-bottom:10px;">
+        <div style="font-size:18px;font-weight:800;">Tag ${idx+1}</div>
+        <div class="muted" style="font-size:13px;">${dayLabel(day.date)}</div>
+      </div>
+      ${meals.map(m => `
+        <div class="card2" style="display:flex;align-items:center;margin-bottom:6px;">
+          <div style="flex:1;">
+            <div style="font-size:10px;font-weight:700;color:var(--muted);text-transform:uppercase;letter-spacing:.5px;">${m.label}</div>
+            <div style="font-size:14px;font-weight:600;margin-top:2px;">${m.r ? m.r.name : '–'}</div>
+            ${m.r ? `<div class="muted" style="font-size:12px;margin-top:3px;">${m.r.kcal} kcal · ${m.r.protein}g Protein · ${m.r.time} Min</div>` : ''}
+          </div>
+          ${m.r ? `<button class="btn btn-secondary btn-sm" onclick="swapMeal('${blockId}',${idx},'${m.cat}')" style="color:var(--accent);">Tauschen</button>` : ''}
+        </div>
+      `).join('')}
+      <div style="border-top:1px solid var(--border);margin-top:8px;padding-top:8px;text-align:right;font-size:13px;font-weight:700;">
+        Gesamt: ${day.totalKcal || 0} kcal · ${day.totalProt || 0}g Protein
+      </div>
+    </div>
+  `;
+}
+
+function swapMeal(blockId, dayIdx, cat) {
+  const mc = state.mealCycle;
+  if (!mc) return;
+  const block = blockId === 'A' ? mc.blockA : mc.blockB;
+  const day = block.meals[dayIdx];
+  if (!day) return;
+  const used = new Set();
+  const newRecipe = pickRecipe(cat, state.profile, used);
+  if (!newRecipe) return;
+  day[cat] = newRecipe;
+  day.totalKcal = (day.breakfast?.kcal||0) + (day.lunch?.kcal||0) + (day.dinner?.kcal||0) + (day.snack?.kcal||0);
+  day.totalProt = (day.breakfast?.protein||0) + (day.lunch?.protein||0) + (day.dinner?.protein||0) + (day.snack?.protein||0);
+  save();
+  renderMealsContent();
+  toast('Mahlzeit getauscht');
+}
+
+function renderShopping(el, mc) {
+  const items = buildShoppingList(mc);
+  if (!items.length) { el.innerHTML = `<div class="empty">Keine Artikel.</div>`; return; }
+  el.innerHTML = `
+    <div class="section-title">Einkaufsliste</div>
+    ${items.map(item => {
+      const key = item.name + '_' + item.unit;
+      const checked = state.shopChecked.has(key);
+      return `<div class="shop-row" onclick="toggleShop('${key}')">
+        <div class="checkbox${checked?' checked':''}">${checked?'✓':''}</div>
+        <div class="shop-name${checked?' done':''}">${item.name}</div>
+        <div class="shop-amount">${item.amount} ${item.unit}</div>
+      </div>`;
+    }).join('')}
+    <div style="text-align:center;padding:16px 0;color:var(--muted);font-size:12px;">
+      ${items.filter(i => state.shopChecked.has(i.name+'_'+i.unit)).length}/${items.length} erledigt
+    </div>
+  `;
+}
+
+function toggleShop(key) {
+  if (state.shopChecked.has(key)) state.shopChecked.delete(key);
+  else state.shopChecked.add(key);
+  renderMealsContent();
+}
+
+// ==================== TRAINING ====================
+
+function renderTraining() {
+  const tw = state.trainingWeek;
+  const el = document.getElementById('training-content');
+  if (!tw || !tw.slots?.length) {
+    el.innerHTML = `<div class="empty">Kein Trainingsplan.</div>`; return;
+  }
+
+  const weekDays = Array.from({length:7}, (_,i) => addDays(tw.weekStart, i));
+  let html = `<div style="background:var(--card2);border-radius:10px;padding:12px 14px;margin-bottom:14px;font-size:13px;color:var(--muted);">
+    KW ab ${dayLabel(tw.weekStart)} · ${tw.slots.length} Einheiten
+  </div>`;
+
+  weekDays.forEach(date => {
+    const slot = tw.slots.find(s => s.date === date);
+    const { name: dayName, num: dayNum } = shortDay(date);
+    if (!slot) {
+      html += `<div class="rest-tag">${dayName} ${dayNum} – Ruhetag 😴</div>`;
+    } else {
+      html += `
+        <div class="workout-card">
+          <div class="workout-header">
+            <div>
+              <div style="font-size:17px;font-weight:800;">${slot.name}</div>
+              <div class="workout-day">${dayLabel(date)} · ${slot.durationMin} Min</div>
+            </div>
+            <span style="font-size:22px;">💪</span>
+          </div>
+          ${slot.exercises.map(ex => `
+            <div class="exercise-row">
+              <div>
+                <div class="ex-name">${ex.name}</div>
+                ${ex.muscle ? `<div class="muted" style="font-size:11px;">${ex.muscle}</div>` : ''}
+              </div>
+              <div class="ex-sets">${ex.sets}</div>
+            </div>
+          `).join('')}
+        </div>
+      `;
+    }
+  });
+  el.innerHTML = html;
+}
+
+function regenerateAll() {
+  if (!state.profile) return;
+  const today = todayISO();
+  const weekStart = getMondayISO();
+  state.mealCycle = buildMealCycle(today, state.profile);
+  state.trainingWeek = buildTrainingWeek(weekStart, state.profile);
+  state.timeline = buildTimeline(weekStart, state.profile, state.mealCycle, state.trainingWeek);
+  save();
+  renderCurrentView();
+  toast('Plan neu generiert');
+}
+
+// ==================== PROFILE ====================
+
+function renderProfile() {
+  const p = state.profile;
+  const el = document.getElementById('profile-content');
+  if (!p) { el.innerHTML = `<div class="empty">Kein Profil.</div>`; return; }
+
+  const GOAL_LABELS = {weightloss:'Abnehmen',muscle:'Muskelaufbau',fitness:'Fitness',energy:'Energie',structure:'Struktur',boxing:'Boxen',rehab:'Rehab',mobility:'Mobility'};
+  const EQUIP_LABELS = {gym:'Studio',home:'Zuhause',bodyweight:'Körpergewicht',dumbbells:'Hanteln',running:'Laufen'};
+  const TIME_LABELS = {morning:'Morgens',afterwork:'Nach der Arbeit',evening:'Abends'};
+  const DIET_LABELS = {normal:'Normal',vegetarian:'Vegetarisch',nofish:'Kein Fisch',nopork:'Kein Schwein'};
+
+  const bmi = (p.weightKg / ((p.heightCm/100)**2)).toFixed(1);
+
+  el.innerHTML = `
+    <div class="stat-row">
+      <div class="stat-box"><div class="stat-val">${p.calorieTarget}</div><div class="stat-lbl">kcal/Tag</div></div>
+      <div class="stat-box"><div class="stat-val">${p.proteinTargetG}g</div><div class="stat-lbl">Protein/Tag</div></div>
+      <div class="stat-box"><div class="stat-val">${bmi}</div><div class="stat-lbl">BMI</div></div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:10px;">Persönliches</h3>
+      ${pRow('Name', p.name)}
+      ${pRow('Alter', p.age + ' Jahre')}
+      ${pRow('Größe', p.heightCm + ' cm')}
+      ${pRow('Gewicht', p.weightKg + ' kg')}
+      ${pRow('Fitness-Level', {beginner:'Anfänger',intermediate:'Fortgeschritten',advanced:'Profi'}[p.fitnessLevel]||p.fitnessLevel)}
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:10px;">Ziele & Training</h3>
+      ${pRow('Ziele', p.goals.map(g=>GOAL_LABELS[g]||g).join(', '))}
+      ${pRow('Equipment', p.equipment.map(e=>EQUIP_LABELS[e]||e).join(', '))}
+      ${pRow('Trainingszeit', TIME_LABELS[p.preferredTrainingTime]||p.preferredTrainingTime)}
+      ${p.injuries?.length ? pRow('Verletzungen', p.injuries.join(', ')) : ''}
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:10px;">Ernährung</h3>
+      ${pRow('Stil', DIET_LABELS[p.dietStyle]||p.dietStyle)}
+      ${pRow('Modus', {general:'Standard',diet:'Diät',mass:'Masse'}[p.mealMode]||p.mealMode)}
+      ${pRow('Shakes', p.shakeEnabled ? 'Ja' : 'Nein')}
+      ${p.allergies?.length ? pRow('Allergien', p.allergies.join(', ')) : ''}
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom:10px;">Alltag</h3>
+      ${pRow('Aufstehen', p.wakeTime)}
+      ${pRow('Schlafen', p.sleepTime)}
+      ${pRow('Arbeit', `${p.workSchedule.startTime} – ${p.workSchedule.endTime}`)}
+    </div>
+
+    <button class="btn btn-primary" style="margin-top:8px;" onclick="regenerateAll()">Plan neu generieren</button>
+    <button class="btn btn-secondary" style="margin-top:10px;color:var(--danger);border-color:var(--danger);" onclick="resetApp()">App zurücksetzen</button>
+  `;
+}
+
+function pRow(key, val) {
+  return `<div class="profile-row"><span class="profile-key">${key}</span><span class="profile-val">${val}</span></div>`;
+}
+
+function resetApp() {
+  if (!confirm('Wirklich alles zurücksetzen?')) return;
+  localStorage.clear();
+  location.reload();
+}
+
+// ==================== TOAST ====================
+
+function toast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  setTimeout(() => el.classList.remove('show'), 2500);
+}
+
+// ==================== INIT ====================
+
+load();
+if (state.profile) {
+  if (!state.selectedDate) state.selectedDate = todayISO();
+  document.getElementById('screen-onboarding').classList.remove('active');
+  document.getElementById('screen-main').classList.add('active');
+  showView('timeline');
+} else {
+  obStep = 0;
+  renderOb();
+}
+</script>
+</body>
+</html>
