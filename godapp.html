@@ -257,8 +257,8 @@ h3{font-size:16px;font-weight:700;}
       <div style="font-size:12px;color:var(--muted);margin-top:2px;" id="meal-sub"></div>
     </div>
     <div class="sub-tabs" style="margin-top:4px;">
-      <div class="sub-tab active" id="meal-tab-A" onclick="setMealTab('A')">Block A</div>
-      <div class="sub-tab" id="meal-tab-B" onclick="setMealTab('B')">Block B</div>
+      <div class="sub-tab active" id="meal-tab-A" onclick="setMealTab('A')">Mo – Mi</div>
+      <div class="sub-tab" id="meal-tab-B" onclick="setMealTab('B')">Do – So</div>
       <div class="sub-tab" id="meal-tab-shop" onclick="setMealTab('shop')">Einkauf</div>
     </div>
     <div class="content" id="meal-content"></div>
@@ -636,13 +636,15 @@ function buildMealDay(date,profile,used){
 }
 
 function buildMealCycle(weekStart,profile){
-  // Prep on Sunday (end of week) for Mon+Tue, prep on Wednesday for Thu+Fri
+  // Block A: prepped Sunday → covers Mo, Di, Mi (3 days)
+  // Block B: prepped Wednesday → covers Do, Fr, Sa, So (4 days)
   const sun=addDays(weekStart,6),wed=addDays(weekStart,2);
-  const mon=weekStart,tue=addDays(weekStart,1),thu=addDays(weekStart,3),fri=addDays(weekStart,4);
   const u=new Set(),ub=new Set();
   return{cycleStart:weekStart,
-    blockA:{prepDate:sun,coversDay1:mon,coversDay2:tue,meals:[0,1].map(i=>buildMealDay(addDays(weekStart,i),profile,u))},
-    blockB:{prepDate:wed,coversDay1:thu,coversDay2:fri,meals:[3,4].map(i=>buildMealDay(addDays(weekStart,i),profile,ub))}};
+    blockA:{prepDate:sun,label:'Mo – Mi',days:[0,1,2],
+      meals:[0,1,2].map(i=>buildMealDay(addDays(weekStart,i),profile,u))},
+    blockB:{prepDate:wed,label:'Do – So',days:[3,4,5,6],
+      meals:[3,4,5,6].map(i=>buildMealDay(addDays(weekStart,i),profile,ub))}};
 }
 
 function buildShoppingList(cycle,profile){
@@ -1210,7 +1212,7 @@ function setMealTab(tab){
 
 function renderMeals(){
   const mc=state.mealCycle;
-  document.getElementById('meal-sub').textContent=mc?`KW ab ${dayLabel(mc.cycleStart)} · Prep: So + Mi`:'';
+  document.getElementById('meal-sub').textContent=mc?`Prep: Sonntag + Mittwoch`:'';
   renderMealsContent();
 }
 
@@ -1219,11 +1221,12 @@ function renderMealsContent(){
   if(!mc){el.innerHTML=`<div class="empty">Kein Mealplan.</div>`;return;}
   if(mealTab==='shop'){renderShopping(el,mc);return;}
   const block=mealTab==='A'?mc.blockA:mc.blockB;
+  const lastDay=block.meals[block.meals.length-1];
   el.innerHTML=`<div class="fade-up">
     <div class="card2" style="display:flex;flex-wrap:wrap;gap:12px;align-items:center;margin-bottom:14px;">
       <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Prep am</div><div style="font-weight:800;">${dayLabel(block.prepDate)}</div></div>
       <div style="color:var(--border);font-size:20px;">|</div>
-      <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Deckt ab</div><div style="font-weight:800;">${dayLabel(block.coversDay1)} & ${dayLabel(block.coversDay2)}</div></div>
+      <div><div style="font-size:10px;color:var(--muted);font-weight:700;text-transform:uppercase;">Mahlzeiten</div><div style="font-weight:800;">${block.label}</div></div>
     </div>
     ${block.meals.map((day,idx)=>renderMealDay(day,idx,mealTab)).join('')}
   </div>`;
@@ -1232,9 +1235,10 @@ function renderMealsContent(){
 function renderMealDay(day,idx,blockId){
   const p=state.profile;
   const meals=[{cat:'breakfast',label:'Frühstück',r:day.breakfast},{cat:'lunch',label:'Mittagessen',r:day.lunch},{cat:'dinner',label:'Abendessen',r:day.dinner},{cat:'snack',label:'Snack',r:day.snack}];
+  const{name:dname}=shortDay(day.date);
   return`<div class="card" style="margin-bottom:12px;">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
-      <div style="font-size:20px;font-weight:800;">Tag ${idx+1}</div>
+      <div style="font-size:20px;font-weight:800;">${dname}</div>
       <div style="font-size:12px;color:var(--muted);">${dayLabel(day.date)}</div>
     </div>
     ${meals.map(m=>{if(!m.r)return'';
