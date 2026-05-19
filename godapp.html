@@ -544,26 +544,27 @@ function findFreeSlot(occ,dur,early,late){
   return null;
 }
 
-function calcKcal(w,h,age,goals,level,mealMode){
-  // Mifflin-St Jeor (sex-neutral)
-  const bmr=10*w+6.25*h-5*age+100;
+function calcKcal(w,h,age,sex,goals,level,mealMode){
+  // Mifflin-St Jeor — sex-specific
+  const sexOffset={male:5,female:-161,other:-78}[sex]??-78;
+  const bmr=10*w+6.25*h-5*age+sexOffset;
   const act={beginner:1.35,intermediate:1.5,advanced:1.65}[level]??1.45;
   let kcal=bmr*act;
   const hasLoss=goals.includes('weightloss');
   const hasMass=goals.includes('mass');
   const hasMuscle=goals.includes('muscle')||hasMass;
   const isBoxer=goals.includes('boxing');
-  // Conflict: weightloss + muscle → recomp (maintenance)
-  if(hasLoss&&hasMuscle){/* recomp: no change */}
+  if(hasLoss&&hasMuscle){/* recomp: maintenance */}
   else if(hasMass)kcal+=450;
   else if(hasMuscle)kcal+=250;
   else if(isBoxer)kcal+=150;
   else if(hasLoss)kcal-=400;
-  // Nutrition mode fine-tune
   if(mealMode==='diet')kcal-=150;
   if(mealMode==='mass')kcal+=150;
   return Math.round(kcal/50)*50;
 }
+function effectiveKcal(p){return p.calorieOverride||p.calorieTarget||2000;}
+
 function calcProt(w,goals){
   const hasLoss=goals.includes('weightloss');
   const hasMuscle=goals.includes('muscle')||goals.includes('mass');
@@ -647,7 +648,7 @@ function buildMealDay(date,profile,used){
   const lu=pickRecipe('lunch',profile,used);used.add(lu.id);
   const di=pickRecipe('dinner',profile,used);used.add(di.id);
   const sn=pickRecipe('snack',profile,new Set());
-  const tk=profile.calorieTarget||2000;
+  const tk=effectiveKcal(profile);
   return{date,breakfast:bf,lunch:lu,dinner:di,snack:sn,
     totalKcal:Math.round(tk),totalProt:profile.proteinTargetG||Math.round(profile.weightKg*1.8)};
 }
@@ -669,7 +670,7 @@ function buildShoppingList(cycle,profile){
   [...cycle.blockA.meals,...cycle.blockB.meals].forEach(day=>{
     cats.forEach(cat=>{
       const r=day[cat];if(!r||!r.ingredients)return;
-      const f=r.kcal>0?((profile.calorieTarget||2000)*(MEAL_SPLIT[cat]||.25))/r.kcal:1;
+      const f=r.kcal>0?((effectiveKcal(profile))*(MEAL_SPLIT[cat]||.25))/r.kcal:1;
       r.ingredients.forEach(ing=>{
         const k=ing.n+'_'+ing.u,a=ing.a*f;
         if(items[k])items[k].a+=a;else items[k]={name:ing.n,unit:ing.u,a};
@@ -833,7 +834,7 @@ function buildTimeline(weekStart,profile,mealCycle,trainingWeek){
 
 let obStep=0;
 let obData={
-  name:'',age:'25',height:'180',weight:'80',
+  name:'',age:'25',height:'180',weight:'80',sex:'male',
   goals:['fitness'],
   wakeTime:'06:30',sleepTime:'22:30',
   workDays:[1,2,3,4,5],workStart:'09:00',workEnd:'18:00',
@@ -859,6 +860,12 @@ const OB_STEPS=[
     </div>
     <label>Gewicht (kg)</label>
     <input type="number" value="${obData.weight}" oninput="obData.weight=this.value" step="0.5">
+    <label>Biologisches Geschlecht</label>
+    <div class="chips">
+      <div class="chip${obData.sex==='male'?' sel':''}" onclick="obData.sex='male';renderOb()">Mann</div>
+      <div class="chip${obData.sex==='female'?' sel':''}" onclick="obData.sex='female';renderOb()">Frau</div>
+      <div class="chip${obData.sex==='other'?' sel':''}" onclick="obData.sex='other';renderOb()">Divers</div>
+    </div>
    `},valid(){return obData.name.trim().length>0;}},
 
   {title:'Deine Ziele',sub:'Mehrfachauswahl möglich.',
@@ -974,12 +981,12 @@ function finishOnboarding(){
   const w=parseFloat(obData.weight)||80;
   const profile={
     id:'user_'+Date.now(),name:obData.name.trim()||'Du',
-    age:parseInt(obData.age)||25,heightCm:parseInt(obData.height)||180,weightKg:w,
+    age:parseInt(obData.age)||25,heightCm:parseInt(obData.height)||180,weightKg:w,sex:obData.sex||'male',
     goals:obData.goals,fitnessLevel:obData.fitnessLevel,equipment:obData.equipment,
     injuries:obData.injuries,dietStyle:obData.dietStyle,mealMode:obData.mealMode,
     allergies:obData.allergies.split(',').map(a=>a.trim()).filter(Boolean),
-    calorieTarget:calcKcal(w,parseInt(obData.height)||180,parseInt(obData.age)||25,obData.goals,obData.fitnessLevel,obData.mealMode),
-    proteinTargetG:calcProt(w,obData.goals),
+    calorieTarget:calcKcal(w,parseInt(obData.height)||180,parseInt(obData.age)||25,obData.sex||'male',obData.goals,obData.fitnessLevel,obData.mealMode),
+    proteinTargetG:calcProt(w,obData.goals),calorieOverride:null,
     shakeEnabled:obData.shakeEnabled,snacksEnabled:obData.snacksEnabled,
     wakeTime:obData.wakeTime,sleepTime:obData.sleepTime,
     preferredTrainingTime:obData.trainingTime,
@@ -1363,7 +1370,7 @@ function renderMealDay(day,idx,blockId){
       <div style="font-size:12px;color:var(--muted);">${dayLabel(day.date)}</div>
     </div>
     ${meals.map(m=>{if(!m.r)return'';
-      const tk=Math.round((p.calorieTarget||2000)*(MEAL_SPLIT[m.cat]||.25));
+      const tk=Math.round((effectiveKcal(p))*(MEAL_SPLIT[m.cat]||.25));
       const f=m.r.kcal>0?tk/m.r.kcal:1;
       const tp=Math.round(m.r.protein*f);
       return`<div class="card2" style="margin-bottom:6px;">
@@ -1390,7 +1397,7 @@ function renderMealDay(day,idx,blockId){
 function showRecipe(recipeId,cat){
   const r=RECIPES.find(x=>x.id===recipeId);if(!r)return;
   const p=state.profile;
-  const tk=Math.round((p.calorieTarget||2000)*(MEAL_SPLIT[cat]||.25));
+  const tk=Math.round((effectiveKcal(p))*(MEAL_SPLIT[cat]||.25));
   const f=r.kcal>0?tk/r.kcal:1;
   const tp=Math.round(r.protein*f);
   const catLabels={breakfast:'Frühstück',lunch:'Mittagessen',dinner:'Abendessen',snack:'Snack'};
@@ -1550,7 +1557,11 @@ function renderProfile(){
 
     <!-- Stats -->
     <div class="stat-grid">
-      <div class="stat-box"><div class="stat-val">${p.calorieTarget}</div><div class="stat-lbl">kcal / Tag</div></div>
+      <div class="stat-box" onclick="editCalorieTarget()" style="cursor:pointer;position:relative;">
+        <div class="stat-val">${effectiveKcal(p)}</div>
+        <div class="stat-lbl">kcal / Tag${p.calorieOverride?` <span style="color:var(--gold);font-size:9px;">manuell</span>`:''}</div>
+        <div style="position:absolute;top:8px;right:10px;font-size:10px;color:var(--muted);">Bearbeiten</div>
+      </div>
       <div class="stat-box"><div class="stat-val">${p.proteinTargetG}g</div><div class="stat-lbl">Protein / Tag</div></div>
       <div class="stat-box"><div class="stat-val">${bmi}</div><div class="stat-lbl">BMI</div></div>
       <div class="stat-box"><div class="stat-val">${p.weightKg}kg</div><div class="stat-lbl">Gewicht</div></div>
@@ -1558,6 +1569,7 @@ function renderProfile(){
 
     <div class="card">
       <h3 style="margin-bottom:10px;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.8px;">Ziele & Training</h3>
+      ${pRow('Geschlecht',{male:'Mann',female:'Frau',other:'Divers'}[p.sex]||'–')}
       ${pRow('Ziele',p.goals.map(g=>GL[g]||g).join(', '))}
       ${pRow('Level',{beginner:'Anfänger',intermediate:'Fortgeschritten',advanced:'Profi'}[p.fitnessLevel]||p.fitnessLevel)}
       ${pRow('Training',{morning:'Morgens',afterwork:'Nach Arbeit',evening:'Abends'}[p.preferredTrainingTime]||p.preferredTrainingTime)}
@@ -1575,6 +1587,17 @@ function renderProfile(){
     <button class="btn btn-grad" style="margin-bottom:10px;" onclick="regenerateAll()">↺ Plan neu generieren</button>
     <button class="btn btn-danger" onclick="resetApp()">App zurücksetzen</button>
   </div>`;
+}
+
+function editCalorieTarget(){
+  const p=state.profile;if(!p)return;
+  const cur=effectiveKcal(p);
+  const val=prompt(`Kalorienziel anpassen (aktuell: ${cur} kcal)\nLeer lassen = automatisch berechnet (${p.calorieTarget} kcal)`,p.calorieOverride||'');
+  if(val===null)return; // cancelled
+  const n=parseInt(val);
+  p.calorieOverride=(val.trim()===''||isNaN(n))?null:Math.max(500,Math.min(6000,n));
+  save();renderProfile();
+  toast(p.calorieOverride?`Kalorienziel auf ${p.calorieOverride} kcal gesetzt`:'Automatische Berechnung wiederhergestellt');
 }
 
 function pRow(k,v){return`<div style="display:flex;justify-content:space-between;align-items:center;padding:10px 0;border-bottom:1px solid var(--border);"><span style="font-size:13px;color:var(--muted);">${k}</span><span style="font-size:14px;font-weight:700;">${v}</span></div>`;}
