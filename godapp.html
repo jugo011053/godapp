@@ -527,12 +527,35 @@ function findFreeSlot(occ,dur,early,late){
   return null;
 }
 
-function calcKcal(w,goal){
-  const base=w*24;
-  const f={weightloss:.82,muscle:1.15,mass:1.2}[goal]??1;
-  return Math.round(base*f/50)*50;
+function calcKcal(w,h,age,goals,level,mealMode){
+  // Mifflin-St Jeor (sex-neutral)
+  const bmr=10*w+6.25*h-5*age+100;
+  const act={beginner:1.35,intermediate:1.5,advanced:1.65}[level]??1.45;
+  let kcal=bmr*act;
+  const hasLoss=goals.includes('weightloss');
+  const hasMass=goals.includes('mass');
+  const hasMuscle=goals.includes('muscle')||hasMass;
+  const isBoxer=goals.includes('boxing');
+  // Conflict: weightloss + muscle → recomp (maintenance)
+  if(hasLoss&&hasMuscle){/* recomp: no change */}
+  else if(hasMass)kcal+=450;
+  else if(hasMuscle)kcal+=250;
+  else if(isBoxer)kcal+=150;
+  else if(hasLoss)kcal-=400;
+  // Nutrition mode fine-tune
+  if(mealMode==='diet')kcal-=150;
+  if(mealMode==='mass')kcal+=150;
+  return Math.round(kcal/50)*50;
 }
-function calcProt(w){return Math.round(w*1.8);}
+function calcProt(w,goals){
+  const hasLoss=goals.includes('weightloss');
+  const hasMuscle=goals.includes('muscle')||goals.includes('mass');
+  const isBoxer=goals.includes('boxing');
+  if(hasLoss&&hasMuscle)return Math.round(w*2.2);// recomp: max protein
+  if(hasMuscle)return Math.round(w*2.0);
+  if(hasLoss||isBoxer)return Math.round(w*1.9);
+  return Math.round(w*1.7);
+}
 
 // ══════════════════════════════════════════════
 //  STORAGE + XP
@@ -612,11 +635,14 @@ function buildMealDay(date,profile,used){
     totalKcal:Math.round(tk),totalProt:profile.proteinTargetG||Math.round(profile.weightKg*1.8)};
 }
 
-function buildMealCycle(today,profile){
+function buildMealCycle(weekStart,profile){
+  // Prep on Sunday (end of week) for Mon+Tue, prep on Wednesday for Thu+Fri
+  const sun=addDays(weekStart,6),wed=addDays(weekStart,2);
+  const mon=weekStart,tue=addDays(weekStart,1),thu=addDays(weekStart,3),fri=addDays(weekStart,4);
   const u=new Set(),ub=new Set();
-  return{cycleStart:today,
-    blockA:{prepDate:today,coversDay1:today,coversDay2:addDays(today,1),meals:[0,1].map(i=>buildMealDay(addDays(today,i),profile,u))},
-    blockB:{prepDate:addDays(today,2),coversDay1:addDays(today,2),coversDay2:addDays(today,3),meals:[2,3].map(i=>buildMealDay(addDays(today,i),profile,ub))}};
+  return{cycleStart:weekStart,
+    blockA:{prepDate:sun,coversDay1:mon,coversDay2:tue,meals:[0,1].map(i=>buildMealDay(addDays(weekStart,i),profile,u))},
+    blockB:{prepDate:wed,coversDay1:thu,coversDay2:fri,meals:[3,4].map(i=>buildMealDay(addDays(weekStart,i),profile,ub))}};
 }
 
 function buildShoppingList(cycle,profile){
@@ -636,16 +662,19 @@ function buildShoppingList(cycle,profile){
 }
 
 function buildTrainingWeek(weekStart,profile){
-  const goal=profile.goals[0]||'fitness';
-  const isBoxer=profile.goals.includes('boxing');
+  const goals=profile.goals||['fitness'];
+  const isBoxer=goals.includes('boxing');
+  const hasMuscle=goals.includes('muscle')||goals.includes('mass');
+  const hasLoss=goals.includes('weightloss');
+  // Derive effective training goal: boxing > muscle+loss(recomp) > muscle > loss > fitness
+  const effectiveGoal=isBoxer?'boxing':hasMuscle&&hasLoss?'recomp':hasMuscle?'muscle':hasLoss?'weightloss':'fitness';
   const level=profile.fitnessLevel||'intermediate';
   const daysCount={beginner:2,intermediate:3,advanced:4}[level]??3;
 
-  // Spread training evenly across the week, avoid back-to-back where possible
+  // Spread training evenly, avoid back-to-back where possible
   const extDays=(profile.externalTraining||[]).map(e=>new Date(e.date+'T00:00:00').getDay());
   const spreadPresets={2:[1,4],3:[1,3,5],4:[1,2,4,6]};
   const spread=(spreadPresets[daysCount]||[1,3,5]).filter(d=>!extDays.includes(d));
-  // If preset days are all blocked by external training, fall back to any free days
   const freeDays=[1,2,3,4,5,6].filter(d=>!extDays.includes(d));
   const trainingDays=spread.length>=daysCount?spread.slice(0,daysCount):freeDays.slice(0,daysCount);
 
@@ -656,13 +685,13 @@ function buildTrainingWeek(weekStart,profile){
       exercises:[{name:'Eigenes Boxtraining',sets:'–',muscle:'Komplett-Workout'}],durationMin:tdiff(ext.start,ext.end)});
   });
 
-  // Complementary sessions
+  // Complementary / main training sessions
   const boxingTemplates=[
     {name:'Box-Kraft A',exs:['Liegestütze','Turkish Get-Up','Plank-Variationen','Seilspringen']},
     {name:'Box-Kraft B',exs:['Klimmzüge / Rudern','Bulgarian Split Squat','Medizinball-Rotationen','Explosive Liegestütze']},
     {name:'Box-Kraft C',exs:['Farmer\'s Walk','Schattenboxen','Plank-Variationen','Seilspringen']},
   ];
-  const templates=isBoxer?boxingTemplates:getTemplate(goal,level);
+  const templates=isBoxer?boxingTemplates:getTemplate(effectiveGoal,level);
   trainingDays.forEach((dow,i)=>{
     const date=addDays(weekStart,dow===0?6:dow-1);
     const tpl=templates[i%templates.length];
@@ -672,12 +701,32 @@ function buildTrainingWeek(weekStart,profile){
         return{name:ex.name,sets:ex.sets,muscle:ex.muscle};
       }),durationMin:{beginner:45,intermediate:60,advanced:75}[level]??60});
   });
+
+  // Rehab sessions (3× per week on non-training days if possible)
+  if((profile.injuries||[]).length>0){
+    const usedDays=new Set([...trainingDays,...extDays]);
+    const rehabCandidates=[1,2,3,4,5,6,0].filter(d=>!usedDays.has(d));
+    // Fill remaining spots with training days if needed
+    if(rehabCandidates.length<3)trainingDays.forEach(d=>{if(rehabCandidates.length<3)rehabCandidates.push(d);});
+    rehabCandidates.slice(0,3).forEach(dow=>{
+      const date=addDays(weekStart,dow===0?6:dow-1);
+      slots.push({id:uid(),date,name:'Rehab',type:'rehab',durationMin:25,
+        exercises:(profile.injuries).flatMap(inj=>REHAB_EXERCISES[inj]||[]).slice(0,4)});
+    });
+  }
+
   slots.sort((a,b)=>a.date.localeCompare(b.date));
   return{weekStart,slots};
 }
 
 function getTemplate(goal,level){
   const sets=level==='beginner'?'3×10':level==='advanced'?'5×6':'4×8';
+  if(goal==='recomp')return[// Muscle + weightloss: strength + cardio hybrid
+    {name:'Kraft + Cardio A',exs:['Kniebeugen','Bankdrücken','Rudern','Burpees']},
+    {name:'Kraft + Cardio B',exs:['Kreuzheben','Schulterdrücken','Klimmzüge','Mountain Climber']},
+    {name:'HIIT-Ganzkörper',exs:['Kettlebell Swing','Ausfallschritte','Liegestütze','Seilspringen']},
+    {name:'Oberkörper + Lauf',exs:['Bankdrücken','Rudern','Trizepsstrecken','Laufen 20 Min']},
+  ];
   if(goal==='muscle'||goal==='mass')return[
     {name:'Push (Brust/Schulter)',exs:['Bankdrücken','Schulterdrücken','Trizepsstrecken']},
     {name:'Pull (Rücken/Bizeps)',exs:['Klimmzüge','Rudern','Bizepscurls']},
@@ -727,13 +776,23 @@ function buildTimeline(weekStart,profile,mealCycle,trainingWeek){
     });
 
     // Regular training
+    const MORNING_BUF=30; // min after wake before training
     const trainSlots=(trainingWeek?.slots||[]).filter(s=>s.date===date&&s.type==='training');
     trainSlots.forEach(slot=>{
       const pref=profile.preferredTrainingTime;
       let ts=null;
-      if(pref==='morning')ts=findFreeSlot(occ,slot.durationMin,wakeMin,isWork?wsMin-15:sleepMin);
-      if(!ts)ts=findFreeSlot(occ,slot.durationMin,isWork?weMin+buf:wakeMin,sleepMin-30);
+      if(pref==='morning')ts=findFreeSlot(occ,slot.durationMin,wakeMin+MORNING_BUF,isWork?wsMin-30:sleepMin);
+      if(!ts)ts=findFreeSlot(occ,slot.durationMin,isWork?weMin+buf:wakeMin+MORNING_BUF,sleepMin-30);
       if(ts){occ.push(ts);blocks.push({id:uid(),type:'training',title:slot.name,startTime:m2t(ts.start),endTime:m2t(ts.end),status:'planned',date,priority:2});}
+    });
+
+    // Rehab sessions
+    const rehabSlots=(trainingWeek?.slots||[]).filter(s=>s.date===date&&s.type==='rehab');
+    rehabSlots.forEach(slot=>{
+      // Try morning first as warmup, then evening
+      let rs=findFreeSlot(occ,slot.durationMin,wakeMin+MORNING_BUF,isWork?wsMin-15:sleepMin);
+      if(!rs)rs=findFreeSlot(occ,slot.durationMin,isWork?weMin+buf:wakeMin+MORNING_BUF,sleepMin-30);
+      if(rs){occ.push(rs);blocks.push({id:uid(),type:'rehab',title:'Rehab',startTime:m2t(rs.start),endTime:m2t(rs.end),status:'planned',date,priority:2});}
     });
 
     // Meal prep
@@ -900,7 +959,8 @@ function finishOnboarding(){
     goals:obData.goals,fitnessLevel:obData.fitnessLevel,equipment:obData.equipment,
     injuries:obData.injuries,dietStyle:obData.dietStyle,mealMode:obData.mealMode,
     allergies:obData.allergies.split(',').map(a=>a.trim()).filter(Boolean),
-    calorieTarget:calcKcal(w,obData.goals[0]),proteinTargetG:calcProt(w),
+    calorieTarget:calcKcal(w,parseInt(obData.height)||180,parseInt(obData.age)||25,obData.goals,obData.fitnessLevel,obData.mealMode),
+    proteinTargetG:calcProt(w,obData.goals),
     shakeEnabled:obData.shakeEnabled,snacksEnabled:obData.snacksEnabled,
     wakeTime:obData.wakeTime,sleepTime:obData.sleepTime,
     preferredTrainingTime:obData.trainingTime,
@@ -912,7 +972,7 @@ function finishOnboarding(){
   };
   state.profile=profile;
   const today=todayISO(),weekStart=getMon();
-  state.mealCycle=buildMealCycle(today,profile);
+  state.mealCycle=buildMealCycle(weekStart,profile);
   state.trainingWeek=buildTrainingWeek(weekStart,profile);
   state.timeline=buildTimeline(weekStart,profile,state.mealCycle,state.trainingWeek);
   state.selectedDate=today;
@@ -1150,7 +1210,7 @@ function setMealTab(tab){
 
 function renderMeals(){
   const mc=state.mealCycle;
-  document.getElementById('meal-sub').textContent=mc?`Zyklus ab ${dayLabel(mc.cycleStart)}`:'';
+  document.getElementById('meal-sub').textContent=mc?`KW ab ${dayLabel(mc.cycleStart)} · Prep: So + Mi`:'';
   renderMealsContent();
 }
 
@@ -1326,7 +1386,7 @@ function renderTraining(){
 function regenerateAll(){
   if(!state.profile)return;
   const today=todayISO(),weekStart=getMon();
-  state.mealCycle=buildMealCycle(today,state.profile);
+  state.mealCycle=buildMealCycle(weekStart,state.profile);
   state.trainingWeek=buildTrainingWeek(weekStart,state.profile);
   state.timeline=buildTimeline(weekStart,state.profile,state.mealCycle,state.trainingWeek);
   save();renderCurrentView();
