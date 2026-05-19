@@ -127,14 +127,31 @@ select option{background:var(--card2);}
 .block-meta{display:flex;align-items:center;gap:8px;margin-top:5px;}
 .pill{padding:2px 8px;border-radius:10px;font-size:10px;font-weight:700;background:var(--card2);}
 
-/* Week view */
-.week-grid{display:grid;grid-template-columns:repeat(7,1fr);gap:4px;padding:0 16px 12px;overflow-x:auto;}
-.wg-col{min-width:42px;}
-.wg-head{text-align:center;font-size:10px;font-weight:700;color:var(--muted);padding:4px 0;text-transform:uppercase;}
-.wg-head.today{color:#a78bfa;}
-.wg-block{border-radius:6px;margin-bottom:3px;padding:3px 4px;font-size:9px;font-weight:700;color:#fff;cursor:pointer;line-height:1.2;transition:all .15s;overflow:hidden;}
-.wg-block:active{transform:scale(.95);}
-.wg-empty{height:6px;}
+/* ── Week Timetable ── */
+.wc-wrap{display:flex;flex-direction:column;height:100%;overflow:hidden;}
+.wc-hdr{display:flex;flex-shrink:0;border-bottom:1px solid var(--border);background:var(--bg);}
+.wc-gut{width:42px;flex-shrink:0;border-right:1px solid var(--border);}
+.wc-dh{flex:1;text-align:center;padding:5px 2px;font-size:9px;font-weight:700;color:var(--muted);text-transform:uppercase;border-right:1px solid var(--border);line-height:1.5;cursor:pointer;}
+.wc-dh:active{background:var(--card2);}
+.wc-dh.wc-today{color:#a78bfa;}
+.wc-dh b{display:block;font-size:14px;font-weight:800;color:var(--text);}
+.wc-dh.wc-today b{color:#a78bfa;}
+.wc-scroll{flex:1;overflow-y:auto;overflow-x:hidden;display:flex;}
+.wc-tcol{width:42px;flex-shrink:0;position:relative;border-right:1px solid var(--border);}
+.wc-tl{position:absolute;right:5px;font-size:9px;color:var(--muted);font-weight:600;transform:translateY(-50%);white-space:nowrap;pointer-events:none;}
+.wc-grid{flex:1;position:relative;}
+.wc-hl{position:absolute;left:0;right:0;border-top:1px solid var(--border);pointer-events:none;}
+.wc-hlh{position:absolute;left:0;right:0;border-top:1px dashed rgba(255,255,255,.05);pointer-events:none;}
+.wc-cs{position:absolute;top:0;bottom:0;border-right:1px solid var(--border);pointer-events:none;}
+.wc-cs.wc-td{background:rgba(124,58,237,.04);}
+.wc-now-line{position:absolute;left:0;right:0;border-top:2px solid #ef4444;pointer-events:none;z-index:4;}
+.wc-now-line::before{content:'';position:absolute;left:-3px;top:-4px;width:7px;height:7px;border-radius:50%;background:#ef4444;}
+.wc-block{position:absolute;border-radius:5px;padding:3px 5px 10px;font-size:9px;font-weight:700;color:#fff;cursor:grab;overflow:hidden;touch-action:none;user-select:none;box-shadow:0 2px 8px rgba(0,0,0,.4);z-index:2;transition:box-shadow .1s;}
+.wc-block.wc-drag{box-shadow:0 10px 28px rgba(0,0,0,.6);opacity:.88;z-index:20;cursor:grabbing;}
+.wc-bn{white-space:nowrap;overflow:hidden;text-overflow:ellipsis;line-height:1.35;}
+.wc-bt{font-size:8px;opacity:.75;margin-top:1px;}
+.wc-rh{position:absolute;bottom:0;left:0;right:0;height:10px;cursor:ns-resize;display:flex;align-items:center;justify-content:center;touch-action:none;}
+.wc-rh::after{content:'';width:16px;height:2px;background:rgba(255,255,255,.55);border-radius:1px;}
 
 /* Sub tabs */
 .sub-tabs{display:flex;margin:0 16px 12px;background:var(--card);border-radius:12px;padding:4px;gap:4px;}
@@ -1034,19 +1051,19 @@ function renderTimeline(){
   const days=tl.days;
   document.getElementById('tl-range').textContent=days.length?`${dayLabel(days[0].date)} – ${dayLabel(days[days.length-1].date)}`:'';
   const today=todayISO();
-
-  // Day picker (always shown)
-  document.getElementById('tl-day-picker').innerHTML=days.map(d=>{
-    const{name,num}=shortDay(d.date);
-    const isActive=d.date===state.selectedDate;
-    const isToday=d.date===today;
-    return`<div class="day-chip${isActive?' active':''}${!isActive&&isToday?' today':''}" onclick="selectDay('${d.date}')">
-      <div class="dc-name">${name}</div><div class="dc-num">${num}</div>
-    </div>`;
-  }).join('');
-
-  if(tlView==='week'){renderWeekView(days,today);}
-  else{renderDayView(days,today);}
+  const isWeek=tlView==='week';
+  // Hide day picker in week view (it's built into the timetable header)
+  document.getElementById('tl-day-picker').style.display=isWeek?'none':'';
+  const el=document.getElementById('tl-content');
+  if(isWeek){el.style.padding='0';el.style.overflowY='hidden';renderWeekView(days,today);}
+  else{el.style.padding='';el.style.overflowY='';
+    // Day picker
+    document.getElementById('tl-day-picker').innerHTML=days.map(d=>{
+      const{name,num}=shortDay(d.date);const isActive=d.date===state.selectedDate,isToday=d.date===today;
+      return`<div class="day-chip${isActive?' active':''}${!isActive&&isToday?' today':''}" onclick="selectDay('${d.date}')"><div class="dc-name">${name}</div><div class="dc-num">${num}</div></div>`;
+    }).join('');
+    renderDayView(days,today);
+  }
 }
 
 function renderDayView(days,today){
@@ -1073,21 +1090,125 @@ function renderDayView(days,today){
   `).join('')+'</div>';
 }
 
+// ══ WEEK TIMETABLE ══
+const WC_HR=64,WC_S0=6*60,WC_S1=23*60,WC_SN=15;
+let wcd=null;
+
 function renderWeekView(days,today){
   const el=document.getElementById('tl-content');
-  const header=days.map(d=>{
+  const hrs=(WC_S1-WC_S0)/60,pxH=hrs*WC_HR;
+  const N=days.length;
+
+  // Day headers
+  const hdrs=days.map((d,i)=>{
     const{name,num}=shortDay(d.date);
-    const isToday=d.date===today;
-    return`<div class="wg-col"><div class="wg-head${isToday?' today':''}">${name}<br><span style="font-size:12px;font-weight:800;">${num}</span></div>${
-      d.blocks.length?d.blocks.map(b=>`<div class="wg-block" style="background:${BLOCK_COLORS[b.type]||'#64748b'};" onclick="openBlockAction('${b.date}','${b.id}')" title="${b.title} ${b.startTime}-${b.endTime}">${b.title.substring(0,6)}</div>`).join('')
-      :'<div class="wg-empty"></div>'
-    }</div>`;
+    return`<div class="wc-dh${d.date===today?' wc-today':''}" onclick="selectDay('${d.date}');setTLView('day')">${name}<b>${num}</b></div>`;
   }).join('');
-  el.innerHTML=`<div class="week-grid fade-up">${header}</div>
-  <div style="padding:0 16px;"><div class="section-title">Legende</div>
-  <div style="display:flex;flex-wrap:wrap;gap:8px;">
-    ${Object.entries(BLOCK_LABELS).map(([k,v])=>`<div style="display:flex;align-items:center;gap:5px;font-size:11px;color:var(--muted);"><div style="width:10px;height:10px;border-radius:3px;background:${BLOCK_COLORS[k]};flex-shrink:0;"></div>${v}</div>`).join('')}
-  </div></div>`;
+
+  // Time labels + grid lines
+  let tlbls='',hlines='';
+  for(let h=0;h<=hrs;h++){
+    const top=h*WC_HR,lh=WC_S0/60+h;
+    tlbls+=`<div class="wc-tl" style="top:${top}px">${String(lh).padStart(2,'0')}:00</div>`;
+    hlines+=`<div class="wc-hl" style="top:${top}px"></div>`;
+    if(h<hrs)hlines+=`<div class="wc-hlh" style="top:${top+WC_HR/2}px"></div>`;
+  }
+
+  // Column backgrounds
+  const cols=days.map((d,i)=>{
+    const l=(i/N*100).toFixed(3),w=(100/N).toFixed(3);
+    return`<div class="wc-cs${d.date===today?' wc-td':''}" style="left:${l}%;width:${w}%"></div>`;
+  }).join('');
+
+  // Current time line
+  const nowMin=new Date().getHours()*60+new Date().getMinutes();
+  const nowLine=(nowMin>=WC_S0&&nowMin<WC_S1)?`<div class="wc-now-line" style="top:${(nowMin-WC_S0)/60*WC_HR}px"></div>`:'';
+
+  // Blocks
+  const blks=days.flatMap((day,ci)=>day.blocks.map(b=>{
+    const sm=t2m(b.startTime),em=t2m(b.endTime);
+    const cs=Math.max(sm,WC_S0),ce=Math.min(em,WC_S1);
+    if(ce<=cs)return'';
+    const top=(cs-WC_S0)/60*WC_HR,h=Math.max((ce-cs)/60*WC_HR,16);
+    const l=(ci/N*100).toFixed(3),w=(100/N).toFixed(3);
+    return`<div class="wc-block" data-id="${b.id}" data-date="${b.date}" data-col="${ci}" data-sm="${sm}" data-em="${em}"
+      style="top:${top}px;height:${h}px;left:calc(${l}% + 2px);width:calc(${w}% - 4px);background:${BLOCK_COLORS[b.type]||'#64748b'};"
+      onpointerdown="wcDown(event,this,false)">
+      <div class="wc-bn">${b.title}</div>
+      ${h>28?`<div class="wc-bt">${b.startTime}–${m2t(em)}</div>`:''}
+      <div class="wc-rh" onpointerdown="event.stopPropagation();wcDown(event,this.closest('.wc-block'),true)"></div>
+    </div>`;
+  })).join('');
+
+  el.innerHTML=`<div class="wc-wrap">
+    <div class="wc-hdr"><div class="wc-gut"></div>${hdrs}</div>
+    <div class="wc-scroll" id="wc-scroll">
+      <div class="wc-tcol" style="height:${pxH+80}px">${tlbls}</div>
+      <div class="wc-grid" id="wc-grid" style="height:${pxH+80}px">${cols}${hlines}${nowLine}${blks}</div>
+    </div>
+  </div>`;
+
+  // Scroll to current time (or 07:00 if outside range)
+  const sc=document.getElementById('wc-scroll');
+  if(sc)sc.scrollTop=Math.max(0,(Math.min(Math.max(nowMin,WC_S0),WC_S1)-WC_S0-60)/60*WC_HR);
+}
+
+function wcDown(e,el,isResize){
+  e.preventDefault();
+  const sm=parseInt(el.dataset.sm),em=parseInt(el.dataset.em);
+  const gr=document.getElementById('wc-grid').getBoundingClientRect();
+  const sc=document.getElementById('wc-scroll');
+  wcd={el,isResize,sm,em,dur:em-sm,gr,sc,N:state.timeline?.days.length||7,
+    offY:e.clientY-el.getBoundingClientRect().top,
+    origId:el.dataset.id,origDate:el.dataset.date,
+    origCol:parseInt(el.dataset.col),newCol:parseInt(el.dataset.col)};
+  el.classList.add('wc-drag');
+  el.setPointerCapture(e.pointerId);
+  el.onpointermove=wcMove;
+  el.onpointerup=wcUp;
+}
+
+function wcMove(e){
+  if(!wcd)return;
+  e.preventDefault();
+  const{el,isResize,dur,gr,sc,offY,N}=wcd;
+  const relY=e.clientY-gr.top+sc.scrollTop;
+  if(isResize){
+    const newEm=Math.round((WC_S0+relY/WC_HR*60)/WC_SN)*WC_SN;
+    if(newEm>wcd.sm+WC_SN&&newEm<=WC_S1){
+      el.style.height=Math.max((newEm-wcd.sm)/60*WC_HR,16)+'px';wcd.em=newEm;
+    }
+  }else{
+    const newSm=Math.round((WC_S0+(relY-offY)/WC_HR*60)/WC_SN)*WC_SN;
+    const newEm=newSm+dur;
+    if(newSm>=WC_S0&&newEm<=WC_S1){
+      el.style.top=(newSm-WC_S0)/60*WC_HR+'px';wcd.sm=newSm;wcd.em=newEm;
+    }
+    const nc=Math.max(0,Math.min(N-1,Math.floor((e.clientX-gr.left)/(gr.width/N))));
+    if(nc!==wcd.newCol){el.style.left=`calc(${(nc/N*100).toFixed(3)}% + 2px)`;wcd.newCol=nc;}
+  }
+}
+
+function wcUp(){
+  if(!wcd)return;
+  const{el,origId,origDate,origCol,sm,em,newCol}=wcd;
+  el.classList.remove('wc-drag');el.onpointermove=null;el.onpointerup=null;
+  const tl=state.timeline;if(!tl){wcd=null;return;}
+  const newDate=tl.days[newCol]?.date||origDate;
+  const origDay=tl.days.find(d=>d.date===origDate);
+  const block=origDay?.blocks.find(b=>b.id===origId);
+  if(block){
+    block.startTime=m2t(sm);block.endTime=m2t(em);
+    if(newDate!==origDate){
+      origDay.blocks=origDay.blocks.filter(b=>b.id!==origId);
+      block.date=newDate;
+      const nd=tl.days.find(d=>d.date===newDate);
+      if(nd){nd.blocks.push(block);nd.blocks.sort((a,b)=>a.startTime.localeCompare(b.startTime));}
+    }else origDay.blocks.sort((a,b)=>a.startTime.localeCompare(b.startTime));
+    save();
+  }
+  wcd=null;
+  renderWeekView(tl.days,todayISO());
 }
 
 function selectDay(date){state.selectedDate=date;renderTimeline();}
