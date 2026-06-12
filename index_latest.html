@@ -1698,11 +1698,12 @@ function renderWeekNav(){
 function goToToday(){
   const today=todayISO();
   const ws=getMon(today);
-  if(state.planWeekStart!==ws){state.planWeekStart=ws;regenerateAll(false,{weekStart:ws});}
-  else{state.selectedDate=today;tlView='week';renderTimeline();}
+  const needRegen=getMon(state.planWeekStart||today)!==ws;
   state.selectedDate=today;
-  tlView='week';
-  renderTimeline();
+  // tlView bleibt wie er ist: in Tagesansicht zeigt Heute den heutigen Tag,
+  // in Wochenansicht bleibt man in der Woche.
+  if(needRegen){state.planWeekStart=ws;regenerateAll(false,{weekStart:ws});renderCurrentView();}
+  else{renderTimeline();}
 }
 function shiftPlanWeek(delta){
   const current=getMon(state.planWeekStart||state.timeline?.weekStart||state.selectedDate||getMon());
@@ -1719,10 +1720,9 @@ function openWeekOverlay(){tlView='week';renderTimeline();}
 function closeWeekOverlay(){tlView='week';renderTimeline();}
 function renderWeekOverlay(){renderTimeline();}
 function setTLView(v){tlView=v;renderTimeline();}function renderTimeline(){const tl=state.timeline;if(!tl){document.getElementById('tl-content').innerHTML='<div class="empty" style="padding:40px 0;text-align:center"><div style="font-size:32px;margin-bottom:12px">📅</div><div style="font-weight:700">Plan wird generiert…</div></div>';return;}const days=tl.days,today=todayISO();if(!state.selectedDate||!days.some(d=>d.date===state.selectedDate))state.selectedDate=today;const el=document.getElementById('tl-content');const dp=document.getElementById('tl-day-picker');// update toggle button states
-const vbW=document.getElementById('vbtn-week'),vbD=document.getElementById('vbtn-day');if(vbW){vbW.classList.toggle('active',tlView==='week');vbD.classList.toggle('active',tlView==='day');}if(tlView==='week'){dp.style.display='none';el.style.padding='16px';el.style.overflow='';// Wochenansicht mit echter Zeitachse (Standardansicht)
-// renderWeekView kümmert sich um nav + zeitgitter; dayClickFn navigiert in Tag
-renderWeekView(days,today,{dayClickFn:"tlView='day';renderTimeline()"});}else{// Day detail view
-dp.style.display='none';el.style.padding='16px';el.style.overflow='';const sd=shortDay(state.selectedDate);const isToday=state.selectedDate===today;const dayLabel=isToday?'Heute':sd.name+' '+sd.num;el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><button class="btn btn-secondary btn-sm" onclick="tlView='week';renderTimeline()" style="flex-shrink:0">← Woche</button><div style="font-weight:900;font-size:16px;flex:1">${dayLabel}</div>${!isToday?`<button class="btn btn-secondary btn-sm" onclick="goToToday()" style="background:var(--accent);color:#000;font-weight:800;border-color:var(--accent)">Heute</button>`:''}</div>`;renderDayView(days,today);}}function renderDayView(days,today){if(!state.selectedDate)state.selectedDate=today;const day=days.find(d=>d.date===state.selectedDate);const el=document.getElementById('tl-content');if(!day||!day.blocks.length){el.innerHTML+='<div class="empty" style="padding:32px 0;text-align:center">Heute nichts geplant.</div>';return}const scorable=day.blocks.filter(b=>b.type!=='work'),done=scorable.filter(b=>b.status==='done').length,pct=scorable.length?Math.round(done/scorable.length*100):0;const isToday=day.date===today;const isMinimal=!!(state.minimalDays?.[day.date]);const hasMoveable=day.blocks.some(b=>b.status==='planned'&&(b.type==='training'||b.type==='shopping'||b.type==='prep'||b.type==='mobility'));const actionBtn=isToday?(isMinimal?`<button class="btn btn-secondary btn-sm" onclick="undoMinimalDay('${day.date}')" style="margin-left:auto;touch-action:manipulation">↩ Rückgängig</button>`:hasMoveable?`<button class="btn btn-secondary btn-sm" onclick="activateMinimalDay('${day.date}')" style="margin-left:auto;touch-action:manipulation">Tag entlasten</button>`:''):'';el.innerHTML+=`<div class="day-score"><div class="score-dot" style="--p:${pct}%">${pct}%</div><div><div style="font-weight:900">${done}/${scorable.length} erledigt</div>${isMinimal?'<div class="small muted" style="margin-top:4px">Entspannter Tag</div>':''}</div>${actionBtn}</div>`+renderCarryOver()+day.blocks.map(b=>renderBlockCard(b)).join('')}function renderBlockCard(b){const statusClass=b.status==='done'?'done':b.status==='skipped'?'skipped':b.status==='missed'?'skipped':b.status==='moved'?'skipped':'';const statusBadge=b.status==='done'?'✓':b.status==='missed'?'<span style="color:var(--danger);font-size:9px;font-weight:800">VERPASST</span>':b.status==='moved'?'<span style="color:#d97706;font-size:9px;font-weight:800">VERSCHOBEN</span>':b.status==='blocked'?'<span style="color:var(--danger);font-size:9px;font-weight:800">BLOCKIERT</span>':'';return `<div class="block-card ${statusClass}" onclick="openBlockAction('${b.date}','${b.id}')"><div class="block-bar" style="background:${BLOCK_COLORS[b.type]||'#64748b'}"></div><div class="block-body"><div class="block-time">${b.startTime} – ${b.endTime} ${statusBadge}</div><div class="block-title">${esc(b.title)}</div><div class="block-meta"><span class="muted small" style="font-weight:800">${tdiff(b.startTime,b.endTime)} Min</span><span class="pill" style="background:${BLOCK_COLORS[b.type]||'#64748b'}22;color:${BLOCK_COLORS[b.type]||'#64748b'}">${BLOCK_LABELS[b.type]||b.type}</span>${b.notes?`<span class="muted small">${esc(b.notes)}</span>`:''}</div></div></div>`}
+const vbW=document.getElementById('vbtn-week'),vbD=document.getElementById('vbtn-day');if(vbW){vbW.classList.toggle('active',tlView==='week');vbD.classList.toggle('active',tlView==='day');}if(tlView==='week'){dp.style.display='none';el.style.padding='0';el.style.overflow='hidden';el.style.display='flex';el.style.flexDirection='column';// Wochenansicht: Zeitachse exakt einpassen, KEIN Scroll (deterministische Höhe)
+const availH=el.clientHeight||(window.innerHeight-160);const gridH=Math.max(280,availH-86);renderWeekView(days,today,{gridH,withNav:true,dayClickFn:"tlView='day';renderTimeline()"});}else{// Day detail view
+dp.style.display='none';el.style.padding='16px';el.style.overflow='auto';el.style.display='block';el.style.flexDirection='';const sd=shortDay(state.selectedDate);const isToday=state.selectedDate===today;const dayLabel=isToday?'Heute':sd.name+' '+sd.num;el.innerHTML=`<div style="display:flex;align-items:center;gap:10px;margin-bottom:12px"><button class="btn btn-secondary btn-sm" onclick="tlView='week';renderTimeline()" style="flex-shrink:0">← Woche</button><div style="font-weight:900;font-size:16px;flex:1">${dayLabel}</div>${!isToday?`<button class="btn btn-secondary btn-sm" onclick="goToToday()" style="background:var(--accent);color:#000;font-weight:800;border-color:var(--accent)">Heute</button>`:''}</div>`;renderDayView(days,today);}}function renderDayView(days,today){if(!state.selectedDate)state.selectedDate=today;const day=days.find(d=>d.date===state.selectedDate);const el=document.getElementById('tl-content');if(!day||!day.blocks.length){el.innerHTML+='<div class="empty" style="padding:32px 0;text-align:center">Heute nichts geplant.</div>';return}const scorable=day.blocks.filter(b=>b.type!=='work'),done=scorable.filter(b=>b.status==='done').length,pct=scorable.length?Math.round(done/scorable.length*100):0;const isToday=day.date===today;const isMinimal=!!(state.minimalDays?.[day.date]);const hasMoveable=day.blocks.some(b=>b.status==='planned'&&(b.type==='training'||b.type==='shopping'||b.type==='prep'||b.type==='mobility'));const actionBtn=isToday?(isMinimal?`<button class="btn btn-secondary btn-sm" onclick="undoMinimalDay('${day.date}')" style="margin-left:auto;touch-action:manipulation">↩ Rückgängig</button>`:hasMoveable?`<button class="btn btn-secondary btn-sm" onclick="activateMinimalDay('${day.date}')" style="margin-left:auto;touch-action:manipulation">Tag entlasten</button>`:''):'';el.innerHTML+=`<div class="day-score"><div class="score-dot" style="--p:${pct}%">${pct}%</div><div><div style="font-weight:900">${done}/${scorable.length} erledigt</div>${isMinimal?'<div class="small muted" style="margin-top:4px">Entspannter Tag</div>':''}</div>${actionBtn}</div>`+renderCarryOver()+day.blocks.map(b=>renderBlockCard(b)).join('')}function renderBlockCard(b){const statusClass=b.status==='done'?'done':b.status==='skipped'?'skipped':b.status==='missed'?'skipped':b.status==='moved'?'skipped':'';const statusBadge=b.status==='done'?'✓':b.status==='missed'?'<span style="color:var(--danger);font-size:9px;font-weight:800">VERPASST</span>':b.status==='moved'?'<span style="color:#d97706;font-size:9px;font-weight:800">VERSCHOBEN</span>':b.status==='blocked'?'<span style="color:var(--danger);font-size:9px;font-weight:800">BLOCKIERT</span>':'';return `<div class="block-card ${statusClass}" onclick="openBlockAction('${b.date}','${b.id}')"><div class="block-bar" style="background:${BLOCK_COLORS[b.type]||'#64748b'}"></div><div class="block-body"><div class="block-time">${b.startTime} – ${b.endTime} ${statusBadge}</div><div class="block-title">${esc(b.title)}</div><div class="block-meta"><span class="muted small" style="font-weight:800">${tdiff(b.startTime,b.endTime)} Min</span><span class="pill" style="background:${BLOCK_COLORS[b.type]||'#64748b'}22;color:${BLOCK_COLORS[b.type]||'#64748b'}">${BLOCK_LABELS[b.type]||b.type}</span>${b.notes?`<span class="muted small">${esc(b.notes)}</span>`:''}</div></div></div>`}
 let WC_HR_A=30,WC_HR_E=11;const WC_S0=6*60,WC_S1=23*60,WC_SN=15;function wcComputeScale(targetH){const{wake,sleep}=wcBounds();const aH=(sleep-wake)/60,eH=((wake-WC_S0)+(WC_S1-sleep))/60;if(targetH){const x=Math.max(0.5,targetH)/Math.max(1,aH*2.7+eH);WC_HR_A=x*2.7;WC_HR_E=x;}else{const avail=Math.max(380,window.innerHeight-168);const x=avail/(aH*2.7+eH);WC_HR_A=Math.max(18,Math.min(46,x*2.7));WC_HR_E=Math.max(7,Math.min(18,x));}}
 function wcBounds(){const p=state.profile;const wake=p?Math.max(WC_S0,t2m(p.wakeTime||'07:00')):7*60;const sleep=p?Math.min(WC_S1,t2m(p.sleepTime||'23:00')):22*60;return{wake,sleep}}
 function wcMinToY(m){const{wake,sleep}=wcBounds();m=Math.max(WC_S0,Math.min(WC_S1,m));if(m<=wake)return(m-WC_S0)/60*WC_HR_E;const edgeH=(wake-WC_S0)/60*WC_HR_E;if(m<=sleep)return edgeH+(m-wake)/60*WC_HR_A;const activeH=(sleep-wake)/60*WC_HR_A;return edgeH+activeH+(m-sleep)/60*WC_HR_E}
@@ -1762,8 +1762,9 @@ function renderWeekView(days,today,opts){
     return `<div class="wc-block ${b.status==='done'?'done':b.status==='skipped'?'skipped':''}" data-id="${b.id}" data-date="${b.date}" data-col="${ci}" data-sm="${sm}" data-em="${em}" style="top:${top}px;height:${h}px;left:calc(${l}% + ${pad}px);width:calc(${w}% - ${pad*2}px);background:${BLOCK_COLORS[b.type]||'#64748b'}" onpointerdown="wcDown(event,this,false)"><div class="wc-bn">${esc(b.title)}</div>${h>28?`<div class="wc-bt">${b.startTime}–${m2t(em)}</div>`:''}<div class="wc-rh" onpointerdown="event.stopPropagation();wcDown(event,this.closest('.wc-block'),true)"></div></div>`;
   })}).join('');
   if(gridH){
-    // Overlay: fill exact height, no scroll, no week-nav header
-    el.innerHTML=`<div class="wc-hdr" style="flex-shrink:0"><div class="wc-gut"></div>${hdrs}</div><div id="wc-scroll" style="flex:1;overflow:hidden;display:flex"><div class="wc-tcol" style="height:${pxH}px">${labels}</div><div class="wc-grid" id="wc-grid" style="height:${pxH}px">${zones}${cols}${lines}${nowLine}${blks}</div></div>`;
+    // Exakt einpassen, KEIN Scroll. Optional Wochen-Nav oben.
+    const nav=opts?.withNav?`<div style="padding:10px 12px 2px;flex-shrink:0">${renderWeekNav()}</div>`:'';
+    el.innerHTML=nav+`<div class="wc-hdr" style="flex-shrink:0"><div class="wc-gut"></div>${hdrs}</div><div id="wc-scroll" style="flex:1;overflow:hidden;display:flex"><div class="wc-tcol" style="height:${pxH}px">${labels}</div><div class="wc-grid" id="wc-grid" style="height:${pxH}px">${zones}${cols}${lines}${nowLine}${blks}</div></div>`;
   }else{
     const _wrapH=Math.max(300,window.innerHeight-el.getBoundingClientRect().top-52);
     el.innerHTML=renderWeekNav()+`<div class="wc-wrap" style="height:${_wrapH}px"><div class="wc-hdr"><div class="wc-gut"></div>${hdrs}</div><div class="wc-scroll" id="wc-scroll"><div class="wc-tcol" style="height:${pxH}px">${labels}</div><div class="wc-grid" id="wc-grid" style="height:${pxH}px">${zones}${cols}${lines}${nowLine}${blks}</div></div></div>`;
@@ -1840,7 +1841,7 @@ function wcCancel(){
   wcRestoreScroll=wcd.sc?wcd.sc.scrollTop:null;
   wcCleanup();
   wcd=null;
-  if(tl)renderWeekView(tl.days,todayISO());
+  if(tl)renderTimeline();
 }
 
 function wcUp(e){
@@ -1866,7 +1867,7 @@ function wcUp(e){
       const oTop=wcMinToY(t2m(block.startTime)),oH=Math.max(wcMinToY(t2m(block.endTime))-oTop,22),oCol=+el.dataset.col,N=tl.days.length;
       el.style.top=oTop+'px';el.style.height=oH+'px';el.style.left=`calc(${(oCol/N*100).toFixed(3)}% + 2px)`;
       el.classList.add('wc-bounce');
-      wcd=null;setTimeout(()=>renderWeekView(tl.days,todayISO()),460);return;
+      wcd=null;setTimeout(()=>renderTimeline(),460);return;
     }
     block.startTime=m2t(sm);block.endTime=m2t(em);
     if(newDate!==origDate){
@@ -1878,7 +1879,7 @@ function wcUp(e){
     save();
   }
   wcd=null;
-  renderWeekView(tl.days,todayISO());
+  renderTimeline();
 }
 
 function toggleBlockMore(){const w=document.getElementById('block-more-wrap');const b=document.getElementById('block-more-btn');if(!w||!b)return;const open=w.style.display!=='none';w.style.display=open?'none':'block';b.textContent=open?'Mehr ···':'Weniger ↑';}
