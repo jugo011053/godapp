@@ -2757,7 +2757,8 @@ function renderPushCard(){
 
 // Init: restore session from localStorage
 _sbLoadSession();
-if(checkOAuthCallback()){setTimeout(()=>onAuthSuccess(),800);}
+// checkOAuthCallback ist async (verifiziert das Token beim Server), deshalb .then
+checkOAuthCallback().then(ok=>{if(ok)setTimeout(()=>onAuthSuccess(),800);}).catch(e=>console.warn('OAuth-Callback:',e));
 setTimeout(()=>{try{detectMissedBlocks();if(state.timeline)runPlanQualityCheck(state.timeline,state.profile);}catch(_){}},1200);
 
 // ── Auth Screen ────────────────────────────────────────────────────────────
@@ -2850,29 +2851,76 @@ async function asSubmit() {
   }
 }
 
+// Marker, dass DIESER Tab einen Login gestartet hat. sessionStorage überlebt den
+// Redirect zu Google und zurück, ist aber pro Tab isoliert — ein von außen
+// geschickter Link landet also immer in einem Tab ohne Marker.
+const SB_OAUTH_PENDING = 'sb_oauth_pending';
+const SB_OAUTH_MAX_AGE = 10 * 60 * 1000; // 10 Minuten
+
 function sbSignInWithGoogle() {
+  try { sessionStorage.setItem(SB_OAUTH_PENDING, String(Date.now())); } catch(_) {}
   const redirectTo = encodeURIComponent(window.location.origin + window.location.pathname);
   window.location.href = SB_URL + '/auth/v1/authorize?provider=google&redirect_to=' + redirectTo;
 }
 
-function checkOAuthCallback() {
+// Nimmt ein Token aus dem URL-Fragment NUR an, wenn dieser Tab den Login selbst
+// angestossen hat, und verifiziert es danach beim Server. Ohne die erste Prüfung
+// genügt ein praeparierter Link (#access_token=...), um jemanden still in einen
+// fremden Account einzuloggen; ohne die zweite würde dem ungeprüften JWT-Inhalt
+// vertraut, der clientseitig frei erfindbar ist.
+async function checkOAuthCallback() {
   const hash = window.location.hash;
   if (!hash.includes('access_token=')) return false;
+
+  // Fragment immer entfernen — auch bei Ablehnung, damit kein fremdes Token in
+  // URL, History oder Referrer stehen bleibt.
+  const clearHash = () => {
+    try { history.replaceState(null, '', window.location.pathname + window.location.search); } catch(_) {}
+  };
+
+  let startedAt = null;
   try {
-    const params = new URLSearchParams(hash.slice(1));
-    const accessToken = params.get('access_token');
-    const refreshToken = params.get('refresh_token');
-    if (!accessToken) return false;
-    const parts = accessToken.split('.');
-    const payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+    startedAt = sessionStorage.getItem(SB_OAUTH_PENDING);
+    sessionStorage.removeItem(SB_OAUTH_PENDING); // einmalig verwendbar
+  } catch(_) {}
+
+  const fresh = startedAt && /^\d+$/.test(startedAt) && (Date.now() - Number(startedAt)) < SB_OAUTH_MAX_AGE;
+  if (!fresh) {
+    clearHash();
+    console.warn('OAuth-Callback ignoriert: in diesem Tab wurde keine Anmeldung gestartet.');
+    try { toast('Anmeldelink ungültig — bitte in der App auf „Mit Google anmelden" tippen.'); } catch(_) {}
+    return false;
+  }
+
+  const params = new URLSearchParams(hash.slice(1));
+  const accessToken = params.get('access_token');
+  const refreshToken = params.get('refresh_token');
+  clearHash();
+  if (!accessToken) return false;
+
+  try {
+    const res = await fetch(SB_URL + '/auth/v1/user', {
+      headers: { apikey: SB_KEY, Authorization: 'Bearer ' + accessToken }
+    });
+    if (!res.ok) {
+      console.warn('OAuth-Token von Supabase abgelehnt:', res.status);
+      try { toast('Anmeldung fehlgeschlagen'); } catch(_) {}
+      return false;
+    }
+    const user = await res.json();
+    if (!user || !user.id) return false;
+    // Nutzerdaten kommen aus der Serverantwort, nicht aus dem dekodierten Token.
     _sbSaveSession({
       access_token: accessToken,
       refresh_token: refreshToken,
-      user: { id: payload.sub, email: payload.email || payload.user_metadata?.email || '' }
+      user: { id: user.id, email: user.email || user.user_metadata?.email || '' }
     });
-    history.replaceState(null, '', window.location.pathname);
     return true;
-  } catch(e) { console.warn('OAuth parse error:', e); return false; }
+  } catch(e) {
+    console.warn('OAuth-Verifikation fehlgeschlagen:', e);
+    try { toast('Anmeldung fehlgeschlagen'); } catch(_) {}
+    return false;
+  }
 }
 
 // ── Supplement Stack ─────────────────────────────────────────────────────────
