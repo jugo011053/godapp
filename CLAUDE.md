@@ -1,33 +1,42 @@
-# CLAUDE.md — D1 Fitness PWA · Kontext-Recovery-Datei
+# CLAUDE.md — Preply · Kontext-Recovery-Datei
 
-> **Für Claude nach Context-Reset:** Diese Datei + die hochgeladene `index_latest.html` sind alles was du brauchst.
-> Lies diese Datei zuerst, dann starte direkt — keine Rückfragen an den User.
+> **Für Claude nach Context-Reset:** Diese Datei allein reicht. Repo fetchen, das hier lesen, weiterarbeiten. **Keine Uploads mehr nötig** — der Code liegt im Repo.
 
 ---
 
-## Workflow (WICHTIG — hier liegt das Problem)
+## Die eine Regel
+
+**Die lebende Datei ist `app/index.html`. Nur die.**
+
+Alles unter `archive/` ist tot und wird nicht deployt — auch wenn es dieselbe `APP_VERSION` trägt. Verlass dich auf den Pfad, nie auf die Versionsnummer.
+
+---
+
+## Workflow
 
 ```
-User hat privates Repo, das NUR er pusht.
-Claude hat keinen Push-Zugriff auf das private Repo.
-Claude EDITIERT index_latest.html lokal → sendet via SendUserFile → User lädt hoch.
-
-NACH CONTEXT-RESET:
-1. User schickt index_latest.html als Upload (erstes oder zweites Message)
-2. Claude: cp Upload → /home/user/godapp/index_latest.html
-3. Claude: liest diese CLAUDE.md → kennt Stand
-4. Weiterarbeiten als wäre nichts gewesen.
-
-NACH JEDER PATCH-SESSION:
-Claude pusht CLAUDE.md + supabase_schema.sql via MCP push_files (klein, geht).
-index_latest.html pusht Claude NICHT (836KB, zu groß für MCP-Parameter).
+1. app/index.html bearbeiten
+2. committen
+3. nach main pushen
+4. GitHub Actions deployt automatisch -> live in ~1 Minute
 ```
 
-**Session-Start-Kommando wenn User index_latest.html hochlädt:**
+Kein Upload, kein SendUserFile-Umweg, kein manueller Schritt. Claude hat Push-Zugriff.
+
+**Live:** https://jugo011053.github.io/godapp/
+**Repo:** https://github.com/jugo011053/godapp — **öffentlich** (nicht privat!)
+
+### Deploy-Details
+- Workflow: `.github/workflows/deploy-pages.yml`
+- Triggert auf Push nach `main`, wenn sich `app/**` ändert
+- Lädt `app/` als Site-Root hoch → alle Pfade in der App sind **relativ**, damit sie unter `/godapp/` funktionieren. **Nie auf absolute Pfade (`/sw.js`, `/manifest.json`) umstellen** — das bricht den Unterpfad-Deploy.
+- Pages deployt **nur vom Default-Branch**. Arbeit auf einem Feature-Branch muss nach `main` gemergt werden, sonst passiert nichts.
+
+### Session-Start
 ```bash
-cp "<upload-pfad>" /home/user/godapp/index_latest.html
-grep -o "APP_VERSION='[^']*'" /home/user/godapp/index_latest.html
-grep -c "pushProfile\|_hhReady\|adjustPortion" /home/user/godapp/index_latest.html
+cd /home/user/godapp
+git fetch origin main && git checkout main && git pull
+grep -oE "APP_VERSION='[^']*'" app/index.html
 ```
 
 ---
@@ -36,169 +45,119 @@ grep -c "pushProfile\|_hhReady\|adjustPortion" /home/user/godapp/index_latest.ht
 
 | Key | Wert |
 |-----|------|
+| Produktname | **Preply** (Repo heißt noch `godapp`, App-interne Namen noch `godapp*` — Altlast) |
 | APP_VERSION | `godapp6.7.1` |
 | SCHEMA_VERSION | `8` |
-| STORE_KEY | `godapp6_7_1_state_v1` |
-| SB_URL | `https://rfdtjodpjvynnavnucvu.supabase.co` |
-| SB_KEY | `eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHRqb2RwanZ5bm5hdm51Y3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3Nzc0NTAsImV4cCI6MjA5NTM1MzQ1MH0._TFOq21ghEbcTrqAbrN3VGAiGP3e2MfAGqk7g0VZi2A` |
-| Design | Amber `#F59E0B`, Navy `#0E1530`, Font Manrope |
-| Datei | `/home/user/godapp/index_latest.html` (Single-File PWA) |
-| Schema | `/home/user/godapp/supabase_schema.sql` (idempotent, im Supabase SQL-Editor ausführen) |
+| STORE_KEY | `godapp6_7_1_state_v1` — **nicht umbenennen**, sonst verlieren alle Nutzer ihre lokalen Daten |
+| Supabase URL | `https://rfdtjodpjvynnavnucvu.supabase.co` (Projekt heißt im Dashboard noch `D1 DayOne`) |
+| Supabase anon key | **steht in `app/index.html`** — hier bewusst nicht dupliziert, die frühere Kopie in dieser Datei war fehlerhaft und führte zu 401ern |
+| Datei | `app/index.html` (Single-File-PWA, ~890 KB, kein Build, kein Framework) |
 
----
-
-## Aktuelle Patches (Stand: Patch 13)
-
-| Patch | Inhalt | Status |
-|-------|--------|--------|
-| 1–10 | Grundgerüst, Onboarding, Rezepte, Trainingsplan, Timeline, Gamification, Barcode, Shop | ✅ |
-| 11 | Blob-basierter Haushalt-Sync (veraltet, durch Patch 12 ersetzt) | 🔁 ersetzt |
-| 12 | **Granularer Haushalt-Sync** via RPCs `create_household`/`join_household` + Tabellen `meal_plans`/`meal_plan_entries`/`shopping_items`. Funktionen: `_sbRest`, `_sbRpc`, `createHousehold`, `joinHousehold`, `leaveHousehold`, `_getOrCreatePlanId`, `pushMealPlan`, `_applyPlanToMealWeek`, `syncHousehold`, `saveToHousehold` (debounced), `pushShopItem`, `pullShopping`, `pushAllShopping`. Guard: `_hhReady` Flag blockiert Push bis erster Sync. | ✅ |
-| 13 | **Granulare Personen-Daten** — `pushProfile` (→ `profiles`, typed Cols via `_PROFILE_COLMAP` + Settings-Blob, in `save()`), `pushGamification` (→ `gamification`, in `addXP`), `pushWeightLog`/`pushWaterLog` (upsert/Tag, in `logWeight`/`addWater`). **Pro-Person-Portionen**: `state.profile.portionFactor` (0.6–1.8), Regler im Profil-UI (`adjustPortion(±0.1)`), `scaledRecipe` multipliziert Faktor — eigene kcal/Mengen skalieren, geteilter Plan bleibt identisch. `state.bestStreak` in `updateStreak` getrackt. Initial-Push nach Login in `onAuthSuccess`. | ✅ |
-
----
-
-## Nächste geplante Patches
-
-| Patch | Priorität | Inhalt |
-|-------|-----------|--------|
-| 14 | 🔴 Kritisch | JWT-Refresh (Token läuft nach 1h ab, Sync schlägt still fehl), Sync-Fehler-Toast (User sieht nichts), sw.js + manifest.json regenerieren |
-| 15 | 🟠 UX | `prompt()`/`confirm()` → eigene Modals (6 Stellen), Zwangs-Login raus aus Onboarding, tote „+ Profil"-Button fixen, Schrittzähler korrigieren, Portionsmodal „Einloggen"→„Bestätigen" |
-| 16 | 🟡 Engine | Echte Trainings-Progression (letztes Gewicht/Wdh je Übung → nächste Session vorschlagen), Rezept-Wiederholungsschutz über ganze Woche |
-| 17 | Später | Learning-Signals aktivieren, Kalender-Konflikt-Fallback, Macro-Skalierung verbessern |
-
----
-
-## Supabase Schema (v2)
-
-Datei: `supabase_schema.sql`. Im Supabase SQL-Editor ausführen — ist idempotent (DROP IF EXISTS + CREATE IF NOT EXISTS).
-
-### 20 Tabellen
-
-| Tabelle | Zweck |
-|---------|-------|
-| `profiles` | 1 Zeile/User; alle Onboarding-Daten + Settings |
-| `households` | Haushalt-Grunddaten (invite_code, name, created_by) |
-| `household_members` | User↔Haushalt mit role (owner/member) |
-| `meal_plans` | 1/Woche/Haushalt (week_start, diet_override, meta JSONB) |
-| `meal_plan_entries` | Tag×Kategorie×Rezept-ID (day_date, category, recipe_id, prep_group) |
-| `meal_entry_status` | Pro-Person Abhaken + portion_factor (entry_id, user_id, status, portion_factor) |
-| `shopping_items` | Granulare Einkaufsliste (gegenseitig abhakbar, checked_by) |
-| `timeline_blocks` | Kalender-Blöcke (kind, day_date=NULL=unscheduled) |
-| `training_plans` | Wochenplan-Metadaten |
-| `training_sessions` | Session-Log |
-| `training_sets` | Satz×Gewicht×Wdh |
-| `supplement_stack` | Stack-Definitionen |
-| `supplement_logs` | Tägliches Logging |
-| `weight_logs` | Gewichtsverlauf (upsert/Tag) |
-| `water_logs` | Wasseraufnahme (upsert/Tag) |
-| `gamification` | XP/Level/Streak/best_streak/badges |
-| `custom_recipes` | Eigene Rezepte (privat oder im Haushalt geteilt) |
-| `pantry_items` | Vorrat |
-| `day_meta` | Tages-Metadaten (load, minimalDay) |
-| `user_state` | Blob-Backup des kompletten States |
-
-### RLS-Prinzip
-- Persönliche Tabellen: `user_id = auth.uid()` 
-- Haushalt-Tabellen: `household_id IN (user_household_ids())`
-- Haushalt INSERT/UPDATE: nur über Security-Definer-RPCs (`create_household`, `join_household`)
-- `award_xp(p_xp)` RPC: Streak/Level automatisch (Security Definer)
-
----
-
-## State → DB Mapping
-
-| `state.*` | DB-Tabelle | Migriert? |
-|-----------|-----------|-----------|
-| `profile` | `profiles` | ✅ write-through (`pushProfile` in `save()`, typed Cols + `settings`-Blob) |
-| `profile.portionFactor` | in `settings` | ✅ Patch 13 |
-| `mealWeek` | `meal_plans` + `meal_plan_entries` | ✅ im Haushalt; lokal noch user_state |
-| `shopChecked` | `shopping_items` | ✅ gegenseitig abhakbar |
-| `householdId/Code` | `households` via RPCs | ✅ Patch 12 |
-| `weightLog` | `weight_logs` | ✅ write-through (pushWeightLog in logWeight) |
-| `waterLog` | `water_logs` | ✅ write-through (pushWaterLog in addWater) |
-| `xp/level/streak` | `gamification` | ✅ write-through (pushGamification in addXP) |
-| `mealLog/mealActual` | `meal_entry_status` | ⬜ TODO Patch 14+ |
-| `timeline.days[].blocks` | `timeline_blocks` | ⬜ TODO |
-| `trainingWeek` | `training_plans` | ⬜ TODO |
-| `sessionLog/progressionLog` | `training_sessions/sets` | ⬜ TODO |
-| `customRecipes` | `custom_recipes` | ⬜ TODO |
-| `myVorrat` | `pantry_items` | ⬜ TODO |
-| `dayLoad/minimalDays` | `day_meta` | ⬜ TODO |
-
----
-
-## Bekannte App-Profil-Felder (`state.profile`)
-
+### Design (hell/grün — Preply)
 ```
-name, age, heightCm, weightKg, sex, mainGoal, goals[], fitnessLevel,
-equipment[], injuries, dietStyle, mealMode, allergies[], calorieTarget,
-proteinTargetG, shakeEnabled, snacksEnabled, wakeTime, sleepTime,
-preferredTrainingTime, workSchedule{}, bufferAfterWorkMin, prepDays,
-persons, hideKcal, fixedBlocks[], cookDays, shopDays, waterGoalMl,
-portionFactor, createdAt
+--paper / --bg : #f7f7f4     --card  : #ffffff
+--ink / --text : #111111     --muted : #72726d
+--accent       : #78a800     --border: #e1e1db
 ```
-
-`_PROFILE_COLMAP` mappt diese auf DB-Spalten in `profiles`.
-
----
-
-## Key-Funktionen (Zeilen-Referenz für die aktuelle index_latest.html)
-
-| Funktion | Beschreibung |
-|----------|-------------|
-| `save()` | localStorage + `syncToCloud()` + `saveToHousehold()` + `pushProfile()` |
-| `addXP(amount, label)` | XP/Level + `updateStreak()` + `pushGamification()` |
-| `updateStreak()` | streak/lastActive/bestStreak |
-| `scaledRecipe(r, cat, p)` | kcal-Skalierung × `portionFactor` |
-| `effectiveKcal(p)` | `calorieOverride \|\| calorieTarget \|\| 2200` |
-| `logWeight()` | prompt → weightLog[] + `pushWeightLog()` |
-| `addWater(n)` | waterLog{} + `pushWaterLog()` |
-| `adjustPortion(d)` | portionFactor ±0.1, Regler im Profil |
-| `finishOnboarding()` | profile-Objekt aufbauen, `regenerateAll()`, `addXP(100)` |
-| `syncToCloud()` | Debounced (1500ms) → `sbUpsert('user_state', ...)` |
-| `loadFromCloud()` | `sbSelect('user_state', ...)` → `normalizeStateShape()` |
-| `onAuthSuccess()` | Cloud laden, Haushalt-Sync, `pushProfile()`, `pushGamification()` |
-| `init()` | Startup: load, patches, regenerate, Haushalt-Sync |
-| `_sbRest(path, opts)` | Supabase REST wrapper |
-| `_sbRpc(fn, body)` | Supabase RPC wrapper |
-| `syncHousehold()` | Pull meal_plans + entries + shopping (setzt `_hhReady=true`) |
-| `pushMealPlan()` | DELETE + INSERT meal_plan_entries, PATCH meta |
-| `saveToHousehold()` | Debounced (1500ms), Guard: `_hhReady` |
-| `pushShopItem(key, checked)` | Upsert shopping_items |
-| `pushProfile()` | Upsert profiles (debounced 1500ms) |
-| `pushGamification()` | Upsert gamification (debounced 1500ms) |
-| `pushWeightLog(date, w, bf)` | Upsert weight_logs |
-| `pushWaterLog(date, ml)` | Upsert water_logs |
-| `renderMealsContent()` | Haupt-Render Meals-Tab |
-| `renderMealDay(day)` | Einzeltag mit Mahlzeiten-Cards |
-| `renderProfile()` | Profil-Tab (inkl. Portionsfaktor-Regler) |
-| `renderTimeline()` / `renderWeek()` | Kalender-Views |
-| `buildMealWeek(weekStart, p)` | Wochenplan generieren |
-| `buildTrainingWeek(weekStart, p)` | Trainingsplan generieren |
-| `buildTimeline(weekStart, p, ...)` | Kalender-Blöcke platzieren |
+Manifest + `theme-color` sind ebenfalls `#78A800`. **Das frühere Navy/Amber (`#0E1530`/`#F59E0B`) gilt nicht mehr** — es existiert nur noch als erster, überschriebener `:root`-Block im CSS. Beim Prüfen von Farben immer den **letzten** `:root` ansehen, sonst zieht man falsche Schlüsse.
 
 ---
 
-## Was NICHT im Repo ist (und warum)
+## Struktur der App
 
-- `index_latest.html` — 836KB, zu groß für MCP push_files Parameter. **User uploaded es am Session-Start.**
-- `sw.js` + `manifest.json` — fehlen, PWA-Patch (Patch 14) noch ausstehend
-- `icon.png` — liegt bei User lokal
+**Bottom-Nav: Heute · Plan · Einkaufen.** Profil liegt als Icon oben rechts im Header (dort Haushaltscode + Konfiguration).
 
----
+| Bereich | Inhalt |
+|---|---|
+| Heute | Mahlzeiten des heutigen Tages |
+| Plan | Woche, Tage einzeln durchklickbar, Gerichte tauschbar |
+| Einkaufen | Liste aus dem Plan, abhakbar, Pack-/Preisrechnung |
+| Bibliothek | über „Bibliothek öffnen" aus Heute/Plan — nach Mahlzeit getrennt, mit Filtern |
+| Profil | Header-Icon: Ziele, kcal/Protein, Portionsgröße, Personen, Haushaltscode |
 
-## Gesprächskontext (wichtig nach Reset)
-
-- App ist eine **Single-File PWA** (kein Build, kein Framework — reines HTML/CSS/JS)
-- Zielgruppe: deutschsprachig; Design Amber/Navy; Ästhetik: minimalistisch, premium
-- Nutzer: Janik + Freundin (geteilter Haushalt), er auf mehr kcal als sie — deswegen portionFactor
-- **Kein Git-Push von Claude** — Datei wird via `SendUserFile` übergeben, User lädt auf privates Repo hoch
-- **Supabase-Schema ausführen**: einmalig im SQL-Editor, danach nie wieder nötig (außer bei Breaking Changes)
-- `user_state`-Blob bleibt für Restore maßgeblich — granulare Tabellen sind write-through (zusätzlich)
-- **godapp.html** im Repo = alte Version, ignorieren
-- **Expo/React-Native-Skeleton** (`src/`, `App.tsx`) = früher Versuch, ignorieren
+**Nicht sichtbar (Code liegt noch da, ist keine Produktanforderung):** Training, Timeline mit Uhrzeiten, Supplements, XP/Level/Streak, Wasser-/Gewichts-Tracking.
 
 ---
 
-*Zuletzt aktualisiert: Patch 13 — Claude Sonnet 4.6 — 2026-06-11*
+## Rezepte
+
+100 Rezepte inline in `app/index.html` (`const RECIPES = [...]`):
+25 Frühstück · 25 Mittag · 25 Abend · 20 Snack · 5 Shake.
+
+Jedes Rezept trägt `kcal/protein/fat/carbs/fiber`, `time`, `tags[]`, `allergens[]` und `ingredients[]` **mit Einkaufsdaten** (`packSize`, `packPrice`, `buyType`, `step`, `category`, `role`). Diese Einkaufsmetadaten sind die Grundlage der Einkaufslisten-Engine — beim Austausch der Rezept-DB müssen sie erhalten bleiben.
+
+Neuere Seed-DB: `docs/Preply_Seed_Datenbank_v4.3.xlsx` (noch nicht eingepflegt).
+
+**Rezepte haben keine `steps` und kein `cuisine`-Feld.** Deshalb werden Kochschritte generiert (`recipeSteps()`), und ein Küche/Region-Filter ist nicht möglich.
+
+---
+
+## Kern-Funktionen
+
+| Funktion | Zweck |
+|---|---|
+| `navGo(dest)` | Bottom-Nav: `today` / `plan` / `shop` / `profile` |
+| `renderTodayView()` / `renderMealsContent()` | Heute- bzw. Plan-Ansicht |
+| `buildMealWeek(weekStart, p)` | Wochenplan erzeugen (Prep-Gruppen) |
+| `scaledRecipe(r, cat, p)` | Portionsskalierung: `MEAL_SPLIT[cat] × portionFactor` |
+| `MEAL_SPLIT` | Tagesziel-Verteilung: Frühstück .24 / Mittag .34 / Abend .32 / Snack .10 / Shake .10 |
+| `swapMeal(date, cat, maxTime)` | Gericht tauschen (aktualisiert Plan + Einkauf) |
+| `buildStructuredShoppingList()` | Einkaufsliste inkl. Packungen/Preise |
+| `accumulateIngredients()` | Zutaten über Tage summieren |
+| `createHousehold()` / `joinHousehold()` | Haushalt via RPC, Code-Format `PREP-XXXXXX` |
+| `syncHousehold()` | Plan + Einkauf ziehen (Polling ~30 s, **kein Realtime**) |
+| `_sbRest()` / `_sbRpc()` | Supabase-Wrapper |
+
+---
+
+## Supabase
+
+Zwei getrennte Sync-Pfade:
+- **Persönlich:** kompletter State als JSONB in `user_state`, dazu `profiles` u. a.
+- **Haushalt:** `meal_plans` + `meal_plan_entries` (Plan), `shopping_items` (Häkchen)
+
+RLS ist auf allen Tabellen aktiv. Details: `docs/CURRENT_BACKEND.md`.
+Kein `service_role`-Key im Frontend — nur der anon key, der gehört dort hin.
+
+**Vor jeder Schema-/RPC-/RLS-Änderung:** Ist-Zustand dokumentieren, Migration vorschlagen, Sicherheitsfolgen prüfen, **Zustimmung einholen**, danach Advisor erneut laufen lassen.
+
+---
+
+## Offene Punkte (Stand 2026-08-04)
+
+### 🔴 Sicherheit — die App ist öffentlich erreichbar
+1. **OAuth-Token-Injection.** `checkOAuthCallback()` läuft bei jedem Seitenaufruf und übernimmt jedes `#access_token` aus der URL ungeprüft (kein `state`/Nonce, keine Verifikation gegen `/auth/v1/user`). Ein präparierter Link loggt das Opfer still in einen fremden Account. → PKCE-Flow oder mindestens State-Check + Token-Verifikation.
+2. **Registrierung offen:** keine Passwort-Policy, kein CAPTCHA, Leaked-Password-Schutz im Dashboard aus.
+3. **RLS-Policies hängen an Rolle `public`** und wurden nie ausgelesen. Einmal `pg_policies` dumpen und prüfen.
+4. Weitere Advisor-Warnungen: `docs/SECURITY_NOTES.md`.
+
+### 🟠 Funktional
+5. **Google-Login** schlägt fehl, bis in Supabase → Auth → URL Configuration **beide** Redirect-URLs erlaubt sind: `https://jugo011053.github.io/godapp/` **und** `.../godapp/index.html` (die installierte PWA startet über `index.html`).
+6. **Service Worker vergiftet seinen Cache:** `app/sw.js` schreibt *jede* Antwort als `./index.html` — auch eine 404-Seite. Fix: `if (response.ok && !response.redirected)` plus `CACHE_NAME` hochzählen.
+7. **Kein Token-Refresh.** Supabase-Token laufen nach 1 h ab; danach schlägt jeder Sync still fehl (`console.warn`, kein Toast).
+8. **Haushaltsmengen** werden nicht über alle Mitglieder summiert — jeder rechnet mit seinem eigenen Profil.
+
+### 🟡 Aufräumen
+9. Legacy-Code (Training, Timeline, Supplements, XP) liegt ungenutzt in der Datei und kann versehentlich wieder sichtbar werden.
+10. Interne Namen (`godapp*`) passen nicht zum Produktnamen Preply. `STORE_KEY` dabei **nicht** anfassen.
+
+---
+
+## Kontext
+
+- Zielgruppe: deutschsprachig, mobile-first. Ton: aufgeräumt, erwachsen, funktional — keine Fitness-Influencer-Sprache, keine Gamification.
+- Nutzer: Janik + Freundin (geteilter Haushalt), er auf mehr kcal als sie — deswegen `portionFactor`.
+- Die App soll **vorab** sagen, was gekocht und eingekauft wird — nicht dokumentieren, was gegessen wurde.
+- `docs/` enthält das Handoff-Paket (Vision, Backend, Merge-Landkarte, Testliste). `HANDOFF_NEW_APP.md` betrifft eine separate, noch nicht gebaute React-Native-App — **nicht** dieses Repo.
+
+---
+
+## Historie (D1 → Preply)
+
+Die App hieß früher „D1 / Day One" und war ein Fitness-Planer mit Training, Timeline und Supplements. Patches 1–13 bauten Onboarding, Rezepte, Trainingsplan, Kalender, Gamification, Haushalt-Sync (RPCs `create_household`/`join_household`) und granulare Personen-Daten. Danach wurde auf **Food-Only** umgestellt: Kalender/Training/Supplements aus der UI genommen, Navigation auf Heute/Plan/Einkaufen reduziert, Design von Navy/Amber auf hell/grün gewechselt.
+
+Der Rezept-, Einkaufs- und Haushalts-Code aus D1 ist die reife Grundlage und wurde bewusst **erhalten**, nicht neu gebaut.
+
+---
+
+*Zuletzt aktualisiert: 2026-08-04 — nach Pages-Deploy und Repo-Aufräumen.*
