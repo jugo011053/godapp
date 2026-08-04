@@ -1,0 +1,51 @@
+name: Deploy Preply to GitHub Pages
+
+# Publishes the contents of app/ as the site root, so the PWA is reachable at
+# https://jugo011053.github.io/godapp/ . All asset paths in the app are already
+# relative, so it works unchanged from that subpath.
+
+on:
+  push:
+    branches:
+      - claude/planner-app-setup-Tvjyj
+      - main
+    paths:
+      - 'app/**'
+      - '.github/workflows/deploy-pages.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Never run two publishes at once; let a newer one supersede a queued one.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configure Pages
+        # enablement: true turns Pages on for the repo if it is not enabled yet,
+        # so this works without anyone clicking through repo settings first.
+        uses: actions/configure-pages@v5
+        with:
+          enablement: true
+
+      - name: Upload app/ as the site
+        uses: actions/upload-pages-artifact@v3
+        with:
+          path: app
+
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
