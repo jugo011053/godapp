@@ -3261,6 +3261,152 @@ body{background:#e9e9e4;color:var(--ink);font-family:Inter,system-ui,-apple-syst
 #screen-onboarding .ob-scroll{padding:0!important;overflow:hidden!important}
 .preply-onboarding{display:flex;min-height:100%;flex-direction:column;padding:28px 25px 24px}.preply-onboarding-top{display:flex;align-items:center;justify-content:space-between;color:#4a4a45;font-size:9px;font-weight:850;letter-spacing:.12em}.preply-logo{color:var(--ink);font-size:20px;font-weight:900;letter-spacing:-.08em}.preply-logo span{color:#78a800}.preply-onboarding-main{flex:1;padding-top:105px}.preply-onboarding-main h1{margin:0;color:var(--ink);font-size:41px;line-height:.97;letter-spacing:-.075em}.preply-onboarding-main p{max-width:310px;margin:17px 0 0;color:#666660;font-size:14px;line-height:1.42}.preply-onboarding-main .preply-kicker{color:#78a800}.preply-setup{overflow:auto;padding:12px 0 20px}.preply-setup h1{font-size:34px}.preply-setup h2{margin:24px 0 10px;font-size:15px;letter-spacing:-.035em}.preply-choice-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px}.preply-choice-grid button,.preply-choice-list button,.preply-chip-row button{border:1px solid #dddcd7;border-radius:10px;background:#fff;padding:11px;color:var(--ink);font-size:11px;font-weight:750;text-align:left}.preply-choice-grid button.active,.preply-choice-list button.active,.preply-chip-row button.active{border-color:var(--ink);background:var(--ink);color:#fff}.preply-number-row{display:grid;grid-template-columns:repeat(3,1fr);gap:7px}.preply-number-row label{position:relative;display:block;padding:9px 8px 7px;border:1px solid #dddcd7;border-radius:10px;background:#fff}.preply-number-row label span{display:block;color:var(--muted);font-size:9px;font-weight:700}.preply-number-row input{width:100%;margin-top:4px;border:0;outline:0;background:transparent;color:var(--ink);font-size:18px;font-weight:800}.preply-choice-list{display:grid;gap:6px}.preply-choice-list button{display:flex;align-items:center;justify-content:space-between;width:100%}.preply-chip-row{display:flex;flex-wrap:wrap;gap:6px}.preply-chip-row button{padding:8px 10px}.preply-onboarding-actions{display:flex;gap:8px;padding-top:15px}.preply-onboarding-actions button{border:0;border-radius:13px;padding:15px;font-size:13px;font-weight:800}.preply-next{flex:1;background:var(--ink);color:#fff}.preply-back{background:#e9e9e4;color:var(--ink)}
 @media (max-width:480px){#screen-main .header{padding-top:calc(18px + env(safe-area-inset-top,0px))}.preply-onboarding{padding-top:calc(28px + env(safe-area-inset-top,0px))}}
+
+/* ── Preply light compatibility layer ────────────────────────────────────────
+   The Preply screens above are fully themed. The shared components inherited
+   from D1 (toasts, modals, pickers, cook mode, shopping rows, cards, chips)
+   still hardcoded the dark navy/amber palette, which made the product look
+   inconsistent once a modal or toast appeared. These overrides map them onto
+   the light paper/green language. Layout is intentionally untouched. */
+
+/* Feedback: toast + achievement */
+.toast{background:#1f2417;color:#fff;border:1px solid rgba(0,0,0,.08);box-shadow:0 10px 30px rgba(31,36,23,.22)}
+.achievement{background:var(--card);border:1px solid var(--accent);color:var(--text);box-shadow:0 10px 32px rgba(120,168,0,.18)}
+.achievement #ach-icon{background:var(--accent);color:#fff}
+
+/* Accent surfaces that hardcoded amber */
+.grad-text{background:none;-webkit-background-clip:border-box;background-clip:border-box;color:var(--text)}
+.grad-card{background:var(--accent-soft);border:1px solid var(--border);border-radius:14px}
+.grad-card-inner{background:var(--card);border-radius:13px}
+.btn-grad{background:var(--accent);color:#fff;box-shadow:none}
+.fab{background:var(--accent);color:#fff;box-shadow:0 10px 26px rgba(120,168,0,.28)}
+.xp-bar-fill{background:var(--accent);box-shadow:none}
+
+/* Meal cards + day pills */
+.meal-card2{background:var(--card);border:1px solid var(--border)}
+.meal-card2.done{background:var(--accent-soft);border-color:var(--accent)}
+.meal-card2.expanded{border-color:var(--accent)}
+.meal-check-btn{border:1.5px solid var(--border2);background:transparent;color:var(--muted)}
+.meal-check-btn.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.meal-cat-badge{color:var(--muted)}
+.day-pill{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.day-pill.sel{background:var(--accent);border-color:var(--accent);color:#fff;box-shadow:none}
+.day-pill.sel .day-pill-name,.day-pill.sel .day-pill-num{color:#fff}
+.day-pill.today:not(.sel){border-color:var(--accent)}
+.day-pill-dot{background:var(--accent)}
+.step-num{background:var(--accent);color:#fff}
+.pair-badge{background:var(--accent-soft);color:var(--success)}
+
+/* Checkboxes / shopping */
+.checkbox.checked,.check-circle.done{background:var(--accent);border-color:var(--accent);color:#fff}
+.shop-row{background:var(--card);border:1px solid var(--border)}
+.swipe-action.success{background:var(--accent);color:#fff}
+.swipe-action.danger{background:var(--danger);color:#fff}
+
+/* Modals + sheets */
+.modal-bg{background:rgba(17,17,17,.45)}
+.modal{background:var(--card);border-top:1px solid var(--border)}
+.modal-pill{background:var(--border2)}
+.action-item:active{background:var(--bg2)}
+.tr-overlay{background:rgba(17,17,17,.45)}
+.tr-sheet{background:var(--card);color:var(--text);border-top:1px solid var(--border)}
+.tr-drum-item{color:var(--text)}
+.tr-selector{background:var(--accent-soft);border-top:1px solid var(--accent);border-bottom:1px solid var(--accent)}
+.tr-sep{color:var(--muted)}
+
+/* Inputs */
+input,select,textarea{background:var(--card);border:1px solid var(--border);color:var(--text)}
+input:focus,select:focus,textarea:focus{border-color:var(--accent)}
+select option{background:var(--card);color:var(--text)}
+
+/* Cook mode */
+.cook-wrap,#cook-overlay{background:var(--bg)}
+.cook-step-num{color:var(--accent)}
+.cook-progress-fill{background:var(--accent)}
+
+/* Misc legacy bits still reachable from the food product */
+.pill{background:var(--bg2);color:var(--muted)}
+.badge{background:var(--bg2);color:var(--muted)}
+.level-badge,.streak-badge{background:var(--accent-soft);color:var(--success);border:1px solid var(--border)}
+.stat-box{background:var(--card);border:1px solid var(--border)}
+.stat-val{color:var(--text)}
+.week-recap{background:var(--card);border:1px solid var(--border)}
+.wr-v{color:var(--text)}
+.meal-prog-fill{background:var(--accent)}
+.meal-summary-kcal,.meal-summary-prot{color:var(--text)}
+.chip{background:var(--card);border:1px solid var(--border);color:var(--muted)}
+.chip.sel{background:var(--accent-soft);border-color:var(--accent);color:var(--success)}
+.btn-secondary{background:var(--card);color:var(--text);border:1px solid var(--border)}
+.icon-btn{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.meal-empty-slot{background:var(--card);border:1px dashed var(--border2);color:var(--muted)}
+.meal-ing-row{border-bottom:1px solid var(--border)}
+.diet-chip{background:var(--card);border:1px solid var(--border);color:var(--muted)}
+.diet-chip.sel{background:var(--accent-soft);border-color:var(--accent);color:var(--success)}
+
+/* ── Onboarding (legacy .ob-* family) on the light palette ───────────────────
+   These rules predate the Preply layer and hardcoded light-on-dark values
+   (#F5F5FF text, #1A2350 cards, amber accents), which rendered as nearly
+   invisible text on the paper background. Colors only — layout untouched. */
+.ob-back{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.ob-prog{background:var(--border)}
+.ob-prog-fill{background:var(--accent)}
+.ob-step-ct{color:var(--muted)}
+.ob-eyebrow{color:var(--muted)}
+.ob-h1,.ob-hero-title{color:var(--text)}
+.ob-sub,.ob-hero-sub{color:var(--muted)}
+.ob-field-label{color:var(--muted)}
+.ob-field-detail{color:var(--muted)}
+.ob-seg{background:var(--bg2);border:1px solid var(--border)}
+.ob-seg-cell{color:var(--muted)}
+.ob-seg-cell.sel{background:var(--accent);color:#fff}
+.ob-big-input{background:var(--card);border:1px solid var(--border)}
+.ob-big-input:active{border-color:var(--accent)}
+.ob-big-input input,.ob-big-num{color:var(--text)}
+.ob-big-unit{color:var(--muted)}
+.ob-opt{background:var(--card);border:1px solid var(--border)}
+.ob-opt.sel{background:var(--accent-soft);border-color:var(--accent)}
+.ob-opt-icon{background:var(--bg2);color:var(--muted)}
+.ob-opt.sel .ob-opt-icon{background:var(--accent);color:#fff}
+.ob-opt-title{color:var(--text)}
+.ob-opt-sub,.ob-opt-detail{color:var(--muted)}
+.ob-opt-check{background:var(--accent);color:#fff}
+.ob-chip{border:1px solid var(--border);color:var(--muted);background:var(--card)}
+.ob-chip.sel{background:var(--accent);border-color:var(--accent);color:#fff}
+.ob-card{background:var(--card);border:1px solid var(--border)}
+.ob-callout{background:var(--accent-soft);border:1px solid var(--border)}
+.ob-callout b{color:var(--success)}
+.ob-day-row{border-bottom:1px solid var(--border)}
+.ob-day-hours{color:var(--muted)}
+.ob-toggle{background:var(--border2)}
+.ob-toggle.on{background:var(--accent)}
+.ob-input,.ob-time-btn{background:var(--card);border:1px solid var(--border);color:var(--text)}
+.ob-input:focus,.ob-time-btn:active{border-color:var(--accent)}
+.ob-equip-card{background:var(--card);border:1px solid var(--border)}
+.ob-equip-card.sel{background:var(--accent-soft);border-color:var(--accent)}
+.ob-equip-icon{background:var(--bg2);color:var(--muted)}
+.ob-equip-card.sel .ob-equip-icon{background:var(--accent);color:#fff}
+.ob-equip-title{color:var(--text)}
+.ob-equip-desc{color:var(--muted)}
+.ob-equip-check{background:var(--accent);color:#fff}
+.ob-exp-dot{background:var(--border2)}
+.ob-exp-dot.on{background:var(--accent)}
+.ob-slider{background:var(--border)}
+.ob-tick-row{color:var(--muted)}
+#screen-onboarding{background:var(--bg);color:var(--text)}
+
+/* Onboarding: remaining hardcoded dark/amber surfaces */
+.ob-logo-wm{color:var(--text)}
+.ob-logo-mark{color:var(--accent)}
+.ob-hero-eyebrow{color:var(--muted)}
+.ob-primary{background:var(--accent);color:#fff}
+.ob-ghost{color:var(--muted)}
+#ob-bottom{background:linear-gradient(0deg,var(--bg) 65%,rgba(247,247,244,0))}
+
+/* hero accent word + legacy amber accent helper */
+.acc{color:var(--accent)}
+
+/* Recipe titles: wrap to two lines instead of truncating mid-word */
+.preply-discover-card strong{white-space:normal;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;line-height:1.25}
 </style>
 <script id="preply-food-only">
 /* Preply transition layer: use mature D1 meal, shopping and household logic,
@@ -3508,6 +3654,10 @@ body{background:#e9e9e4;color:var(--ink);font-family:Inter,system-ui,-apple-syst
   window.renderProfile=function(){renderPreplyProfile();setTimeout(function(){if(typeof renderSyncCard==='function')renderSyncCard();},0);};
   document.addEventListener('visibilitychange',function(){if(!document.hidden)preplyRefreshHousehold(true);});
   setTimeout(boot,0);
+  /* The legacy D1 init() is bound to window 'load' and repaints #ob-content with
+     the old welcome screen, whose only button this layer hides via CSS — leaving
+     a new user with no way to start. Re-assert the Preply UI after that runs. */
+  window.addEventListener('load',function(){setTimeout(boot,0);});
 })();
 </script>
 </body>
