@@ -3,9 +3,12 @@ name: V8 Browser E2E
 on:
   pull_request:
     paths:
+      - 'app/index.html'
+      - 'app/legacy.html'
       - 'app/v8/**'
       - 'tests/v8-e2e.mjs'
       - 'tests/v8-plan-management-e2e.mjs'
+      - 'tests/v8-root-cutover-e2e.mjs'
       - '.github/workflows/v8-browser-e2e.yml'
   workflow_dispatch:
 
@@ -35,6 +38,7 @@ jobs:
         run: |
           node tests/v8-e2e.mjs
           node tests/v8-plan-management-e2e.mjs
+          node tests/v8-root-cutover-e2e.mjs
       - name: Show server log on failure
         if: failure()
         run: cat /tmp/preply-v8-server.log
