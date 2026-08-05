@@ -1,13 +1,15 @@
 import { emit, on } from './core/events.js';
 import { getRoute, initializeRouter } from './core/router.js';
 import { getState, initializeStore, updateState } from './core/store.js';
-import { renderShell } from './features/shell/renderShell.js';
+import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
 
 const appRoot = document.getElementById('app');
 
 initializeStore();
-on('route:changed', ({ route }) => renderShell(appRoot, { route }));
+on('route:changed', () => rerenderIntegratedApp(appRoot));
+on('state:changed', () => rerenderIntegratedApp(appRoot));
 initializeRouter();
+await startIntegratedApp(appRoot);
 
 window.PreplyV8 = Object.freeze({
   getState,
@@ -16,4 +18,4 @@ window.PreplyV8 = Object.freeze({
 });
 
 emit('app:ready', { state: getState(), route: getRoute() });
-console.info('[Preply V8] Responsive Shell geladen.');
+console.info('[Preply V8] Integrierte Anwendung geladen.');
