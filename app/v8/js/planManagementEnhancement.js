@@ -107,7 +107,7 @@ export function initializePlanManagement() {
   if (initialized) return;
   initialized = true;
   profileSignature = signature(getState().profile);
-  on('state:changed', ({ state }) => {
+  on('state:changed', (state) => {
     const nextSignature = signature(state.profile);
     if (profileSignature !== undefined && nextSignature !== profileSignature && state.currentPlan) {
       pendingProfileDecision = true;
