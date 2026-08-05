@@ -3,13 +3,13 @@ import { normalizeCatalogRecipe } from './recipeNormalizer.js';
 const DEFAULT_ENDPOINT = '/rest/v1/recipe_catalog_v1';
 
 export class RecipeRepository {
-  constructor({ supabaseUrl, anonKey, fetchImpl = fetch }) {
+  constructor({ supabaseUrl, anonKey, fetchImpl } = {}) {
     if (!supabaseUrl || !anonKey) {
       throw new TypeError('RecipeRepository benötigt Supabase-URL und Anon-Key.');
     }
     this.supabaseUrl = supabaseUrl.replace(/\/$/, '');
     this.anonKey = anonKey;
-    this.fetchImpl = fetchImpl;
+    this.fetchImpl = fetchImpl || ((...args) => globalThis.fetch(...args));
   }
 
   async request(query, { signal } = {}) {
