@@ -1,0 +1,56 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <title>Preply V8 Foundation Smoke Test</title>
+</head>
+<body>
+  <pre id="result">Tests laufen…</pre>
+  <script type="module">
+    import { createDefaultProfile, assertPlanRequest, normalizeRecipeCard } from '../js/data/contracts.js';
+    import { migrateLegacyState } from '../js/core/storage.js';
+
+    const tests = [];
+    const test = (name, fn) => tests.push({ name, fn });
+    const assert = (condition, message) => { if (!condition) throw new Error(message); };
+
+    test('Default-Profil ist V2', () => {
+      const profile = createDefaultProfile();
+      assert(profile.version === 2, 'Profilversion falsch');
+      assert(profile.enabledMeals.lunch === true, 'Mittagessen fehlt');
+    });
+
+    test('PlanRequest validiert Pflichtfelder', () => {
+      assertPlanRequest({ selectedDates: ['2026-08-06'], enabledMeals: ['dinner'] });
+      let failed = false;
+      try { assertPlanRequest({ selectedDates: [], enabledMeals: [] }); } catch { failed = true; }
+      assert(failed, 'Ungültiger PlanRequest wurde akzeptiert');
+    });
+
+    test('Legacy-Zustand wird ohne Key-Wechsel migriert', () => {
+      const migrated = migrateLegacyState({ profile: { persons: 2, targetKcal: 2200, prepDays: 3 } });
+      assert(migrated.profile.persons === 2, 'Personenzahl verloren');
+      assert(migrated.profile.calorieTarget === 2200, 'Kalorienziel verloren');
+      assert(migrated.profile.prepDays === 3, 'Prep-Tage verloren');
+    });
+
+    test('RecipeCard normalisiert Datenbankfelder', () => {
+      const recipe = normalizeRecipeCard({ id: 'r1', name: 'Test', cat: 'dinner', diet_tags: ['vegan'] });
+      assert(recipe.category === 'dinner', 'Kategorie falsch');
+      assert(recipe.dietTags.includes('vegan'), 'Diet-Tags fehlen');
+    });
+
+    const output = [];
+    for (const entry of tests) {
+      try {
+        await entry.fn();
+        output.push(`✓ ${entry.name}`);
+      } catch (error) {
+        output.push(`✗ ${entry.name}: ${error.message}`);
+      }
+    }
+    document.getElementById('result').textContent = output.join('\n');
+    if (output.some((line) => line.startsWith('✗'))) throw new Error('Foundation smoke tests fehlgeschlagen');
+  </script>
+</body>
+</html>
