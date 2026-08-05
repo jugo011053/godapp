@@ -2,6 +2,7 @@ import { emit, on } from './core/events.js';
 import { getRoute, initializeRouter } from './core/router.js';
 import { getState, initializeStore, updateState } from './core/store.js';
 import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
+import { installFeatureEnhancements } from './featureEnhancements.js';
 
 const appRoot = document.getElementById('app');
 
@@ -10,6 +11,7 @@ on('route:changed', () => rerenderIntegratedApp(appRoot));
 on('state:changed', () => rerenderIntegratedApp(appRoot));
 initializeRouter();
 await startIntegratedApp(appRoot);
+await installFeatureEnhancements(appRoot);
 
 window.PreplyV8 = Object.freeze({
   getState,
