@@ -44,8 +44,15 @@ async function regenerateDay(date) {
   const state = getState();
   const plan = state.currentPlan;
   if (!plan) return;
+  const currentDay = plan.days.find((day) => day.date === date);
+  if (!currentDay) return;
   const catalog = await recipes();
-  const generated = rebuildPlan(catalog, plan, state.profile, state.preferences, [date]);
+  const currentRecipeIds = Object.values(currentDay.meals || {}).map((meal) => meal.recipe.id);
+  const preferences = {
+    ...state.preferences,
+    excludedRecipeIds: [...new Set([...(state.preferences.excludedRecipeIds || []), ...currentRecipeIds])]
+  };
+  const generated = rebuildPlan(catalog, plan, state.profile, preferences, [date]);
   const replacementDay = generated.days[0];
   const nextDays = plan.days.map((day) => day.date === date ? replacementDay : day);
   updateState((current) => ({
