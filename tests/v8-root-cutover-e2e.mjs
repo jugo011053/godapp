@@ -29,7 +29,7 @@ await page.addInitScript(() => {
 });
 
 await page.goto('http://127.0.0.1:4173/');
-await page.waitForURL('**/v8/');
+await page.waitForURL((url) => url.pathname.endsWith('/v8/'));
 await page.getByText('8 geprüfte Rezepte geladen.').waitFor();
 
 const state = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
