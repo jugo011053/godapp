@@ -2,16 +2,22 @@ import { emit, on } from './core/events.js';
 import { getRoute, initializeRouter } from './core/router.js';
 import { getState, initializeStore, updateState } from './core/store.js';
 import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
-import { installFeatureEnhancements } from './featureEnhancements.js';
+import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
 
 const appRoot = document.getElementById('app');
 
+async function renderAll() {
+  rerenderIntegratedApp(appRoot);
+  await refreshFeatureEnhancements(appRoot);
+}
+
 initializeStore();
-on('route:changed', () => rerenderIntegratedApp(appRoot));
-on('state:changed', () => rerenderIntegratedApp(appRoot));
+on('route:changed', () => void renderAll());
+on('state:changed', () => void renderAll());
 initializeRouter();
 await startIntegratedApp(appRoot);
-await installFeatureEnhancements(appRoot);
+await initializeFeatureEnhancements();
+await refreshFeatureEnhancements(appRoot);
 
 window.PreplyV8 = Object.freeze({
   getState,
