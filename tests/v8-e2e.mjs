@@ -84,10 +84,23 @@ await page.getByRole('button', { name: 'Plan erstellen', exact: true }).click();
 await page.getByText('Dein Plan').waitFor();
 assert.equal(await page.locator('.plan-day').count(), 6);
 
-const savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
+let savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
 assert.equal(savedState.currentPlan.selectedDates.length, 6);
 assert.deepEqual(savedState.currentPlan.enabledMeals.sort(), ['dinner', 'lunch']);
 assert.equal(savedState.currentPlan.days.every((day) => Object.keys(day.meals).length === 2), true);
+
+const originalFirstLunchId = savedState.currentPlan.days[0].meals.lunch.recipeId;
+const untouchedSecondDayLunchId = savedState.currentPlan.days[1].meals.lunch.recipeId;
+await page.locator('[data-replace-meal][data-day-index="0"][data-category="lunch"]').click();
+await page.getByRole('heading', { name: savedState.currentPlan.days[0].meals.lunch.recipe.name }).waitFor();
+await page.getByRole('button', { name: 'Schneller' }).click();
+assert.ok((await page.locator('[data-replacement-recipe]').count()) > 0);
+await page.locator('[data-replacement-recipe]').first().click();
+await page.waitForTimeout(150);
+savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
+assert.notEqual(savedState.currentPlan.days[0].meals.lunch.recipeId, originalFirstLunchId);
+assert.equal(savedState.currentPlan.days[1].meals.lunch.recipeId, untouchedSecondDayLunchId);
+assert.equal(savedState.currentPlan.days[0].meals.lunch.prepGroupId, null);
 
 await page.locator('a[href="#recipes"]').click();
 await page.getByRole('heading', { name: /Für dich und alle Rezepte/ }).waitFor();
