@@ -23,16 +23,42 @@ function scaledIngredientAmount(ingredient, meal) {
   return Number(ingredient.amount || 0) / baseServings * persons * factor;
 }
 
+const WEIGHT_UNITS = new Set(['g', 'kg', 'ml', 'l']);
+
+function unitsCompatible(ingredientUnit, packUnit) {
+  const a = (ingredientUnit || '').toLowerCase();
+  const b = (packUnit || '').toLowerCase();
+  if (a === b) return true;
+  if (WEIGHT_UNITS.has(a) && WEIGHT_UNITS.has(b)) return true;
+  return false;
+}
+
+function convertToPackUnit(amount, ingredientUnit, packUnit) {
+  const from = (ingredientUnit || '').toLowerCase();
+  const to = (packUnit || '').toLowerCase();
+  if (from === to) return amount;
+  if (from === 'kg' && to === 'g') return amount * 1000;
+  if (from === 'g' && to === 'kg') return amount / 1000;
+  if (from === 'l' && to === 'ml') return amount * 1000;
+  if (from === 'ml' && to === 'l') return amount / 1000;
+  return amount;
+}
+
 function packEstimate(amount, ingredient) {
   const packSize = Number(ingredient.packSize || ingredient.pack_size || 0);
   const packPrice = Number(ingredient.packPrice || ingredient.pack_price_eur || 0);
-  if (!packSize || amount <= 0) {
-    return { packs: null, buyAmount: amount, estimatedPrice: null };
+  const packUnit = (ingredient.packUnit || ingredient.pack_unit || '').toLowerCase();
+  const ingredientUnit = (ingredient.unit || '').toLowerCase();
+
+  if (!packSize || amount <= 0 || !unitsCompatible(ingredientUnit, packUnit)) {
+    return { packs: null, buyAmount: round(amount), estimatedPrice: packPrice ? round(Math.ceil(amount) * packPrice) : null };
   }
-  const packs = Math.ceil(amount / packSize);
+  const converted = convertToPackUnit(amount, ingredientUnit, packUnit);
+  const packs = Math.ceil(converted / packSize);
   return {
     packs,
-    buyAmount: packs * packSize,
+    buyAmount: round(packs * packSize),
+    buyUnit: packUnit || ingredientUnit,
     estimatedPrice: packPrice ? round(packs * packPrice) : null
   };
 }
