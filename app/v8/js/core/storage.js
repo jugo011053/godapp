@@ -1,6 +1,7 @@
 import { LEGACY_STORE_KEY, createDefaultProfile, createPreferenceSignals } from '../data/contracts.js';
 
 const V8_STATE_KEY = 'preply_v8_state_v1';
+const LEGACY_BACKUP_KEY = 'preply_v7_backup_v1';
 
 function safeParse(value) {
   try {
@@ -29,7 +30,15 @@ export function loadState() {
   const legacy = safeParse(localStorage.getItem(LEGACY_STORE_KEY));
   if (!legacy) return createEmptyState();
 
-  return migrateLegacyState(legacy);
+  try {
+    localStorage.setItem(LEGACY_BACKUP_KEY, JSON.stringify(legacy));
+  } catch (error) {
+    console.warn('[Preply V8] V7-Sicherung konnte nicht gespeichert werden', error);
+  }
+
+  const migrated = migrateLegacyState(legacy);
+  saveState(migrated);
+  return migrated;
 }
 
 export function saveState(state) {
@@ -49,11 +58,20 @@ export function migrateLegacyState(legacy) {
     prepDays: [1, 2, 3].includes(Number(sourceProfile.prepDays)) ? Number(sourceProfile.prepDays) : 2
   };
 
-  migrated.currentPlan = legacy.mealWeek || null;
+  migrated.preferences = {
+    ...migrated.preferences,
+    favoriteRecipeIds: Array.isArray(legacy.favoriteRecipeIds) ? legacy.favoriteRecipeIds : [],
+    excludedRecipeIds: Array.isArray(legacy.excludedRecipeIds) ? legacy.excludedRecipeIds : [],
+    excludedIngredients: Array.isArray(sourceProfile.excludedIngredients) ? sourceProfile.excludedIngredients : []
+  };
+
+  migrated.currentPlan = null;
   migrated.onboardingCompleted = Boolean(legacy.profile);
   migrated.migration = {
     source: LEGACY_STORE_KEY,
-    migratedAt: new Date().toISOString()
+    backupKey: LEGACY_BACKUP_KEY,
+    migratedAt: new Date().toISOString(),
+    legacyPlanAvailable: Boolean(legacy.mealWeek)
   };
   return migrated;
 }
