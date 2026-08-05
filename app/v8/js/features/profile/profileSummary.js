@@ -27,6 +27,8 @@ export function profileSummary(profile) {
   return parts.filter(Boolean).join(' · ');
 }
 
+export const buildProfileSummary = profileSummary;
+
 export function shouldOfferPlanRefresh(previousProfile, nextProfile) {
   return JSON.stringify(previousProfile) !== JSON.stringify(nextProfile);
 }

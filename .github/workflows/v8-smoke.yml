@@ -1,0 +1,35 @@
+name: V8 Smoke
+
+on:
+  pull_request:
+    paths:
+      - 'app/v8/**'
+      - '.github/workflows/v8-smoke.yml'
+
+permissions:
+  contents: read
+
+jobs:
+  static-checks:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Check JavaScript syntax
+        run: |
+          find app/v8 -name '*.js' -print0 | xargs -0 -n1 node --check
+      - name: Check required PWA files
+        run: |
+          test -f app/v8/index.html
+          test -f app/v8/manifest.json
+          test -f app/v8/sw.js
+          grep -q 'manifest.json' app/v8/index.html
+          grep -q "serviceWorker.register('./sw.js')" app/v8/index.html
+      - name: Check relative module imports
+        run: |
+          if grep -R "from '/" app/v8/js --include='*.js'; then
+            echo 'Absolute module import found.'
+            exit 1
+          fi
