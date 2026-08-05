@@ -5,6 +5,7 @@ import { rerenderIntegratedApp, startIntegratedApp } from './integrationControll
 import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
 import { refreshPlanReplacementEnhancement } from './planReplacementEnhancement.js';
+import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
 
 const appRoot = document.getElementById('app');
 
@@ -13,9 +14,11 @@ async function renderAll() {
   await refreshFeatureEnhancements(appRoot);
   refreshHistoryEnhancement(appRoot);
   await refreshPlanReplacementEnhancement(appRoot);
+  refreshPlanManagement(appRoot);
 }
 
 initializeStore();
+initializePlanManagement();
 on('route:changed', () => void renderAll());
 on('state:changed', () => void renderAll());
 initializeRouter();
@@ -24,6 +27,7 @@ await initializeFeatureEnhancements();
 await refreshFeatureEnhancements(appRoot);
 refreshHistoryEnhancement(appRoot);
 await refreshPlanReplacementEnhancement(appRoot);
+refreshPlanManagement(appRoot);
 
 window.PreplyV8 = Object.freeze({
   getState,
