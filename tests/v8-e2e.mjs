@@ -81,19 +81,19 @@ assert.ok((await page.locator('.plan-day').count()) >= 3);
 
 await page.locator('a[href="#recipes"]').click();
 await page.getByRole('heading', { name: /Für dich und alle Rezepte/ }).waitFor();
-await page.locator('[data-filter="category"]').selectOption('dinner');
-assert.ok((await page.locator('[data-enhanced-recipe]').count()) > 0);
-await page.locator('[data-favorite]').first().click();
+await page.locator('[data-v8-filter="category"]').selectOption('dinner');
+assert.ok((await page.locator('.recipe-card').count()) > 0);
+await page.locator('[data-v8-favorite]').first().click();
 assert.equal(await page.getByRole('button', { name: 'Gespeichert' }).count(), 1);
 
 await page.locator('a[href="#shopping"]').click();
 await page.getByRole('heading', { name: 'Einkaufsliste' }).waitFor();
-assert.ok((await page.locator('[data-shop-date]').count()) >= 3);
-assert.ok((await page.locator('[data-shop-check]').count()) > 0);
-const before = await page.locator('[data-shop-check]').count();
-await page.locator('[data-shop-date]').first().click();
+assert.ok((await page.locator('[data-v8-date]').count()) >= 3);
+assert.ok((await page.locator('[data-v8-check]').count()) > 0);
+const before = await page.locator('[data-v8-check]').count();
+await page.locator('[data-v8-date]').first().click();
 await page.waitForTimeout(150);
-assert.ok((await page.locator('[data-shop-check]').count()) <= before);
+assert.ok((await page.locator('[data-v8-check]').count()) <= before);
 
 await page.locator('a[href="#profile"]').click();
 await page.getByRole('heading', { name: 'Deine Einstellungen' }).waitFor();
