@@ -76,8 +76,18 @@ assert.equal(await page.getByText('Drei Vorschläge für heute').count(), 1);
 assert.equal(await page.locator('.recipe-card').count(), 3);
 
 await page.getByRole('button', { name: /Essensplan erstellen/ }).click();
+await page.getByRole('heading', { name: 'Welche Tage und Mahlzeiten?' }).waitFor();
+await page.getByRole('button', { name: '5 Tage' }).click();
+await page.locator('[data-plan-add-date]').click();
+await page.locator('[data-plan-meal="breakfast"]').click();
+await page.getByRole('button', { name: 'Plan erstellen' }).click();
 await page.getByText('Dein Plan').waitFor();
-assert.ok((await page.locator('.plan-day').count()) >= 3);
+assert.equal(await page.locator('.plan-day').count(), 6);
+
+const savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
+assert.equal(savedState.currentPlan.selectedDates.length, 6);
+assert.deepEqual(savedState.currentPlan.enabledMeals.sort(), ['dinner', 'lunch']);
+assert.equal(savedState.currentPlan.days.every((day) => Object.keys(day.meals).length === 2), true);
 
 await page.locator('a[href="#recipes"]').click();
 await page.getByRole('heading', { name: /Für dich und alle Rezepte/ }).waitFor();
@@ -88,7 +98,7 @@ assert.equal(await page.getByRole('button', { name: 'Gespeichert' }).count(), 1)
 
 await page.locator('a[href="#shopping"]').click();
 await page.getByRole('heading', { name: 'Einkaufsliste' }).waitFor();
-assert.ok((await page.locator('[data-v8-date]').count()) >= 3);
+assert.equal(await page.locator('[data-v8-date]').count(), 6);
 assert.ok((await page.locator('[data-v8-check]').count()) > 0);
 const before = await page.locator('[data-v8-check]').count();
 await page.locator('[data-v8-date]').first().click();
