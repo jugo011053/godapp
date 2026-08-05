@@ -46,12 +46,12 @@ grep -oE "APP_VERSION='[^']*'" app/index.html
 | Key | Wert |
 |-----|------|
 | Produktname | **Preply** (Repo heißt noch `godapp`, App-interne Namen noch `godapp*` — Altlast) |
-| APP_VERSION | `godapp6.7.1` |
-| SCHEMA_VERSION | `8` |
+| APP_VERSION | `godapp7.0.0` |
+| SCHEMA_VERSION | `9` |
 | STORE_KEY | `godapp6_7_1_state_v1` — **nicht umbenennen**, sonst verlieren alle Nutzer ihre lokalen Daten |
 | Supabase URL | `https://rfdtjodpjvynnavnucvu.supabase.co` (Projekt heißt im Dashboard noch `D1 DayOne`) |
 | Supabase anon key | **steht in `app/index.html`** — hier bewusst nicht dupliziert, die frühere Kopie in dieser Datei war fehlerhaft und führte zu 401ern |
-| Datei | `app/index.html` (Single-File-PWA, ~890 KB, kein Build, kein Framework) |
+| Datei | `app/index.html` (Single-File-PWA, ~410 KB, kein Build, kein Framework) |
 
 ### Design (hell/grün — Preply)
 ```
@@ -81,14 +81,20 @@ Manifest + `theme-color` sind ebenfalls `#78A800`. **Das frühere Navy/Amber (`#
 
 ## Rezepte
 
-100 Rezepte inline in `app/index.html` (`const RECIPES = [...]`):
-25 Frühstück · 25 Mittag · 25 Abend · 20 Snack · 5 Shake.
+**600 Rezepte in Supabase** (`recipe_catalog_v1`), geladen via Supabase REST → IndexedDB-Cache:
+- 100 Legacy-Rezepte (source=`legacy_v1`, original aus D1)
+- 500 neue Rezepte (source=`catalog_v5`, aus `Preply_Seed_Datenbank_v5.0_clean.xlsx`)
+- 87 Frühstück · 194 Mittag · 282 Abend · 30 Snack · 7 Shake
 
-Jedes Rezept trägt `kcal/protein/fat/carbs/fiber`, `time`, `tags[]`, `allergens[]` und `ingredients[]` **mit Einkaufsdaten** (`packSize`, `packPrice`, `buyType`, `step`, `category`, `role`). Diese Einkaufsmetadaten sind die Grundlage der Einkaufslisten-Engine — beim Austausch der Rezept-DB müssen sie erhalten bleiben.
+**Keine Inline-Rezepte mehr.** `RECIPES` ist initial leer und wird beim Start aus Supabase/Cache befüllt (`loadRecipeCatalog()`). Stale-while-revalidate: Cache wird nach 1h im Hintergrund aktualisiert.
 
-Neuere Seed-DB: `docs/Preply_Seed_Datenbank_v4.3.xlsx` (noch nicht eingepflegt).
+**846 Foods** in der `foods`-Tabelle: Lebensmittel-Stammdaten mit USDA-Nährwerten pro 100g und Supermarktpreisen.
 
-**Rezepte haben keine `steps` und kein `cuisine`-Feld.** Deshalb werden Kochschritte generiert (`recipeSteps()`), und ein Küche/Region-Filter ist nicht möglich.
+Jedes Rezept trägt `kcal/protein/fat/carbs/fiber/salt`, `time`, `prep_time`, `tags[]`, `allergens[]`, `diet_tags[]`, `steps[]` (echte Kochschritte!), `classification` (41 Felder), `quality_score`, `source_url` und `ingredients[]` **mit Einkaufsdaten** (`packSize`, `packPrice`, `step`, `category`). Einkaufsmetadaten sind weiterhin die Grundlage der Einkaufslisten-Engine.
+
+Seed-DB v5.0: `docs/Preply_Seed_Datenbank_v5.0_clean.xlsx` (eingepflegt am 2026-08-05).
+
+**Neue Rezepte HABEN echte `steps`.** `recipeSteps()` prüft zuerst `r.steps`, dann V2-Patches, dann Fallback-Generierung.
 
 ---
 
@@ -107,12 +113,16 @@ Neuere Seed-DB: `docs/Preply_Seed_Datenbank_v4.3.xlsx` (noch nicht eingepflegt).
 | `createHousehold()` / `joinHousehold()` | Haushalt via RPC, Code-Format `PREP-XXXXXX` |
 | `syncHousehold()` | Plan + Einkauf ziehen (Polling ~30 s, **kein Realtime**) |
 | `_sbRest()` / `_sbRpc()` | Supabase-Wrapper |
+| `loadRecipeCatalog()` | Rezepte aus Supabase/Cache laden → `RECIPES` befüllen |
+| `_enrichRecipe(r)` | Katalog-Rezept mit App-kompatiblen Feldern anreichern |
+| `_rcGet()` / `_rcSet()` | IndexedDB-Wrapper für Rezept-Cache |
 
 ---
 
 ## Supabase
 
-Zwei getrennte Sync-Pfade:
+Drei Daten-Bereiche:
+- **Rezeptkatalog:** `recipe_catalog_v1` (600 Rezepte, öffentlich lesbar), `foods` (846 Lebensmittel)
 - **Persönlich:** kompletter State als JSONB in `user_state`, dazu `profiles` u. a.
 - **Haushalt:** `meal_plans` + `meal_plan_entries` (Plan), `shopping_items` (Häkchen)
 
@@ -123,7 +133,7 @@ Kein `service_role`-Key im Frontend — nur der anon key, der gehört dort hin.
 
 ---
 
-## Offene Punkte (Stand 2026-08-04)
+## Offene Punkte (Stand 2026-08-05)
 
 ### 🔴 Sicherheit — die App ist öffentlich erreichbar
 1. **OAuth-Token-Injection.** `checkOAuthCallback()` läuft bei jedem Seitenaufruf und übernimmt jedes `#access_token` aus der URL ungeprüft (kein `state`/Nonce, keine Verifikation gegen `/auth/v1/user`). Ein präparierter Link loggt das Opfer still in einen fremden Account. → PKCE-Flow oder mindestens State-Check + Token-Verifikation.
@@ -133,7 +143,7 @@ Kein `service_role`-Key im Frontend — nur der anon key, der gehört dort hin.
 
 ### 🟠 Funktional
 5. **Google-Login** schlägt fehl, bis in Supabase → Auth → URL Configuration **beide** Redirect-URLs erlaubt sind: `https://jugo011053.github.io/godapp/` **und** `.../godapp/index.html` (die installierte PWA startet über `index.html`).
-6. **Service Worker vergiftet seinen Cache:** `app/sw.js` schreibt *jede* Antwort als `./index.html` — auch eine 404-Seite. Fix: `if (response.ok && !response.redirected)` plus `CACHE_NAME` hochzählen.
+6. ~~**Service Worker vergiftet seinen Cache**~~ ✅ Gefixt in v7.0.0: `response.ok && !response.redirected`-Check + neuer `CACHE_NAME`.
 7. **Kein Token-Refresh.** Supabase-Token laufen nach 1 h ab; danach schlägt jeder Sync still fehl (`console.warn`, kein Toast).
 8. **Haushaltsmengen** werden nicht über alle Mitglieder summiert — jeder rechnet mit seinem eigenen Profil.
 
@@ -160,4 +170,4 @@ Der Rezept-, Einkaufs- und Haushalts-Code aus D1 ist die reife Grundlage und wur
 
 ---
 
-*Zuletzt aktualisiert: 2026-08-04 — nach Pages-Deploy und Repo-Aufräumen.*
+*Zuletzt aktualisiert: 2026-08-05 — v7.0.0: 600 Rezepte aus Supabase, 846 Foods, IndexedDB-Cache, SW-Fix.*
