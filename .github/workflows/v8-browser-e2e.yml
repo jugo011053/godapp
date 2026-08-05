@@ -5,6 +5,7 @@ on:
     paths:
       - 'app/v8/**'
       - 'tests/v8-e2e.mjs'
+      - 'tests/v8-plan-management-e2e.mjs'
       - '.github/workflows/v8-browser-e2e.yml'
   workflow_dispatch:
 
@@ -30,8 +31,10 @@ jobs:
           python3 -m http.server 4173 --directory app > /tmp/preply-v8-server.log 2>&1 &
           echo $! > /tmp/preply-v8-server.pid
           for i in {1..20}; do curl -fsS http://127.0.0.1:4173/v8/ >/dev/null && break; sleep 1; done
-      - name: Run browser flow
-        run: node tests/v8-e2e.mjs
+      - name: Run browser flows
+        run: |
+          node tests/v8-e2e.mjs
+          node tests/v8-plan-management-e2e.mjs
       - name: Show server log on failure
         if: failure()
         run: cat /tmp/preply-v8-server.log
