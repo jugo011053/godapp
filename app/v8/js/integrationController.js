@@ -26,10 +26,12 @@ const runtime = {
   catalogError: null,
   suggestions: [],
   onboardingDraft: null,
+  planDraft: null,
   activeDialog: null
 };
 
 const MEAL_LABELS = Object.fromEntries(MEAL_OPTIONS);
+const formatDay = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
 
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, (character) => ({
@@ -44,18 +46,14 @@ function localDate(offset = 0) {
   return date.toISOString().slice(0, 10);
 }
 
+function dateLabel(value) {
+  return formatDay.format(new Date(`${value}T12:00:00`));
+}
+
 function recipeCard(recipe, extra = '') {
   return `<article class="recipe-card" data-recipe-id="${escapeHtml(recipe.id)}">
-    <div>
-      <p class="eyebrow">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</p>
-      <h3>${escapeHtml(recipe.name)}</h3>
-    </div>
-    <div class="recipe-meta">
-      <span>${Math.round(recipe.kcal)} kcal</span>
-      <span>${Math.round(recipe.protein)} g Protein</span>
-      <span>${Math.round(recipe.time)} Min.</span>
-      <span>${escapeHtml(recipe.simplicity || 'ausgewogen')}</span>
-    </div>
+    <div><p class="eyebrow">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</p><h3>${escapeHtml(recipe.name)}</h3></div>
+    <div class="recipe-meta"><span>${Math.round(recipe.kcal)} kcal</span><span>${Math.round(recipe.protein)} g Protein</span><span>${Math.round(recipe.time)} Min.</span><span>${escapeHtml(recipe.simplicity || 'ausgewogen')}</span></div>
     ${extra}
   </article>`;
 }
@@ -71,21 +69,21 @@ function renderPlanPage() {
   const plan = state.currentPlan;
   if (plan && !isPlanExpired(plan)) {
     return `<section class="v8-page">
-      <div class="v8-page-head"><div><p class="eyebrow">Dein Plan</p><h1>${escapeHtml(plan.startDate)} bis ${escapeHtml(plan.endDate)}</h1></div><p>Gerichte austauschen und Einkaufstage auswählen folgen direkt aus diesem Plan.</p></div>
+      <div class="v8-page-head"><div><p class="eyebrow">Dein Plan</p><h1>${escapeHtml(plan.startDate)} bis ${escapeHtml(plan.endDate)}</h1></div><p>${plan.selectedDates.length} ausgewählte Tage · ${plan.enabledMeals.map((meal) => MEAL_LABELS[meal] || meal).join(', ')}</p></div>
       ${catalogStatusHtml()}
       <div class="v8-actions"><button class="v8-button primary" data-action="today-inspiration">Inspiration für heute</button><button class="v8-button" data-action="create-plan">Neuen Plan erstellen</button></div>
-      <div class="v8-panel">${plan.days.map((day) => `<section class="plan-day"><h2>${escapeHtml(day.date)}</h2>${Object.entries(day.meals).map(([category, meal]) => `<div class="meal-row"><div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div><div><strong>${escapeHtml(meal.recipe.name)}</strong><div class="recipe-meta"><span>${meal.estimatedKcalPerPerson} kcal</span><span>${meal.estimatedProteinPerPerson} g Protein</span>${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}</div></div></div>`).join('')}</section>`).join('')}</div>
+      <div class="v8-panel">${plan.days.map((day) => `<section class="plan-day"><h2>${escapeHtml(dateLabel(day.date))}</h2>${Object.entries(day.meals).map(([category, meal]) => `<div class="meal-row"><div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div><div><strong>${escapeHtml(meal.recipe.name)}</strong><div class="recipe-meta"><span>${meal.estimatedKcalPerPerson} kcal</span><span>${meal.estimatedProteinPerPerson} g Protein</span>${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}</div></div></div>`).join('')}</section>`).join('')}</div>
     </section>`;
   }
 
   const returnOptions = getReturnOptions(state);
   return `<section class="v8-page">
-    <div class="v8-page-head"><div><p class="eyebrow">Planen</p><h1>Was passt heute?</h1></div><p>Direkte Inspiration oder ein Plan für ausgewählte Tage. Die App verlangt keine religiöse Bindung an Montag bis Sonntag.</p></div>
+    <div class="v8-page-head"><div><p class="eyebrow">Planen</p><h1>Was passt heute?</h1></div><p>Direkte Inspiration oder ein Plan für frei ausgewählte Tage.</p></div>
     ${catalogStatusHtml()}
     ${returnOptions.actions.includes('open_history') ? '<div class="v8-status">Dein alter Plan ist abgelaufen. Du kannst neu starten oder die Historie öffnen.</div>' : ''}
     <div class="v8-start-grid">
       <button class="v8-start-card primary" data-action="today-inspiration"><strong>Was esse ich heute?</strong><span>Drei passende Vorschläge anhand deines Profils.</span></button>
-      <button class="v8-start-card" data-action="create-plan"><strong>Essensplan erstellen</strong><span>Plane die nächsten drei Tage oder eine ganze Woche.</span></button>
+      <button class="v8-start-card" data-action="create-plan"><strong>Essensplan erstellen</strong><span>Wähle Tage und Mahlzeiten selbst aus.</span></button>
     </div>
     ${runtime.suggestions.length ? `<div class="v8-panel"><h2>Drei Vorschläge für heute</h2><div class="v8-grid">${runtime.suggestions.map((recipe) => recipeCard(recipe, '<button class="v8-button primary" data-action="use-suggestion">Für heute wählen</button>')).join('')}</div></div>` : ''}
   </section>`;
@@ -98,13 +96,12 @@ function renderRecipesPage() {
 function renderShoppingPage() {
   const plan = getState().currentPlan;
   if (!plan || isPlanExpired(plan)) return '<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Noch kein aktiver Plan</h1></div><p>Erstelle zuerst einen Plan. Danach erscheinen hier die auswählbaren Tage.</p></div></section>';
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Welche Tage kaufst du ein?</h1></div><p>Die Tagesauswahl wird aus deinem aktuellen Plan erzeugt.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${new Intl.DateTimeFormat('de-DE',{weekday:'short'}).format(new Date(`${date}T12:00:00`))}</button>`).join('')}</div><div class="empty-state">Die Detailzutaten werden beim nächsten Integrationsschritt aus den Rezeptdetails aggregiert.</div></div></section>`;
+  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Welche Tage kaufst du ein?</h1></div><p>Die Tagesauswahl wird aus deinem aktuellen Plan erzeugt.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div></section>`;
 }
 
 function renderProfilePage() {
   const state = getState();
-  const summary = buildProfileSummary(state.profile);
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Profil</p><h1>Deine Einstellungen</h1></div><p>Diese Angaben steuern Vorschläge und Pläne.</p></div><div class="v8-panel"><p>${escapeHtml(summary)}</p><div class="v8-actions"><button class="v8-button primary" data-action="open-onboarding">Profil bearbeiten</button></div></div></section>`;
+  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Profil</p><h1>Deine Einstellungen</h1></div><p>Diese Angaben steuern Vorschläge und Pläne.</p></div><div class="v8-panel"><p>${escapeHtml(buildProfileSummary(state.profile))}</p><div class="v8-actions"><button class="v8-button primary" data-action="open-onboarding">Profil bearbeiten</button></div></div></section>`;
 }
 
 function pageForRoute(route) {
@@ -155,8 +152,40 @@ function onboardingBody(draft) {
   return `<h2>So wird geplant</h2><div class="v8-status">${escapeHtml(buildProfileSummary(profile))}</div>`;
 }
 
+function createPlanDraft(profile) {
+  return {
+    selectedDates: [localDate(0), localDate(1), localDate(2)],
+    enabledMeals: Object.entries(profile.enabledMeals || {}).filter(([, enabled]) => enabled).map(([meal]) => meal),
+    customDate: localDate(3),
+    error: null
+  };
+}
+
+function renderPlanDialog(root) {
+  const draft = runtime.planDraft;
+  const overlay = document.createElement('div');
+  overlay.className = 'v8-overlay';
+  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
+    <p class="eyebrow">Plan konfigurieren</p>
+    <h2 id="plan-dialog-title">Welche Tage und Mahlzeiten?</h2>
+    <p>Presets sind nur ein Startpunkt. Jeder Tag lässt sich einzeln entfernen oder ergänzen.</p>
+    <h3>Zeitraum</h3>
+    <div class="v8-actions">${[3,5,7].map((count) => `<button class="v8-button ${draft.selectedDates.length === count ? 'primary' : ''}" data-plan-preset="${count}">${count} Tage</button>`).join('')}</div>
+    <div class="day-chip-row" style="margin-top:12px">${draft.selectedDates.map((date) => `<button class="day-toggle active" data-plan-date="${date}" title="Tag entfernen">${escapeHtml(dateLabel(date))} ×</button>`).join('')}</div>
+    <div class="form-field" style="margin-top:14px"><label for="plan-custom-date">Weiteres Datum</label><div class="v8-actions"><input id="plan-custom-date" type="date" min="${localDate(0)}" value="${escapeHtml(draft.customDate)}" data-plan-custom-date><button class="v8-button" data-plan-add-date>Hinzufügen</button></div></div>
+    <h3>Mahlzeiten</h3>
+    <div class="option-grid">${MEAL_OPTIONS.map(([key, label]) => `<button class="option-card ${draft.enabledMeals.includes(key) ? 'selected' : ''}" data-plan-meal="${key}"><strong>${escapeHtml(label)}</strong></button>`).join('')}</div>
+    <div class="v8-status">${draft.selectedDates.length} Tage · ${draft.enabledMeals.length} Mahlzeiten pro Tag · ${draft.selectedDates.length * draft.enabledMeals.length} Gerichte</div>
+    <p class="v8-status error" data-plan-error ${draft.error ? '' : 'hidden'}>${escapeHtml(draft.error || '')}</p>
+    <div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-plan-action="close">Abbrechen</button><button class="v8-button primary" data-plan-action="create">Plan erstellen</button></div>
+  </section>`;
+  root.appendChild(overlay);
+  bindPlanDialogEvents(root);
+}
+
 function renderDialog(root) {
   root.querySelector('.v8-overlay')?.remove();
+  if (runtime.activeDialog === 'plan' && runtime.planDraft) { renderPlanDialog(root); return; }
   if (runtime.activeDialog !== 'onboarding' || !runtime.onboardingDraft) return;
   const draft = runtime.onboardingDraft;
   const step = currentStep(draft);
@@ -165,6 +194,41 @@ function renderDialog(root) {
   overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Später</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
   root.appendChild(overlay);
   bindDialogEvents(root);
+}
+
+function bindPlanDialogEvents(root) {
+  root.querySelectorAll('[data-plan-preset]').forEach((button) => button.addEventListener('click', () => {
+    const count = Number(button.dataset.planPreset);
+    runtime.planDraft.selectedDates = Array.from({ length: count }, (_, index) => localDate(index));
+    runtime.planDraft.customDate = localDate(count);
+    runtime.planDraft.error = null;
+    renderDialog(root);
+  }));
+  root.querySelectorAll('[data-plan-date]').forEach((button) => button.addEventListener('click', () => {
+    runtime.planDraft.selectedDates = runtime.planDraft.selectedDates.filter((date) => date !== button.dataset.planDate);
+    runtime.planDraft.error = null;
+    renderDialog(root);
+  }));
+  root.querySelector('[data-plan-custom-date]')?.addEventListener('change', (event) => { runtime.planDraft.customDate = event.target.value; });
+  root.querySelector('[data-plan-add-date]')?.addEventListener('click', () => {
+    const date = root.querySelector('[data-plan-custom-date]')?.value;
+    if (date && !runtime.planDraft.selectedDates.includes(date)) runtime.planDraft.selectedDates = [...runtime.planDraft.selectedDates, date].sort();
+    runtime.planDraft.customDate = date || runtime.planDraft.customDate;
+    runtime.planDraft.error = null;
+    renderDialog(root);
+  });
+  root.querySelectorAll('[data-plan-meal]').forEach((button) => button.addEventListener('click', () => {
+    const meal = button.dataset.planMeal;
+    runtime.planDraft.enabledMeals = runtime.planDraft.enabledMeals.includes(meal)
+      ? runtime.planDraft.enabledMeals.filter((item) => item !== meal)
+      : [...runtime.planDraft.enabledMeals, meal];
+    runtime.planDraft.error = null;
+    renderDialog(root);
+  }));
+  root.querySelectorAll('[data-plan-action]').forEach((button) => button.addEventListener('click', () => {
+    if (button.dataset.planAction === 'close') { runtime.activeDialog = null; runtime.planDraft = null; renderApp(root); return; }
+    createConfiguredPlan(root);
+  }));
 }
 
 function bindDialogEvents(root) {
@@ -211,17 +275,42 @@ function openOnboarding(root) {
   renderDialog(root);
 }
 
-function buildQuickPlan() {
-  const state = getState();
-  const enabledMeals = Object.entries(state.profile.enabledMeals).filter(([, enabled]) => enabled).map(([key]) => key);
-  const plan = buildPlan(runtime.recipes, {
-    startDate: localDate(0),
-    selectedDates: [localDate(0), localDate(1), localDate(2)],
-    enabledMeals,
-    mode: 'multi_day',
-    profile: state.profile
-  }, state.preferences, { seed: Date.now() % 100000 });
-  updateState((current) => ({ ...current, currentPlan: plan }));
+function openPlanDialog(root) {
+  runtime.planDraft = createPlanDraft(getState().profile);
+  runtime.activeDialog = 'plan';
+  renderDialog(root);
+}
+
+function createConfiguredPlan(root) {
+  const draft = runtime.planDraft;
+  if (!draft.selectedDates.length) { draft.error = 'Wähle mindestens einen Tag aus.'; renderDialog(root); return; }
+  if (!draft.enabledMeals.length) { draft.error = 'Wähle mindestens eine Mahlzeit aus.'; renderDialog(root); return; }
+  if (draft.selectedDates.length > 14) { draft.error = 'Ein einzelner Plan ist auf 14 Tage begrenzt.'; renderDialog(root); return; }
+
+  try {
+    const state = getState();
+    const plan = buildPlan(runtime.recipes, {
+      startDate: draft.selectedDates[0],
+      selectedDates: draft.selectedDates,
+      enabledMeals: draft.enabledMeals,
+      mode: draft.selectedDates.length === 1 ? 'single_day' : 'multi_day',
+      profile: state.profile
+    }, state.preferences, { seed: Date.now() % 100000 });
+
+    updateState((current) => ({
+      ...current,
+      currentPlan: plan,
+      planHistory: current.currentPlan
+        ? [current.currentPlan, ...(current.planHistory || [])].slice(0, 12)
+        : current.planHistory || []
+    }));
+    runtime.activeDialog = null;
+    runtime.planDraft = null;
+    renderApp(root);
+  } catch (error) {
+    draft.error = error.message;
+    renderDialog(root);
+  }
 }
 
 function bindPageEvents(root) {
@@ -229,13 +318,16 @@ function bindPageEvents(root) {
   root.querySelectorAll('[data-action="today-inspiration"]').forEach((button) => button.addEventListener('click', () => {
     if (!runtime.recipes.length) return;
     const state = getState();
-    runtime.suggestions = suggestForToday(runtime.recipes, state.profile, state.preferences, { category: state.profile.enabledMeals.dinner ? 'dinner' : Object.keys(state.profile.enabledMeals).find((key) => state.profile.enabledMeals[key]) || 'dinner', seed: Date.now() });
+    runtime.suggestions = suggestForToday(runtime.recipes, state.profile, state.preferences, {
+      category: state.profile.enabledMeals.dinner ? 'dinner' : Object.keys(state.profile.enabledMeals).find((key) => state.profile.enabledMeals[key]) || 'dinner',
+      seed: Date.now()
+    });
     renderApp(root);
   }));
   root.querySelectorAll('[data-action="create-plan"]').forEach((button) => button.addEventListener('click', () => {
     if (!getState().onboardingCompleted) { openOnboarding(root); return; }
     if (!runtime.recipes.length) return;
-    try { buildQuickPlan(); renderApp(root); } catch (error) { runtime.catalogError = error.message; runtime.catalogStatus = 'error'; renderApp(root); }
+    openPlanDialog(root);
   }));
   root.querySelector('#recipe-search')?.addEventListener('input', (event) => {
     const query = event.target.value.trim().toLowerCase();
