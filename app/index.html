@@ -3243,10 +3243,11 @@ body{background:#e9e9e4;color:var(--ink);font-family:Inter,system-ui,-apple-syst
 #app-sub{font-size:10px!important;color:var(--muted)!important}
 #view-timeline,#view-training,#view-stack,#week-overlay,#view-meals>.sub-tabs,#view-meals>.fab,#intro-overlay{display:none!important}
 #view-meals{background:var(--paper)}
-#view-meals.active{display:block!important}
+#view-meals.active{display:flex!important;flex-direction:column}
 #view-profile{background:var(--paper);color:var(--ink)}
-#profile-content{padding:8px 20px calc(88px + env(safe-area-inset-bottom,0px));background:var(--paper);color:var(--ink)}
-#meal-content{padding:8px 20px calc(88px + env(safe-area-inset-bottom,0px));background:var(--paper);color:var(--ink)}
+#view-profile.active{display:flex!important;flex-direction:column}
+#profile-content{flex:1;overflow-y:auto;padding:8px 20px calc(88px + env(safe-area-inset-bottom,0px));background:var(--paper);color:var(--ink)}
+#meal-content{flex:1;overflow-y:auto;padding:8px 20px calc(88px + env(safe-area-inset-bottom,0px));background:var(--paper);color:var(--ink)}
 #screen-main .tabs{height:68px;background:rgba(247,247,244,.96);border-top:1px solid var(--line);padding:7px 16px calc(5px + env(safe-area-inset-bottom,0px));backdrop-filter:blur(12px)}
 #screen-main .tab{color:#85857d;font-size:9px;font-family:inherit}
 #screen-main .tab .ic{width:29px;height:23px}
