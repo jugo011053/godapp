@@ -80,7 +80,7 @@ await page.getByRole('heading', { name: 'Welche Tage und Mahlzeiten?' }).waitFor
 await page.getByRole('button', { name: '5 Tage' }).click();
 await page.locator('[data-plan-add-date]').click();
 await page.locator('[data-plan-meal="breakfast"]').click();
-await page.getByRole('button', { name: 'Plan erstellen' }).click();
+await page.getByRole('button', { name: 'Plan erstellen', exact: true }).click();
 await page.getByText('Dein Plan').waitFor();
 assert.equal(await page.locator('.plan-day').count(), 6);
 
