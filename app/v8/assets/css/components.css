@@ -1,0 +1,24 @@
+.foundation-card {
+  max-width: 720px;
+  margin: 10vh auto 0;
+  padding: clamp(24px, 5vw, 48px);
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-lg);
+  box-shadow: var(--shadow);
+}
+.foundation-card h1 {
+  margin: 6px 0 14px;
+  font-size: clamp(2rem, 6vw, 4rem);
+  line-height: 0.98;
+  letter-spacing: -0.055em;
+}
+.foundation-card p { color: var(--muted); line-height: 1.65; }
+.eyebrow {
+  margin: 0;
+  color: var(--accent-strong) !important;
+  font-size: 0.78rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+}
