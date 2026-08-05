@@ -1,4 +1,4 @@
-import { normalizeRecipeCard } from './contracts.js';
+import { normalizeCatalogRecipe } from './recipeNormalizer.js';
 
 const DEFAULT_ENDPOINT = '/rest/v1/recipe_catalog_v1';
 
@@ -12,14 +12,8 @@ export class RecipeRepository {
     this.fetchImpl = fetchImpl;
   }
 
-  async listCards({ signal } = {}) {
-    const select = [
-      'id', 'name', 'cat', 'kcal', 'protein', 'carbs', 'fat', 'time',
-      'difficulty', 'tags', 'allergens', 'diet_tags', 'classification',
-      'quality_score', 'is_plan_eligible'
-    ].join(',');
-    const url = `${this.supabaseUrl}${DEFAULT_ENDPOINT}?is_plan_eligible=eq.true&select=${encodeURIComponent(select)}&order=name`;
-    const response = await this.fetchImpl(url, {
+  async request(query, { signal } = {}) {
+    const response = await this.fetchImpl(`${this.supabaseUrl}${DEFAULT_ENDPOINT}?${query}`, {
       signal,
       headers: {
         apikey: this.anonKey,
@@ -29,27 +23,57 @@ export class RecipeRepository {
     if (!response.ok) {
       throw new Error(`Rezeptkatalog konnte nicht geladen werden (${response.status}).`);
     }
-    const recipes = await response.json();
-    return recipes.map((recipe) => normalizeRecipeCard({
-      ...recipe,
-      mealPrepScore: recipe.classification?.meal_prep_score_v2,
-      costBand: recipe.classification?.cost_band
-    }));
+    return response.json();
+  }
+
+  async listCards({ signal, includeBlocked = false } = {}) {
+    const select = [
+      'id', 'source', 'code', 'name', 'cat', 'kcal', 'protein', 'carbs', 'fat',
+      'time', 'servings', 'difficulty', 'tags', 'allergens', 'diet_tags',
+      'ingredients', 'steps', 'classification', 'quality_score', 'is_plan_eligible'
+    ].join(',');
+    const filter = includeBlocked ? '' : 'is_plan_eligible=eq.true&';
+    const recipes = await this.request(`${filter}select=${encodeURIComponent(select)}&order=name`, { signal });
+    return recipes
+      .map(normalizeCatalogRecipe)
+      .filter((recipe) => includeBlocked || recipe.planEligible)
+      .map((recipe) => ({
+        id: recipe.id,
+        code: recipe.code,
+        name: recipe.name,
+        category: recipe.category,
+        mealRole: recipe.mealRole,
+        kcal: Number(recipe.kcal || 0),
+        protein: Number(recipe.protein || 0),
+        carbs: Number(recipe.carbs || 0),
+        fat: Number(recipe.fat || 0),
+        time: Number(recipe.time || 0),
+        servings: Number(recipe.servings || 1),
+        difficulty: recipe.difficulty || 'medium',
+        simplicity: recipe.simplicity,
+        mealPrepScore: recipe.mealPrepScore,
+        noveltyLevel: recipe.noveltyLevel,
+        costBand: recipe.costBand,
+        tags: recipe.tags || [],
+        allergens: recipe.allergens,
+        dietTags: recipe.dietTags,
+        planEligible: recipe.planEligible,
+        qualityStatus: recipe.qualityStatus,
+        qualityIssues: recipe.qualityIssues,
+        familyKey: recipe.familyKey,
+        primaryProtein: recipe.primaryProtein,
+        dishType: recipe.dishType,
+        ingredientNames: recipe.ingredientNames
+      }));
   }
 
   async getRecipe(id, { signal } = {}) {
-    const url = `${this.supabaseUrl}${DEFAULT_ENDPOINT}?id=eq.${encodeURIComponent(id)}&select=*&limit=1`;
-    const response = await this.fetchImpl(url, {
-      signal,
-      headers: {
-        apikey: this.anonKey,
-        Accept: 'application/json'
-      }
-    });
-    if (!response.ok) {
-      throw new Error(`Rezept konnte nicht geladen werden (${response.status}).`);
-    }
-    const [recipe] = await response.json();
-    return recipe || null;
+    const [recipe] = await this.request(`id=eq.${encodeURIComponent(id)}&select=*&limit=1`, { signal });
+    return recipe ? normalizeCatalogRecipe(recipe) : null;
+  }
+
+  async listForQualityAudit({ signal } = {}) {
+    const recipes = await this.request('select=*&order=code', { signal });
+    return recipes.map(normalizeCatalogRecipe);
   }
 }
