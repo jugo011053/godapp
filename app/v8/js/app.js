@@ -3,6 +3,7 @@ import { getRoute, initializeRouter } from './core/router.js';
 import { getState, initializeStore, updateState } from './core/store.js';
 import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
 import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
+import { refreshProfileMaster } from './profileMasterEnhancement.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
 import { refreshPlanReplacementEnhancement } from './planReplacementEnhancement.js';
 import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
@@ -12,6 +13,7 @@ const appRoot = document.getElementById('app');
 async function renderAll() {
   rerenderIntegratedApp(appRoot);
   await refreshFeatureEnhancements(appRoot);
+  refreshProfileMaster(appRoot);
   refreshHistoryEnhancement(appRoot);
   await refreshPlanReplacementEnhancement(appRoot);
   refreshPlanManagement(appRoot);
@@ -26,6 +28,7 @@ try {
   await startIntegratedApp(appRoot);
   await initializeFeatureEnhancements();
   await refreshFeatureEnhancements(appRoot);
+  refreshProfileMaster(appRoot);
   refreshHistoryEnhancement(appRoot);
   await refreshPlanReplacementEnhancement(appRoot);
   refreshPlanManagement(appRoot);
