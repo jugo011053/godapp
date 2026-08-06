@@ -20,6 +20,16 @@
   --success: #12a150;
   --success-bg: #ecfdf3;
 
+  /* Dark stats card */
+  --stats-bg: #1a1d17;
+  --stats-ink: #ffffff;
+  --stats-muted: rgba(255,255,255,.55);
+
+  /* Meal card accents */
+  --meal-accent-1: #78a800;
+  --meal-bg-hero: #d4e8a0;
+  --meal-bg-light: #eef6d6;
+
   /* Radii */
   --radius-xs: 6px;
   --radius-sm: 10px;

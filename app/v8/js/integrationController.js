@@ -27,7 +27,8 @@ const runtime = {
   expandedMeals: new Set(),
   detailCache: new Map(),
   replaceTarget: null,
-  replaceMode: 'similar'
+  replaceMode: 'similar',
+  viewMode: 'heute'
 };
 
 const MEAL_LABELS = Object.fromEntries(MEAL_OPTIONS);
@@ -76,7 +77,18 @@ function mealCardKey(date, category) {
   return `${date}::${category}`;
 }
 
-function renderMealCard(date, category, meal, dayIndex) {
+function donutSvg(pct) {
+  const r = 15;
+  const c = 2 * Math.PI * r;
+  const offset = c - (Math.min(pct, 100) / 100) * c;
+  return `<svg class="meal-donut" viewBox="0 0 38 38">
+    <circle class="meal-donut-track" cx="19" cy="19" r="${r}"/>
+    <circle class="meal-donut-fill" cx="19" cy="19" r="${r}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
+    <text class="meal-donut-text" x="19" y="19">${Math.round(pct)}%</text>
+  </svg>`;
+}
+
+function renderMealCard(date, category, meal, dayIndex, cardIndex, kcalTarget) {
   const recipe = meal.recipe || meal;
   const name = recipe.name || 'Unbekannt';
   const kcal = meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
@@ -85,6 +97,8 @@ function renderMealCard(date, category, meal, dayIndex) {
   const key = mealCardKey(date, category);
   const isExpanded = runtime.expandedMeals.has(key);
   const detail = runtime.detailCache.get(recipe.id || recipe.recipeId);
+  const pct = kcalTarget > 0 ? (kcal / kcalTarget) * 100 : 0;
+  const bgClass = cardIndex === 0 ? 'hero-card' : 'light-card';
 
   let expandedHtml = '';
   if (isExpanded) {
@@ -103,14 +117,15 @@ function renderMealCard(date, category, meal, dayIndex) {
     </div>`;
   }
 
-  return `<div class="meal-card2 ${isExpanded ? 'expanded' : ''}" data-meal-key="${escapeHtml(key)}">
+  return `<div class="meal-card2 ${bgClass} ${isExpanded ? 'expanded' : ''}" data-meal-key="${escapeHtml(key)}">
     <div class="meal-card2-top" data-expand-meal="${escapeHtml(key)}" data-recipe-id="${escapeHtml(recipe.id || '')}">
-      <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[category] || category)}</div>
-      <div class="meal-card-info">
+      <div class="meal-card-body">
+        <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[category] || category)}</div>
         <div class="meal-name2">${escapeHtml(name)}</div>
-        <div class="meal-macros-line">${kcal} kcal · ${protein}g Protein · ${time} Min.${meal.repeatedForMealPrep ? ' · Prep' : ''}</div>
+        <div class="meal-macros-line">${kcal} kcal · ${protein} g Protein · ${time} Min.</div>
       </div>
-      <button class="meal-check-btn" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" title="Gericht austauschen">⇄</button>
+      ${donutSvg(pct)}
+      <button class="meal-swap-btn" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" title="Gericht austauschen">↻</button>
     </div>
     ${expandedHtml}
   </div>`;
@@ -145,45 +160,84 @@ function renderPlanPage() {
     const kcalTarget = profile.calorieTarget || 2000;
     const proteinTarget = profile.proteinTarget || 120;
     const summary = dayData ? computeDaySummary(dayData) : { totalKcal: 0, totalProtein: 0, mealCount: 0 };
-    const kcalPct = Math.min(100, Math.round((summary.totalKcal / kcalTarget) * 100));
-    const protPct = Math.min(100, Math.round((summary.totalProtein / proteinTarget) * 100));
+
+    const isWeekView = days.length > 1;
+    const viewMode = runtime.viewMode || 'heute';
+    const dayDate = dayData ? new Date(`${dayData.date}T12:00:00`) : new Date();
+    const dayLabel = `HEUTE · ${String(dayDate.getDate()).padStart(2, '0')}.${String(dayDate.getMonth() + 1).padStart(2, '0')}.`;
 
     return `<section class="v8-page">
-      <div class="v8-page-head">
-        <h1>Dein Plan</h1>
+      <!-- Hero -->
+      <div class="plan-hero">
+        <div class="plan-hero-eyebrow">DEIN PLAN</div>
+        <div class="plan-hero-title">Gut essen, ohne<br>nachzudenken.</div>
       </div>
 
+      <!-- Dark stats card -->
+      <div class="stats-card">
+        <div class="stats-card-row">
+          <div class="stats-card-item">
+            <div class="stats-label">TAGESZIEL</div>
+            <div class="stats-value">${kcalTarget}<span class="stats-unit"> kcal</span></div>
+          </div>
+          <div class="stats-card-item">
+            <div class="stats-label">PROTEIN</div>
+            <div class="stats-value">${proteinTarget}<span class="stats-unit"> g</span></div>
+          </div>
+        </div>
+        <div class="stats-card-divider"></div>
+        <div class="stats-card-desc">Der Plan ist auf deinen Bedarf und deine Auswahl zugeschnitten.</div>
+      </div>
+
+      ${isWeekView ? `
+      <!-- Heute / Woche toggle -->
+      <div class="view-toggle">
+        <button class="view-toggle-btn ${viewMode === 'heute' ? 'active' : ''}" data-view-mode="heute">Heute</button>
+        <button class="view-toggle-btn ${viewMode === 'woche' ? 'active' : ''}" data-view-mode="woche">Woche</button>
+      </div>
+      ` : ''}
+
+      <!-- Day pills -->
       <div class="meal-day-nav">
         ${days.map((day) => {
           const d = new Date(`${day.date}T12:00:00`);
           const wd = WEEKDAY_SHORT[d.getDay()];
           const dd = String(d.getDate()).padStart(2, '0');
-          const isToday = day.date === today;
+          const isDayToday = day.date === today;
           const isActive = day.date === (dayData ? dayData.date : '');
-          const hasMeals = Object.keys(day.meals || {}).length > 0;
-          return `<button class="day-pill ${isActive ? 'sel' : ''} ${isToday ? 'today' : ''}" data-plan-day="${day.date}">
-            <span class="day-pill-name">${wd}</span>
+          return `<button class="day-pill ${isActive ? 'sel' : ''}" data-plan-day="${day.date}">
+            ${isDayToday && isActive ? '<span class="day-pill-today">HEUTE</span>' : `<span class="day-pill-name">${wd}</span>`}
             <span class="day-pill-num">${dd}</span>
-            ${hasMeals ? '<span class="day-pill-dot"></span>' : ''}
           </button>`;
         }).join('')}
       </div>
 
-      ${dayData ? `
-        <div class="meal-summary-bar">
-          <div><div class="meal-summary-val">${summary.totalKcal}</div><div class="meal-summary-label">/ ${kcalTarget} kcal</div></div>
-          <div style="text-align:right"><div class="meal-summary-val">${summary.totalProtein}g</div><div class="meal-summary-label">/ ${proteinTarget}g Protein</div></div>
-        </div>
-        <div class="meal-prog-track"><div class="meal-prog-fill" style="width:${kcalPct}%"></div></div>
-
-        ${Object.entries(dayData.meals || {}).map(([category, meal]) =>
-          renderMealCard(dayData.date, category, meal, dayIndex)
-        ).join('')}
-      ` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
-
-      <div class="v8-actions" style="margin-top:var(--space-4)">
-        <button class="v8-button primary" data-action="create-plan">Neuer Plan</button>
+      <!-- Info callout -->
+      <div class="info-callout">
+        <div class="info-callout-icon">i</div>
+        <div class="info-callout-text">Heute. Tausche jedes Gericht direkt aus – Plan und Einkaufsliste werden gemeinsam aktualisiert.</div>
       </div>
+
+      ${dayData ? `
+      <!-- Meals section -->
+      <div class="meals-header">
+        <h2>Deine Mahlzeiten</h2>
+        <button class="meals-header-action" data-action="create-plan">Neu zusammenstellen</button>
+      </div>
+
+      <div class="meals-container">
+        <div class="meals-container-header">
+          <div>
+            <div class="meals-container-date">${escapeHtml(dayLabel)}</div>
+            <div class="meals-container-sub">Einfach loskochen</div>
+          </div>
+          <div class="meals-container-badge">${summary.totalKcal} kcal</div>
+        </div>
+        ${Object.entries(dayData.meals || {}).map(([category, meal], idx) =>
+          renderMealCard(dayData.date, category, meal, dayIndex, idx, kcalTarget)
+        ).join('')}
+      </div>
+      ` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
     </section>`;
   }
 
@@ -649,6 +703,12 @@ function bindPageEvents(root) {
     } catch (error) {
       console.error('[Preply] Tagesplan-Fehler', error);
     }
+  }));
+
+  /* View mode toggle (Heute/Woche) */
+  root.querySelectorAll('[data-view-mode]').forEach((btn) => btn.addEventListener('click', () => {
+    runtime.viewMode = btn.dataset.viewMode;
+    renderApp(root);
   }));
 
   /* Plan day pills */
