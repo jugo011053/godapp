@@ -1,0 +1,43 @@
+name: Capture V7 Reference
+
+on:
+  pull_request:
+    paths:
+      - 'tests/capture-v7-reference.mjs'
+      - '.github/workflows/capture-v7-reference.yml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  screenshot:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright
+        run: |
+          npm init -y
+          npm install --no-save playwright@1.54.1
+          npx playwright install --with-deps chromium
+      - name: Extract the black and lime reference version
+        run: |
+          mkdir -p /tmp/preply-reference
+          git archive 55177eafac194ad1afff28c745b36c148e3dc3fb app | tar -x -C /tmp/preply-reference
+      - name: Start reference app
+        run: |
+          python3 -m http.server 4174 --directory /tmp/preply-reference/app > /tmp/preply-reference.log 2>&1 &
+          for i in {1..20}; do curl -fsS http://127.0.0.1:4174/v8/ >/dev/null && break; sleep 1; done
+      - name: Capture screenshot
+        run: node tests/capture-v7-reference.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: preply-v7-reference
+          path: artifacts/preply-v7-reference.png
+          if-no-files-found: error
