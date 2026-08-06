@@ -1,0 +1,243 @@
+/* Approved Preply design additions: plan management and profile decision sheets. */
+
+.plan-menu-overlay,
+.profile-decision-overlay,
+.plan-confirm-overlay {
+  align-items: flex-end;
+  padding: 0;
+}
+
+.plan-menu-sheet,
+.profile-decision-sheet,
+.plan-confirm-sheet {
+  width: min(100%, var(--app-max));
+  max-height: min(92dvh, 760px);
+  margin: 0;
+  padding: 18px 18px calc(18px + env(safe-area-inset-bottom));
+  border: 0;
+  border-radius: 22px 22px 0 0;
+  background: var(--app-bg);
+  box-shadow: 0 -12px 40px rgba(17, 17, 17, .16);
+  animation: preply-sheet-in 180ms var(--ease-out) both;
+}
+
+@keyframes preply-sheet-in {
+  from { transform: translateY(18px); opacity: .72; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.sheet-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.sheet-head h2,
+.profile-decision-sheet h2,
+.plan-confirm-sheet h2 {
+  margin: 0;
+  color: var(--ink);
+  font-size: 1.05rem;
+  line-height: 1.15;
+  letter-spacing: -.035em;
+  font-weight: 850;
+}
+
+.sheet-close {
+  width: 36px;
+  height: 36px;
+  flex: 0 0 36px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-size: 1.05rem;
+}
+
+.plan-menu-list {
+  overflow: hidden;
+  border: 1px solid var(--border);
+  border-radius: 15px;
+  background: var(--surface);
+}
+
+.plan-menu-item {
+  width: 100%;
+  min-height: 64px;
+  display: grid;
+  grid-template-columns: 36px minmax(0, 1fr) 18px;
+  align-items: center;
+  gap: 11px;
+  padding: 11px 12px;
+  border: 0;
+  border-top: 1px solid var(--border-soft);
+  background: transparent;
+  color: var(--ink);
+  text-align: left;
+}
+
+.plan-menu-item:first-child { border-top: 0; }
+.plan-menu-item:hover { background: var(--surface-soft); }
+
+.plan-menu-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 10px;
+  background: var(--surface-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+}
+
+.plan-menu-icon svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.plan-menu-copy strong {
+  display: block;
+  font-size: .73rem;
+  line-height: 1.2;
+  font-weight: 850;
+}
+
+.plan-menu-copy small {
+  display: block;
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .56rem;
+  line-height: 1.35;
+  font-weight: 550;
+}
+
+.plan-menu-arrow {
+  color: var(--muted);
+  font-size: 1rem;
+}
+
+.plan-menu-item.danger {
+  margin-top: 10px;
+  border: 1px solid #f0d2cd;
+  border-radius: 13px;
+  color: var(--danger);
+  background: var(--danger-bg);
+}
+
+.plan-menu-item.danger .plan-menu-icon {
+  color: var(--danger);
+  background: #ffe4df;
+}
+
+.plan-confirm-sheet > p,
+.profile-decision-sheet > p {
+  margin: 9px 0 0;
+  color: var(--muted);
+  font-size: .67rem;
+  line-height: 1.5;
+}
+
+.sheet-actions {
+  display: grid;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.sheet-action {
+  min-height: 48px;
+  border-radius: 12px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .72rem;
+  font-weight: 850;
+}
+
+.sheet-action.primary {
+  border-color: var(--ink);
+  background: var(--ink);
+  color: #fff;
+}
+
+.sheet-action.lime {
+  border-color: var(--lime);
+  background: var(--lime);
+  color: var(--ink);
+}
+
+.sheet-action.danger {
+  border-color: #f0d2cd;
+  background: var(--danger-bg);
+  color: var(--danger);
+}
+
+.profile-decision-sheet {
+  text-align: center;
+}
+
+.profile-decision-icon {
+  width: 68px;
+  height: 68px;
+  margin: 0 auto 16px;
+  border-radius: 50%;
+  background: var(--lime-soft);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+}
+
+.profile-decision-icon svg {
+  width: 31px;
+  height: 31px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.profile-decision-sheet .sheet-actions {
+  text-align: left;
+}
+
+.profile-decision-sheet .sheet-action {
+  height: auto;
+  min-height: 58px;
+  padding: 11px 12px;
+  text-align: left;
+}
+
+.profile-decision-sheet .sheet-action strong,
+.profile-decision-sheet .sheet-action small {
+  display: block;
+}
+
+.profile-decision-sheet .sheet-action small {
+  margin-top: 3px;
+  color: var(--muted);
+  font-size: .56rem;
+  line-height: 1.35;
+}
+
+.profile-decision-sheet .sheet-action.primary small {
+  color: rgba(255,255,255,.72);
+}
+
+.profile-decision-cancel {
+  margin-top: 14px;
+  border: 0;
+  background: transparent;
+  color: var(--ink);
+  font-size: .65rem;
+  font-weight: 800;
+}
+
+[hidden] { display: none !important; }
