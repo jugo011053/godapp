@@ -1,7 +1,7 @@
 *, *::before, *::after { box-sizing: border-box; }
 html, body { margin: 0; min-height: 100dvh; }
 body {
-  background: var(--paper);
+  background: var(--app-outer);
   color: var(--ink);
   font-family: var(--font-sans);
   font-size: var(--text-base);
@@ -9,6 +9,12 @@ body {
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: optimizeLegibility;
+}
+#app {
+  width: min(100%, var(--app-max));
+  min-height: 100dvh;
+  margin: 0 auto;
+  background: var(--app-bg);
 }
 button, input, select, textarea { font: inherit; }
 button { cursor: pointer; }
@@ -21,7 +27,7 @@ ul, ol { margin: 0; padding-left: 1.4em; }
 
 /* Focus visible */
 :focus-visible {
-  outline: 2px solid var(--accent);
+  outline: 2px solid var(--lime);
   outline-offset: 2px;
   border-radius: var(--radius-xs);
 }

@@ -51,6 +51,10 @@ function dateLabel(value) {
   return formatDay.format(new Date(`${value}T12:00:00`));
 }
 
+function tone(index) {
+  return ['tone-lime', 'tone-lavender', 'tone-peach', 'tone-blue', 'tone-pink'][index % 5];
+}
+
 function recipeCard(recipe, extra = '') {
   return `<article class="recipe-card" data-recipe-id="${escapeHtml(recipe.id)}">
     <div><p class="eyebrow">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</p><h3>${escapeHtml(recipe.name)}</h3></div>
@@ -77,18 +81,19 @@ function mealCardKey(date, category) {
   return `${date}::${category}`;
 }
 
-function donutSvg(pct) {
-  const r = 15;
-  const c = 2 * Math.PI * r;
-  const offset = c - (Math.min(pct, 100) / 100) * c;
-  return `<svg class="meal-donut" viewBox="0 0 38 38">
-    <circle class="meal-donut-track" cx="19" cy="19" r="${r}"/>
-    <circle class="meal-donut-fill" cx="19" cy="19" r="${r}" stroke-dasharray="${c.toFixed(1)}" stroke-dashoffset="${offset.toFixed(1)}"/>
-    <text class="meal-donut-text" x="19" y="19">${Math.round(pct)}%</text>
-  </svg>`;
+function computeDaySummary(dayData) {
+  const meals = Object.entries(dayData.meals || {});
+  let totalKcal = 0;
+  let totalProtein = 0;
+  for (const [, meal] of meals) {
+    const recipe = meal.recipe || meal;
+    totalKcal += meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
+    totalProtein += meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0);
+  }
+  return { totalKcal, totalProtein, mealCount: meals.length };
 }
 
-function renderMealCard(date, category, meal, dayIndex, cardIndex, kcalTarget) {
+function renderMealCard(date, category, meal, dayIndex, cardIndex) {
   const recipe = meal.recipe || meal;
   const name = recipe.name || 'Unbekannt';
   const kcal = meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
@@ -97,8 +102,6 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex, kcalTarget) {
   const key = mealCardKey(date, category);
   const isExpanded = runtime.expandedMeals.has(key);
   const detail = runtime.detailCache.get(recipe.id || recipe.recipeId);
-  const pct = kcalTarget > 0 ? (kcal / kcalTarget) * 100 : 0;
-  const bgClass = cardIndex === 0 ? 'hero-card' : 'light-card';
 
   let expandedHtml = '';
   if (isExpanded) {
@@ -117,30 +120,15 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex, kcalTarget) {
     </div>`;
   }
 
-  return `<div class="meal-card2 ${bgClass} ${isExpanded ? 'expanded' : ''}" data-meal-key="${escapeHtml(key)}">
-    <div class="meal-card2-top" data-expand-meal="${escapeHtml(key)}" data-recipe-id="${escapeHtml(recipe.id || '')}">
-      <div class="meal-card-body">
-        <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[category] || category)}</div>
-        <div class="meal-name2">${escapeHtml(name)}</div>
-        <div class="meal-macros-line">${kcal} kcal · ${protein} g Protein · ${time} Min.</div>
-      </div>
-      ${donutSvg(pct)}
-      <button class="meal-swap-btn" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" title="Gericht austauschen">↻</button>
-    </div>
-    ${expandedHtml}
+  return `<div class="preply-meal" data-meal-key="${escapeHtml(key)}">
+    <button class="preply-meal-main ${tone(cardIndex)}" data-expand-meal="${escapeHtml(key)}" data-recipe-id="${escapeHtml(recipe.id || '')}">
+      <span class="preply-meal-slot">${escapeHtml(MEAL_LABELS[category] || category)}</span>
+      <strong>${escapeHtml(name)}</strong>
+      <em>${kcal} kcal · ${protein} g Protein · ${time} Min</em>
+    </button>
+    <button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>
+    ${isExpanded ? expandedHtml : ''}
   </div>`;
-}
-
-function computeDaySummary(dayData) {
-  const meals = Object.entries(dayData.meals || {});
-  let totalKcal = 0;
-  let totalProtein = 0;
-  for (const [, meal] of meals) {
-    const recipe = meal.recipe || meal;
-    totalKcal += meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
-    totalProtein += meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0);
-  }
-  return { totalKcal, totalProtein, mealCount: meals.length };
 }
 
 function renderPlanPage() {
@@ -164,80 +152,84 @@ function renderPlanPage() {
     const isWeekView = days.length > 1;
     const viewMode = runtime.viewMode || 'heute';
     const dayDate = dayData ? new Date(`${dayData.date}T12:00:00`) : new Date();
-    const dayLabel = `HEUTE · ${String(dayDate.getDate()).padStart(2, '0')}.${String(dayDate.getMonth() + 1).padStart(2, '0')}.`;
+    const dayName = dayData && dayData.date === today ? 'Heute' : (dayData ? new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(dayDate) : 'Heute');
+    const dayDateLabel = `${String(dayDate.getDate()).padStart(2, '0')}.${String(dayDate.getMonth() + 1).padStart(2, '0')}.`;
 
-    return `<section class="v8-page">
-      <!-- Hero -->
-      <div class="plan-hero">
-        <div class="plan-hero-eyebrow">DEIN PLAN</div>
-        <div class="plan-hero-title">Gut essen, ohne<br>nachzudenken.</div>
-      </div>
+    return `<section class="v8-page preply-page">
+      <!-- Kicker + Title -->
+      <div class="preply-kicker">Dein Plan</div>
+      <h1 class="preply-title">Gut essen,<br>ohne nachzudenken.</h1>
 
-      <!-- Dark stats card -->
-      <div class="stats-card">
-        <div class="stats-card-row">
-          <div class="stats-card-item">
-            <div class="stats-label">TAGESZIEL</div>
-            <div class="stats-value">${kcalTarget}<span class="stats-unit"> kcal</span></div>
-          </div>
-          <div class="stats-card-item">
-            <div class="stats-label">PROTEIN</div>
-            <div class="stats-value">${proteinTarget}<span class="stats-unit"> g</span></div>
-          </div>
-        </div>
-        <div class="stats-card-divider"></div>
-        <div class="stats-card-desc">Der Plan ist auf deinen Bedarf und deine Auswahl zugeschnitten.</div>
+      <!-- Goal card (dark bg, lime numbers) -->
+      <div class="preply-target">
+        <div><span>Tagesziel</span><b>${kcalTarget} <small>kcal</small></b></div>
+        <div><span>Protein</span><b>${proteinTarget}<small> g</small></b></div>
+        <p>Der Plan ist auf deinen Bedarf und deine Auswahl zugeschnitten.</p>
       </div>
 
       ${isWeekView ? `
       <!-- Heute / Woche toggle -->
-      <div class="view-toggle">
-        <button class="view-toggle-btn ${viewMode === 'heute' ? 'active' : ''}" data-view-mode="heute">Heute</button>
-        <button class="view-toggle-btn ${viewMode === 'woche' ? 'active' : ''}" data-view-mode="woche">Woche</button>
+      <div class="preply-view-toggle">
+        <button class="${viewMode === 'heute' ? 'active' : ''}" data-view-mode="heute">Heute</button>
+        <button class="${viewMode === 'woche' ? 'active' : ''}" data-view-mode="woche">Woche</button>
       </div>
       ` : ''}
 
-      <!-- Day pills -->
-      <div class="meal-day-nav">
+      ${viewMode === 'woche' && isWeekView ? `
+      <!-- Week view -->
+      <div class="preply-section"><h2>Deine Tage</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
+      <div class="preply-week-list">
+        ${days.map((day, i) => {
+          const total = computeDaySummary(day);
+          const cats = Object.keys(day.meals || {}).filter((cat) => day.meals[cat]);
+          const isToday = day.date === today;
+          const meals = cats.map((cat) => `<div class="preply-week-meal"><span>${escapeHtml(MEAL_LABELS[cat] || cat)}</span><strong>${escapeHtml((day.meals[cat].recipe || day.meals[cat]).name)}</strong><b>›</b></div>`).join('');
+          return `<button class="preply-week-card ${isToday ? 'today' : ''}" data-plan-day="${day.date}">
+            <header><div><span>${isToday ? 'Heute' : new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`))} · ${new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(`${day.date}T12:00:00`))}</span><strong>${cats.length} Mahlzeiten</strong></div><b>${total.totalKcal} kcal</b></header>
+            <div class="preply-week-meals">${meals}</div>
+          </button>`;
+        }).join('')}
+      </div>
+      <button class="preply-outline" onclick="location.hash='recipes'">Weitere Rezepte entdecken <span>→</span></button>
+      ` : `
+      <!-- Day picker -->
+      <div class="preply-day-picker">
         ${days.map((day) => {
           const d = new Date(`${day.date}T12:00:00`);
           const wd = WEEKDAY_SHORT[d.getDay()];
-          const dd = String(d.getDate()).padStart(2, '0');
           const isDayToday = day.date === today;
           const isActive = day.date === (dayData ? dayData.date : '');
-          return `<button class="day-pill ${isActive ? 'sel' : ''}" data-plan-day="${day.date}">
-            ${isDayToday && isActive ? '<span class="day-pill-today">HEUTE</span>' : `<span class="day-pill-name">${wd}</span>`}
-            <span class="day-pill-num">${dd}</span>
+          return `<button class="preply-day ${isActive ? 'active' : ''}" data-plan-day="${day.date}">
+            <span>${isDayToday ? 'Heute' : wd}</span>
+            <b>${d.getDate()}</b>
           </button>`;
         }).join('')}
       </div>
 
-      <!-- Info callout -->
-      <div class="info-callout">
-        <div class="info-callout-icon">i</div>
-        <div class="info-callout-text">Heute. Tausche jedes Gericht direkt aus – Plan und Einkaufsliste werden gemeinsam aktualisiert.</div>
-      </div>
+      <!-- Plan hint -->
+      <div class="preply-note"><i>i</i><p><b>${escapeHtml(dayName)}.</b> Tausche jedes Gericht direkt aus – Plan und Einkaufsliste werden gemeinsam aktualisiert.</p></div>
 
       ${dayData ? `
-      <!-- Meals section -->
-      <div class="meals-header">
-        <h2>Deine Mahlzeiten</h2>
-        <button class="meals-header-action" data-action="create-plan">Neu zusammenstellen</button>
-      </div>
+      <!-- Section heading -->
+      <div class="preply-section"><h2>Deine Mahlzeiten</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
 
-      <div class="meals-container">
-        <div class="meals-container-header">
+      <!-- Day card with meals -->
+      <div class="preply-plan-card">
+        <header>
           <div>
-            <div class="meals-container-date">${escapeHtml(dayLabel)}</div>
-            <div class="meals-container-sub">Einfach loskochen</div>
+            <p>${escapeHtml(dayName)} · ${escapeHtml(dayDateLabel)}</p>
+            <h2>Einfach loskochen</h2>
           </div>
-          <div class="meals-container-badge">${summary.totalKcal} kcal</div>
-        </div>
+          <span class="preply-day-total">${summary.totalKcal} kcal</span>
+        </header>
         ${Object.entries(dayData.meals || {}).map(([category, meal], idx) =>
-          renderMealCard(dayData.date, category, meal, dayIndex, idx, kcalTarget)
+          renderMealCard(dayData.date, category, meal, dayIndex, idx)
         ).join('')}
       </div>
-      ` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
+
+      <button class="preply-outline" onclick="location.hash='recipes'">Weitere Rezepte entdecken <span>→</span></button>
+      ` : '<div class="preply-empty">Kein Plan für diesen Tag.</div>'}
+      `}
     </section>`;
   }
 
@@ -245,14 +237,13 @@ function renderPlanPage() {
 }
 
 function renderEmptyPlan() {
-  return `<section class="v8-page">
-    <div class="v8-page-head">
-      <h1>Was kochst du?</h1>
-      <p>Erstelle einen Essensplan oder lass dich inspirieren.</p>
-    </div>
+  return `<section class="v8-page preply-page">
+    <div class="preply-kicker">Plan</div>
+    <h1 class="preply-title">Was kochst<br>du?</h1>
+    <p class="preply-copy">Erstelle einen Essensplan oder lass dich inspirieren.</p>
     ${catalogStatusHtml()}
 
-    <div class="quick-suggest-card" data-action="today-inspiration">
+    <div class="quick-suggest-card" data-action="today-inspiration" style="margin-top:18px">
       <h3>🍳 Was esse ich heute?</h3>
       <p>Schnelle Vorschläge passend zu deinem Profil</p>
     </div>
@@ -263,17 +254,17 @@ function renderEmptyPlan() {
     </div>
 
     ${runtime.suggestions.length ? `
-      <div style="margin-top:var(--space-5)">
-        <h2 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-3)">Vorschläge für dich</h2>
-        ${runtime.suggestions.map((recipe) => `
-          <div class="meal-card2">
-            <div class="meal-card2-top" data-recipe-id="${escapeHtml(recipe.id)}">
-              <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</div>
-              <div class="meal-card-info">
-                <div class="meal-name2">${escapeHtml(recipe.name)}</div>
-                <div class="meal-macros-line">${Math.round(recipe.kcal)} kcal · ${Math.round(recipe.protein)}g Protein · ${Math.round(recipe.time)} Min.</div>
-              </div>
-            </div>
+      <div style="margin-top:18px">
+        <div class="preply-section"><h2>Vorschläge für dich</h2></div>
+        ${runtime.suggestions.map((recipe, i) => `
+          <div class="preply-discover-card" data-recipe-id="${escapeHtml(recipe.id)}">
+            <span class="preply-mark ${tone(i)}"><i></i></span>
+            <span>
+              <small>${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)} · ${Math.round(recipe.time)} Min</small>
+              <strong>${escapeHtml(recipe.name)}</strong>
+              <em>${Math.round(recipe.kcal)} kcal · ${Math.round(recipe.protein)} g Protein</em>
+            </span>
+            <b>›</b>
           </div>
         `).join('')}
       </div>
@@ -283,13 +274,25 @@ function renderEmptyPlan() {
 
 function renderRecipesPage() {
   /* Recipes rendering is handled by featureEnhancementsV2.renderRecipes() */
-  return `<section class="v8-page"><div class="v8-page-head"><h1>Rezepte</h1><p>Werden geladen …</p></div></section>`;
+  return `<section class="v8-page preply-page"><div class="preply-kicker">Rezepte</div><h1 class="preply-title">Was möchtest<br>du kochen?</h1><p class="preply-copy">Werden geladen …</p></section>`;
 }
 
 function renderShoppingPage() {
   const plan = getState().currentPlan;
-  if (!plan || isPlanExpired(plan)) return `<section class="v8-page"><div class="v8-page-head"><h1>Einkaufsliste</h1><p>Erstelle zuerst einen Plan.</p></div><div class="v8-start-grid"><button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Dann wird deine Einkaufsliste automatisch erstellt.</span></button></div></section>`;
-  return `<section class="v8-page"><div class="v8-page-head"><h1>Einkaufsliste</h1><p>Wähle Tage aus, für die du einkaufen willst.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div></section>`;
+  if (!plan || isPlanExpired(plan)) return `<section class="v8-page preply-page">
+    <div class="preply-kicker">Einkaufen</div>
+    <h1 class="preply-title">Alles, was<br>du brauchst.</h1>
+    <p class="preply-copy">Erstelle zuerst einen Plan.</p>
+    <div class="v8-start-grid" style="margin-top:18px">
+      <button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Dann wird deine Einkaufsliste automatisch erstellt.</span></button>
+    </div>
+  </section>`;
+  return `<section class="v8-page preply-page">
+    <div class="preply-kicker">Einkaufen</div>
+    <h1 class="preply-title">Alles, was<br>du brauchst.</h1>
+    <p class="preply-copy">Wähle Tage aus, für die du einkaufen willst.</p>
+    <div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div>
+  </section>`;
 }
 
 function profileRow(label, value) {
@@ -306,17 +309,21 @@ function renderProfilePage() {
   const GOAL_LABELS = { lose: 'Abnehmen', maintain: 'Gewicht halten', gain: 'Zunehmen' };
   const enabledMeals = Object.entries(profile.enabledMeals || {}).filter(([, v]) => v).map(([k]) => MEAL_LABELS[k] || k).join(', ');
 
-  return `<section class="v8-page">
-    <div class="v8-page-head"><h1>Profil</h1></div>
-    <div class="v8-panel">
+  return `<section class="v8-page preply-page">
+    <div class="preply-kicker">Profil</div>
+    <h1 class="preply-title">Deine<br>Einstellungen.</h1>
+    <div class="preply-profile-grid">
+      <div class="preply-profile-stat"><span>Tagesziel</span><b>${profile.calorieTarget || 2000} <small>kcal</small></b></div>
+      <div class="preply-profile-stat"><span>Protein</span><b>${profile.proteinTarget || 120} <small>g</small></b></div>
+    </div>
+    <div class="preply-settings-card">
+      <h2>Ernährungsprofil</h2>
       ${profileRow('Personen', `${profile.persons || 1}`)}
       ${profileRow('Ernährung', DIET_LABELS[profile.dietStyle])}
       ${profileRow('Kochstil', COOK_LABELS[profile.cookingStyle])}
       ${profileRow('Komplexität', SIMPLE_LABELS[profile.simplicity])}
       ${profileRow('Ziel', GOAL_LABELS[profile.goal])}
       ${profileRow('Maximale Kochzeit', profile.maxCookingTime ? `${profile.maxCookingTime} Min.` : null)}
-      ${profileRow('Kalorienziel', profile.calorieTarget ? `${profile.calorieTarget} kcal` : null)}
-      ${profileRow('Proteinziel', profile.proteinTarget ? `${profile.proteinTarget} g` : null)}
       ${profileRow('Mahlzeiten', enabledMeals || null)}
       <div class="v8-actions" style="margin-top:var(--space-4)"><button class="v8-button primary" data-action="open-onboarding">Bearbeiten</button></div>
     </div>
@@ -459,18 +466,17 @@ function renderReplacementDialog(root) {
     <div class="chip-row" style="margin:var(--space-3) 0">${Object.entries(MODE_LABELS).map(([mode, label]) =>
       `<button class="chip ${runtime.replaceMode === mode ? 'active' : ''}" data-replace-mode="${mode}">${label}</button>`
     ).join('')}</div>
-    <div style="display:flex;flex-direction:column;gap:8px">${suggestions.length ? suggestions.map((recipe) => `
-      <div class="meal-card2">
-        <div class="meal-card2-top" style="cursor:default">
-          <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</div>
-          <div class="meal-card-info">
-            <div class="meal-name2">${escapeHtml(recipe.name)}</div>
-            <div class="meal-macros-line">${Math.round(recipe.kcal)} kcal · ${Math.round(recipe.protein)}g P · ${Math.round(recipe.time)} Min.</div>
-          </div>
-          <button class="v8-button primary" style="align-self:center;padding:6px 12px;font-size:12px" data-pick-replacement="${escapeHtml(recipe.id)}">Wählen</button>
-        </div>
+    <div style="display:flex;flex-direction:column;gap:8px">${suggestions.length ? suggestions.map((recipe, i) => `
+      <div class="preply-discover-card">
+        <span class="preply-mark ${tone(i)}"><i></i></span>
+        <span>
+          <small>${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)} · ${Math.round(recipe.time)} Min</small>
+          <strong>${escapeHtml(recipe.name)}</strong>
+          <em>${Math.round(recipe.kcal)} kcal · ${Math.round(recipe.protein)}g Protein</em>
+        </span>
+        <button class="v8-button primary" style="align-self:center;padding:6px 12px;font-size:12px" data-pick-replacement="${escapeHtml(recipe.id)}">Wählen</button>
       </div>
-    `).join('') : '<div class="empty-state">Keine passenden Alternativen gefunden.</div>'}</div>
+    `).join('') : '<div class="preply-empty">Keine passenden Alternativen gefunden.</div>'}</div>
     <div class="v8-actions" style="margin-top:var(--space-4)">
       <button class="v8-button ghost" data-replace-close>Abbrechen</button>
     </div>
@@ -714,6 +720,7 @@ function bindPageEvents(root) {
   /* Plan day pills */
   root.querySelectorAll('[data-plan-day]').forEach((pill) => pill.addEventListener('click', () => {
     runtime.activePlanDay = pill.dataset.planDay;
+    runtime.viewMode = 'heute';
     renderApp(root);
   }));
 
