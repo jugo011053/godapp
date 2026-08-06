@@ -1,6 +1,15 @@
 name: V8 Browser E2E
 
 on:
+  push:
+    branches:
+      - agent/v7-design-current-v8
+    paths:
+      - 'app/v8/**'
+      - 'tests/v8-e2e.mjs'
+      - 'tests/v8-plan-management-e2e.mjs'
+      - 'tests/capture-current-design.mjs'
+      - '.github/workflows/v8-browser-e2e.yml'
   pull_request:
     paths:
       - 'app/index.html'
