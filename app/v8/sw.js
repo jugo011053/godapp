@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-9';
+const CACHE_NAME = 'preply-v8-shell-10';
 const SHELL = [
   './',
   './index.html',
@@ -8,6 +8,7 @@ const SHELL = [
   './assets/css/components.css',
   './assets/css/shell.css',
   './assets/css/integration.css',
+  './assets/css/design-master.css',
   './js/app.js',
   './js/integrationController.js',
   './js/featureEnhancementsV2.js',
