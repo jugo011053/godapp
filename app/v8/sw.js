@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-1';
+const CACHE_NAME = 'preply-v8-shell-2';
 const SHELL = [
   './',
   './index.html',
@@ -11,7 +11,29 @@ const SHELL = [
   './js/app.js',
   './js/integrationController.js',
   './js/featureEnhancementsV2.js',
-  './js/historyEnhancement.js'
+  './js/historyEnhancement.js',
+  './js/planReplacementEnhancement.js',
+  './js/planManagementEnhancement.js',
+  './js/core/events.js',
+  './js/core/router.js',
+  './js/core/store.js',
+  './js/core/storage.js',
+  './js/core/supabase.js',
+  './js/data/contracts.js',
+  './js/data/recipeRepository.js',
+  './js/data/recipeNormalizer.js',
+  './js/data/recipeScoring.js',
+  './js/data/recipeStore.js',
+  './js/features/auth/auth.js',
+  './js/features/discover/discoverEngine.js',
+  './js/features/favorites/preferenceSignals.js',
+  './js/features/history/history.js',
+  './js/features/onboarding/onboardingModel.js',
+  './js/features/onboarding/onboardingSteps.js',
+  './js/features/planner/plannerEngine.js',
+  './js/features/profile/profileSummary.js',
+  './js/features/shell/renderShell.js',
+  './js/features/shopping/shoppingEngine.js'
 ];
 
 self.addEventListener('install', (event) => {
@@ -40,7 +62,7 @@ self.addEventListener('fetch', (event) => {
     caches.match(event.request).then((cached) => {
       const network = fetch(event.request)
         .then((response) => {
-          if (response.ok) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
+          if (response.ok && !response.redirected) caches.open(CACHE_NAME).then((cache) => cache.put(event.request, response.clone()));
           return response;
         })
         .catch(() => cached);

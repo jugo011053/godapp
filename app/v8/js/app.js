@@ -17,23 +17,34 @@ async function renderAll() {
   refreshPlanManagement(appRoot);
 }
 
-initializeStore();
-initializePlanManagement();
-on('route:changed', () => void renderAll());
-on('state:changed', () => void renderAll());
-initializeRouter();
-await startIntegratedApp(appRoot);
-await initializeFeatureEnhancements();
-await refreshFeatureEnhancements(appRoot);
-refreshHistoryEnhancement(appRoot);
-await refreshPlanReplacementEnhancement(appRoot);
-refreshPlanManagement(appRoot);
+try {
+  initializeStore();
+  initializePlanManagement();
+  on('route:changed', () => void renderAll());
+  on('state:changed', () => void renderAll());
+  initializeRouter();
+  await startIntegratedApp(appRoot);
+  await initializeFeatureEnhancements();
+  await refreshFeatureEnhancements(appRoot);
+  refreshHistoryEnhancement(appRoot);
+  await refreshPlanReplacementEnhancement(appRoot);
+  refreshPlanManagement(appRoot);
 
-window.PreplyV8 = Object.freeze({
-  getState,
-  updateState,
-  getRoute
-});
+  window.PreplyV8 = Object.freeze({
+    getState,
+    updateState,
+    getRoute
+  });
 
-emit('app:ready', { state: getState(), route: getRoute() });
-console.info('[Preply V8] Integrierte Anwendung geladen.');
+  emit('app:ready', { state: getState(), route: getRoute() });
+  console.info('[Preply V8] Integrierte Anwendung geladen.');
+} catch (error) {
+  console.error('[Preply V8] Startfehler:', error);
+  if (appRoot) {
+    appRoot.innerHTML = `<div style="max-width:480px;margin:20vh auto;padding:24px;text-align:center;font-family:system-ui,sans-serif">
+      <h1 style="font-size:1.25rem;margin-bottom:12px">Preply konnte nicht geladen werden</h1>
+      <p style="color:#666;margin-bottom:16px">${String(error.message || error).replace(/[<>&]/g, '')}</p>
+      <button onclick="location.reload()" style="padding:8px 20px;border-radius:6px;border:1px solid #ccc;background:#78a800;color:#fff;font-weight:600;cursor:pointer">Neu laden</button>
+    </div>`;
+  }
+}

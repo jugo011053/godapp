@@ -1,6 +1,6 @@
 import { getRoute, navigate } from './core/router.js';
 import { getState, updateState } from './core/store.js';
-import { RecipeRepository } from './data/recipeRepository.js';
+import { loadCards, getCards, getRecipe } from './data/recipeStore.js';
 import { renderShell } from './features/shell/renderShell.js';
 import {
   completeOnboarding,
@@ -15,11 +15,6 @@ import { MEAL_OPTIONS, STEP_DEFINITIONS } from './features/onboarding/onboarding
 import { buildProfileSummary } from './features/profile/profileSummary.js';
 import { buildPlan, suggestForToday } from './features/planner/plannerEngine.js';
 import { getReturnOptions, isPlanExpired } from './features/history/history.js';
-
-const SUPABASE_URL = 'https://rfdtjodpjvynnavnucvu.supabase.co';
-const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHRqb2RwanZ5bm5hdm51Y3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3Nzc0NTAsImV4cCI6MjA5NTM1MzQ1MH0._TFOq21ghEbcTrqAbrNRV-ogNAYt2cCoNHDXoKZ8GzE';
-
-const repository = new RecipeRepository({ supabaseUrl: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY });
 const runtime = {
   recipes: [],
   catalogStatus: 'loading',
@@ -340,7 +335,7 @@ function bindPageEvents(root) {
 export async function startIntegratedApp(root) {
   renderApp(root);
   try {
-    runtime.recipes = await repository.listCards();
+    runtime.recipes = await loadCards();
     runtime.catalogStatus = 'ready';
   } catch (error) {
     runtime.catalogStatus = 'error';

@@ -360,6 +360,9 @@
 }
 
 /* ── Shopping list items ──────────────────────────── */
+label.meal-row {
+  grid-template-columns: 24px 1fr;
+}
 .meal-row input[type="checkbox"] {
   width: 18px;
   height: 18px;

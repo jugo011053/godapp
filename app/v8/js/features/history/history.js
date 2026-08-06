@@ -38,12 +38,17 @@ export function archivePlan(state, plan, options = {}) {
   if (!plan) return state;
   const limit = Number(options.limit || DEFAULT_HISTORY_LIMIT);
   const { startDate, endDate } = getPlanRange(plan);
+  const rawMeals = plan.days || plan.meals || {};
+  const mealsObject = Array.isArray(rawMeals)
+    ? Object.fromEntries(rawMeals.map((day) => [day.date, day.meals || {}]))
+    : rawMeals;
+
   const entry = {
     id: plan.id || `plan-${startDate || 'unknown'}-${Date.now()}`,
     startDate,
     endDate,
     selectedDates: getPlanDates(plan),
-    meals: clone(plan.days || plan.meals || {}),
+    meals: clone(mealsObject),
     completedMeals: clone(plan.completedMeals || {}),
     archivedAt: new Date().toISOString()
   };

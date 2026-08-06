@@ -1,14 +1,9 @@
 import { getRoute } from './core/router.js';
 import { getState, updateState } from './core/store.js';
-import { RecipeRepository } from './data/recipeRepository.js';
+import { loadCards, getCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
 import { toggleFavorite, excludeRecipe, restoreRecipe } from './features/favorites/preferenceSignals.js';
 import { buildShoppingList, copyShoppingText, toggleShoppingDate } from './features/shopping/shoppingEngine.js';
-
-const repository = new RecipeRepository({
-  supabaseUrl: 'https://rfdtjodpjvynnavnucvu.supabase.co',
-  anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InJmZHRqb2RwanZ5bm5hdm51Y3Z1Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzk3Nzc0NTAsImV4cCI6MjA5NTM1MzQ1MH0._TFOq21ghEbcTrqAbrNRV-ogNAYt2cCoNHDXoKZ8GzE'
-});
 
 const ui = {
   recipes: [], filters: createDefaultFilters(), sort: 'recommended',
@@ -52,16 +47,17 @@ function bindRecipeEvents(root) {
 
 async function showDetail(root,id) {
   try {
-    let recipe=ui.details.get(id); if(!recipe){ recipe=await repository.getRecipe(id); ui.details.set(id,recipe); }
+    let recipe=ui.details.get(id); if(!recipe){ recipe=await getRecipe(id); ui.details.set(id,recipe); }
     const overlay=document.createElement('div'); overlay.className='v8-overlay';
-    overlay.innerHTML=`<section class="v8-dialog"><button class="v8-button ghost" data-v8-close>Schließen</button><h2>${esc(recipe.name)}</h2><div class="recipe-meta"><span>${recipe.kcal} kcal</span><span>${recipe.protein} g Protein</span><span>${recipe.time} Min.</span></div><h3>Zutaten</h3><ul>${(recipe.ingredients||[]).map((item)=>`<li>${esc(item.amount ?? item.quantity)} ${esc(item.unit)} ${esc(item.name)}</li>`).join('')}</ul><h3>Zubereitung</h3><ol>${(recipe.steps||[]).map((step)=>`<li>${esc(step)}</li>`).join('')}</ol></section>`;
+    const stepsHtml = (recipe.steps||[]).length ? `<ol>${recipe.steps.map((step)=>`<li>${esc(step)}</li>`).join('')}</ol>` : '<p style="color:var(--muted);font-size:var(--text-sm)">Keine Zubereitungsschritte hinterlegt.</p>';
+    overlay.innerHTML=`<section class="v8-dialog"><button class="v8-button ghost" data-v8-close>Schließen</button><h2>${esc(recipe.name)}</h2><div class="recipe-meta"><span>${recipe.kcal} kcal</span><span>${recipe.protein} g Protein</span><span>${recipe.time} Min.</span></div><h3>Zutaten</h3><ul>${(recipe.ingredients||[]).map((item)=>`<li>${esc(item.amount ?? item.quantity)} ${esc(item.unit)} ${esc(item.name)}</li>`).join('')}</ul><h3>Zubereitung</h3>${stepsHtml}</section>`;
     root.appendChild(overlay); overlay.querySelector('[data-v8-close]').addEventListener('click',()=>overlay.remove());
   } catch(error){ console.error('[Preply V8] Rezeptdetail',error); }
 }
 
 async function detailedPlan(plan) {
   const ids=[...new Set((plan.days||[]).flatMap((day)=>Object.values(day.meals||{}).map((meal)=>meal.recipeId||meal.recipe?.id)).filter(Boolean))];
-  await Promise.all(ids.map(async(id)=>{ if(!ui.details.has(id)) ui.details.set(id,await repository.getRecipe(id)); }));
+  await Promise.all(ids.map(async(id)=>{ if(!ui.details.has(id)) ui.details.set(id,await getRecipe(id)); }));
   return { ...plan, days:plan.days.map((day)=>({ ...day, meals:Object.fromEntries(Object.entries(day.meals).map(([slot,meal])=>[slot,{...meal,recipe:ui.details.get(meal.recipeId||meal.recipe?.id)||meal.recipe}])) })) };
 }
 
@@ -84,7 +80,7 @@ async function renderShopping(root) {
 }
 
 export async function initializeFeatureEnhancements() {
-  try { ui.recipes=await repository.listCards(); } catch(error){ console.error('[Preply V8] Erweiterungskatalog',error); }
+  try { ui.recipes=await loadCards(); } catch(error){ console.error('[Preply V8] Erweiterungskatalog',error); }
 }
 
 export async function refreshFeatureEnhancements(root) {
