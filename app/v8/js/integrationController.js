@@ -13,7 +13,7 @@ import {
 } from './features/onboarding/onboardingModel.js';
 import { MEAL_OPTIONS, STEP_DEFINITIONS } from './features/onboarding/onboardingSteps.js';
 import { buildProfileSummary } from './features/profile/profileSummary.js';
-import { buildPlan, suggestForToday } from './features/planner/plannerEngine.js';
+import { buildPlan, suggestForToday, replacementSuggestions } from './features/planner/plannerEngine.js';
 import { getReturnOptions, isPlanExpired } from './features/history/history.js';
 const runtime = {
   recipes: [],
@@ -23,7 +23,11 @@ const runtime = {
   onboardingDraft: null,
   planDraft: null,
   activeDialog: null,
-  activePlanDay: null
+  activePlanDay: null,
+  expandedMeals: new Set(),
+  detailCache: new Map(),
+  replaceTarget: null,
+  replaceMode: 'similar'
 };
 
 const MEAL_LABELS = Object.fromEntries(MEAL_OPTIONS);
@@ -68,59 +72,116 @@ function normalizeDays(plan) {
   return [];
 }
 
+function mealCardKey(date, category) {
+  return `${date}::${category}`;
+}
+
+function renderMealCard(date, category, meal, dayIndex) {
+  const recipe = meal.recipe || meal;
+  const name = recipe.name || 'Unbekannt';
+  const kcal = meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
+  const protein = meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0);
+  const time = Math.round(recipe.time || 0);
+  const key = mealCardKey(date, category);
+  const isExpanded = runtime.expandedMeals.has(key);
+  const detail = runtime.detailCache.get(recipe.id || recipe.recipeId);
+
+  let expandedHtml = '';
+  if (isExpanded) {
+    const ingredients = detail?.ingredients || recipe.ingredients || [];
+    const steps = detail?.steps || recipe.steps || [];
+    expandedHtml = `<div class="meal-expanded">
+      ${ingredients.length ? `<div class="meal-ing-list">${ingredients.map((item) =>
+        `<div class="meal-ing-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(item.amount ?? item.quantity ?? '')} ${escapeHtml(item.unit || '')}</b></div>`
+      ).join('')}</div>` : ''}
+      ${steps.length ? `<div class="meal-steps-list">${steps.map((step, index) =>
+        `<div class="meal-step"><span class="step-num">${index + 1}</span><span>${escapeHtml(step)}</span></div>`
+      ).join('')}</div>` : '<div style="padding:10px 14px;font-size:13px;color:var(--muted)">Keine Schritte hinterlegt.</div>'}
+      <div class="meal-card-actions">
+        <button class="v8-button ghost" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}">⇄ Austauschen</button>
+      </div>
+    </div>`;
+  }
+
+  return `<div class="meal-card2 ${isExpanded ? 'expanded' : ''}" data-meal-key="${escapeHtml(key)}">
+    <div class="meal-card2-top" data-expand-meal="${escapeHtml(key)}" data-recipe-id="${escapeHtml(recipe.id || '')}">
+      <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[category] || category)}</div>
+      <div class="meal-card-info">
+        <div class="meal-name2">${escapeHtml(name)}</div>
+        <div class="meal-macros-line">${kcal} kcal · ${protein}g Protein · ${time} Min.${meal.repeatedForMealPrep ? ' · Prep' : ''}</div>
+      </div>
+      <button class="meal-check-btn" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" title="Gericht austauschen">⇄</button>
+    </div>
+    ${expandedHtml}
+  </div>`;
+}
+
+function computeDaySummary(dayData) {
+  const meals = Object.entries(dayData.meals || {});
+  let totalKcal = 0;
+  let totalProtein = 0;
+  for (const [, meal] of meals) {
+    const recipe = meal.recipe || meal;
+    totalKcal += meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
+    totalProtein += meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0);
+  }
+  return { totalKcal, totalProtein, mealCount: meals.length };
+}
+
 function renderPlanPage() {
   const state = getState();
   const plan = state.currentPlan;
   if (plan && !isPlanExpired(plan)) {
     const days = normalizeDays(plan);
-    if (!days.length) {
-      /* Plan exists but has no usable day data — treat as empty */
-      return renderEmptyPlan();
-    }
+    if (!days.length) return renderEmptyPlan();
 
     const today = localDate(0);
     const activeDay = runtime.activePlanDay || today;
     const dayData = days.find((d) => d.date === activeDay) || days[0];
+    const dayIndex = days.indexOf(dayData);
     const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+    const profile = state.profile || {};
+    const kcalTarget = profile.calorieTarget || 2000;
+    const proteinTarget = profile.proteinTarget || 120;
+    const summary = dayData ? computeDaySummary(dayData) : { totalKcal: 0, totalProtein: 0, mealCount: 0 };
+    const kcalPct = Math.min(100, Math.round((summary.totalKcal / kcalTarget) * 100));
+    const protPct = Math.min(100, Math.round((summary.totalProtein / proteinTarget) * 100));
 
     return `<section class="v8-page">
       <div class="v8-page-head">
         <h1>Dein Plan</h1>
-        <p>${plan.selectedDates ? plan.selectedDates.length : days.length} Tage · ${(plan.enabledMeals || []).map((m) => MEAL_LABELS[m] || m).join(', ')}</p>
       </div>
 
-      <div class="chip-row" style="margin-bottom:var(--space-4)">
+      <div class="meal-day-nav">
         ${days.map((day) => {
           const d = new Date(`${day.date}T12:00:00`);
           const wd = WEEKDAY_SHORT[d.getDay()];
           const dd = String(d.getDate()).padStart(2, '0');
           const isToday = day.date === today;
           const isActive = day.date === (dayData ? dayData.date : '');
-          return `<button class="chip ${isActive ? 'active' : ''}" data-plan-day="${day.date}">${wd} ${dd}${isToday ? ' ·' : ''}</button>`;
+          const hasMeals = Object.keys(day.meals || {}).length > 0;
+          return `<button class="day-pill ${isActive ? 'sel' : ''} ${isToday ? 'today' : ''}" data-plan-day="${day.date}">
+            <span class="day-pill-name">${wd}</span>
+            <span class="day-pill-num">${dd}</span>
+            ${hasMeals ? '<span class="day-pill-dot"></span>' : ''}
+          </button>`;
         }).join('')}
       </div>
 
-      ${dayData ? `<div class="v8-panel">
-        <h2>${escapeHtml(dateLabel(dayData.date))}${dayData.date === today ? ' — Heute' : ''}</h2>
-        ${Object.entries(dayData.meals || {}).map(([category, meal]) => {
-          const recipe = meal.recipe || meal;
-          const name = recipe.name || 'Unbekannt';
-          return `<div class="meal-row">
-            <div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div>
-            <div>
-              <strong>${escapeHtml(name)}</strong>
-              <div class="recipe-meta">
-                <span>${meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0)} kcal</span>
-                <span>${meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0)} g Protein</span>
-                <span>${Math.round((recipe.time || 0))} Min.</span>
-                ${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}
-              </div>
-            </div>
-          </div>`;
-        }).join('')}
-      </div>` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
+      ${dayData ? `
+        <div class="meal-summary-bar">
+          <div><div class="meal-summary-val">${summary.totalKcal}</div><div class="meal-summary-label">/ ${kcalTarget} kcal</div></div>
+          <div style="text-align:right"><div class="meal-summary-val">${summary.totalProtein}g</div><div class="meal-summary-label">/ ${proteinTarget}g Protein</div></div>
+        </div>
+        <div class="meal-prog-track"><div class="meal-prog-fill" style="width:${kcalPct}%"></div></div>
 
-      <div class="v8-actions" style="margin-top:var(--space-3)">
+        ${Object.entries(dayData.meals || {}).map(([category, meal]) =>
+          renderMealCard(dayData.date, category, meal, dayIndex)
+        ).join('')}
+      ` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
+
+      <div class="v8-actions" style="margin-top:var(--space-4)">
         <button class="v8-button primary" data-action="create-plan">Neuer Plan</button>
       </div>
     </section>`;
@@ -133,14 +194,36 @@ function renderEmptyPlan() {
   return `<section class="v8-page">
     <div class="v8-page-head">
       <h1>Was kochst du?</h1>
-      <p>Erstelle einen Essensplan für die nächsten Tage.</p>
+      <p>Erstelle einen Essensplan oder lass dich inspirieren.</p>
     </div>
     ${catalogStatusHtml()}
-    <div class="v8-start-grid">
-      <button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Wir führen dich Schritt für Schritt.</span></button>
-      <button class="v8-start-card" data-action="today-inspiration"><strong>Inspiration für heute</strong><span>Schnelle Vorschläge passend zu dir.</span></button>
+
+    <div class="quick-suggest-card" data-action="today-inspiration">
+      <h3>🍳 Was esse ich heute?</h3>
+      <p>Schnelle Vorschläge passend zu deinem Profil</p>
     </div>
-    ${runtime.suggestions.length ? `<div class="v8-panel" style="margin-top:var(--space-4)"><h2>Vorschläge</h2><div class="v8-grid">${runtime.suggestions.map((recipe) => recipeCard(recipe)).join('')}</div></div>` : ''}
+
+    <div class="v8-start-grid">
+      <button class="v8-start-card primary" data-action="create-plan"><strong>Wochenplan erstellen</strong><span>Mehrere Tage planen, Einkaufsliste inklusive.</span></button>
+      <button class="v8-start-card" data-action="single-day-plan"><strong>Nur für heute</strong><span>Ein Tag, passende Gerichte, sofort los.</span></button>
+    </div>
+
+    ${runtime.suggestions.length ? `
+      <div style="margin-top:var(--space-5)">
+        <h2 style="font-size:var(--text-base);font-weight:700;margin-bottom:var(--space-3)">Vorschläge für dich</h2>
+        ${runtime.suggestions.map((recipe) => `
+          <div class="meal-card2">
+            <div class="meal-card2-top" data-recipe-id="${escapeHtml(recipe.id)}">
+              <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</div>
+              <div class="meal-card-info">
+                <div class="meal-name2">${escapeHtml(recipe.name)}</div>
+                <div class="meal-macros-line">${Math.round(recipe.kcal)} kcal · ${Math.round(recipe.protein)}g Protein · ${Math.round(recipe.time)} Min.</div>
+              </div>
+            </div>
+          </div>
+        `).join('')}
+      </div>
+    ` : ''}
   </section>`;
 }
 
@@ -296,8 +379,94 @@ function renderPlanDialog(root) {
   bindPlanDialogEvents(root);
 }
 
+function renderReplacementDialog(root) {
+  const target = runtime.replaceTarget;
+  if (!target) return;
+  const state = getState();
+  const plan = state.currentPlan;
+  const days = normalizeDays(plan);
+  const dayData = days[target.dayIndex];
+  if (!dayData) return;
+  const meal = dayData.meals[target.category];
+  if (!meal) return;
+
+  const MODE_LABELS = { similar: 'Ähnlich', faster: 'Schneller', simpler: 'Einfacher', protein: 'Proteinreicher' };
+  const usedIds = new Set(days.flatMap((d) => Object.values(d.meals || {}).map((m) => m.recipeId || m.recipe?.id).filter(Boolean)));
+  const suggestions = replacementSuggestions(runtime.recipes, meal.recipe || meal, {
+    profile: state.profile, preferences: state.preferences, usedRecipeIds: usedIds, usedFamilies: new Set()
+  }, runtime.replaceMode, 8);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'v8-overlay';
+  overlay.dataset.replacementOverlay = 'true';
+  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true">
+    <p class="eyebrow">Gericht austauschen</p>
+    <h2>${escapeHtml((meal.recipe || meal).name)}</h2>
+    <div class="chip-row" style="margin:var(--space-3) 0">${Object.entries(MODE_LABELS).map(([mode, label]) =>
+      `<button class="chip ${runtime.replaceMode === mode ? 'active' : ''}" data-replace-mode="${mode}">${label}</button>`
+    ).join('')}</div>
+    <div style="display:flex;flex-direction:column;gap:8px">${suggestions.length ? suggestions.map((recipe) => `
+      <div class="meal-card2">
+        <div class="meal-card2-top" style="cursor:default">
+          <div class="meal-cat-badge">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</div>
+          <div class="meal-card-info">
+            <div class="meal-name2">${escapeHtml(recipe.name)}</div>
+            <div class="meal-macros-line">${Math.round(recipe.kcal)} kcal · ${Math.round(recipe.protein)}g P · ${Math.round(recipe.time)} Min.</div>
+          </div>
+          <button class="v8-button primary" style="align-self:center;padding:6px 12px;font-size:12px" data-pick-replacement="${escapeHtml(recipe.id)}">Wählen</button>
+        </div>
+      </div>
+    `).join('') : '<div class="empty-state">Keine passenden Alternativen gefunden.</div>'}</div>
+    <div class="v8-actions" style="margin-top:var(--space-4)">
+      <button class="v8-button ghost" data-replace-close>Abbrechen</button>
+    </div>
+  </section>`;
+  root.appendChild(overlay);
+
+  overlay.querySelectorAll('[data-replace-mode]').forEach((button) => button.addEventListener('click', () => {
+    runtime.replaceMode = button.dataset.replaceMode;
+    overlay.remove();
+    renderReplacementDialog(root);
+  }));
+  overlay.querySelector('[data-replace-close]')?.addEventListener('click', () => {
+    runtime.replaceTarget = null;
+    overlay.remove();
+  });
+  overlay.addEventListener('click', (event) => {
+    if (event.target === overlay) { runtime.replaceTarget = null; overlay.remove(); }
+  });
+  overlay.querySelectorAll('[data-pick-replacement]').forEach((button) => button.addEventListener('click', () => {
+    const replacement = runtime.recipes.find((r) => r.id === button.dataset.pickReplacement);
+    if (!replacement) return;
+    updateState((current) => {
+      const updated = structuredClone(current.currentPlan);
+      const updatedDays = normalizeDays(updated);
+      const targetMeal = updatedDays[target.dayIndex]?.meals?.[target.category];
+      if (!targetMeal) return current;
+      const factor = Number(targetMeal.portionFactor || 1);
+      updatedDays[target.dayIndex].meals[target.category] = {
+        ...targetMeal,
+        recipeId: replacement.id,
+        recipe: replacement,
+        prepGroupId: null,
+        prepSourceDate: null,
+        repeatedForMealPrep: false,
+        estimatedKcalPerPerson: Math.round(replacement.kcal * factor),
+        estimatedProteinPerPerson: Math.round(replacement.protein * factor),
+        replacedAt: new Date().toISOString()
+      };
+      updated.days = updatedDays;
+      return { ...current, currentPlan: updated };
+    });
+    runtime.replaceTarget = null;
+    overlay.remove();
+    renderApp(root);
+  }));
+}
+
 function renderDialog(root) {
   root.querySelector('.v8-overlay')?.remove();
+  if (runtime.activeDialog === 'replace' && runtime.replaceTarget) { renderReplacementDialog(root); return; }
   if (runtime.activeDialog === 'plan' && runtime.planDraft) { renderPlanDialog(root); return; }
   if (runtime.activeDialog !== 'onboarding' || !runtime.onboardingDraft) return;
   const draft = runtime.onboardingDraft;
@@ -432,25 +601,97 @@ function createConfiguredPlan(root) {
 
 function bindPageEvents(root) {
   root.querySelectorAll('[data-action="open-onboarding"]').forEach((button) => button.addEventListener('click', () => openOnboarding(root)));
-  root.querySelectorAll('[data-action="today-inspiration"]').forEach((button) => button.addEventListener('click', () => {
+
+  /* "Was esse ich heute?" — quick suggestion */
+  root.querySelectorAll('[data-action="today-inspiration"]').forEach((el) => el.addEventListener('click', () => {
     if (!runtime.recipes.length) return;
     const state = getState();
-    runtime.suggestions = suggestForToday(runtime.recipes, state.profile, state.preferences, {
-      category: state.profile.enabledMeals.dinner ? 'dinner' : Object.keys(state.profile.enabledMeals).find((key) => state.profile.enabledMeals[key]) || 'dinner',
+    const profile = state.profile || {};
+    const enabledMeals = profile.enabledMeals || {};
+    runtime.suggestions = suggestForToday(runtime.recipes, profile, state.preferences, {
+      category: enabledMeals.dinner ? 'dinner' : Object.keys(enabledMeals).find((key) => enabledMeals[key]) || 'dinner',
       seed: Date.now()
     });
     renderApp(root);
   }));
+
+  /* Create multi-day plan */
   root.querySelectorAll('[data-action="create-plan"]').forEach((button) => button.addEventListener('click', () => {
     if (!getState().onboardingCompleted) { openOnboarding(root); return; }
     if (!runtime.recipes.length) return;
     openPlanDialog(root);
   }));
 
-  /* Plan day chips */
-  root.querySelectorAll('[data-plan-day]').forEach((chip) => chip.addEventListener('click', () => {
-    runtime.activePlanDay = chip.dataset.planDay;
+  /* Create single-day plan (quick "Nur für heute") */
+  root.querySelectorAll('[data-action="single-day-plan"]').forEach((button) => button.addEventListener('click', () => {
+    const state = getState();
+    if (!state.onboardingCompleted) { openOnboarding(root); return; }
+    if (!runtime.recipes.length) return;
+    const profile = state.profile || {};
+    const enabledMeals = Object.entries(profile.enabledMeals || {}).filter(([, v]) => v).map(([k]) => k);
+    if (!enabledMeals.length) { openOnboarding(root); return; }
+    try {
+      const plan = buildPlan(runtime.recipes, {
+        startDate: localDate(0),
+        selectedDates: [localDate(0)],
+        enabledMeals,
+        mode: 'single_day',
+        profile
+      }, state.preferences, { seed: Date.now() % 100000 });
+      updateState((current) => ({
+        ...current,
+        currentPlan: plan,
+        planHistory: current.currentPlan
+          ? [current.currentPlan, ...(current.planHistory || [])].slice(0, 12)
+          : current.planHistory || []
+      }));
+      renderApp(root);
+    } catch (error) {
+      console.error('[Preply] Tagesplan-Fehler', error);
+    }
+  }));
+
+  /* Plan day pills */
+  root.querySelectorAll('[data-plan-day]').forEach((pill) => pill.addEventListener('click', () => {
+    runtime.activePlanDay = pill.dataset.planDay;
     renderApp(root);
+  }));
+
+  /* Expand/collapse meal cards */
+  root.querySelectorAll('[data-expand-meal]').forEach((el) => el.addEventListener('click', async (event) => {
+    /* Don't expand if clicking the swap button */
+    if (event.target.closest('[data-swap-meal]')) return;
+    const key = el.dataset.expandMeal;
+    const recipeId = el.dataset.recipeId;
+
+    /* Toggle expansion */
+    if (runtime.expandedMeals.has(key)) {
+      runtime.expandedMeals.delete(key);
+    } else {
+      runtime.expandedMeals.add(key);
+      /* Fetch recipe details if not cached */
+      if (recipeId && !runtime.detailCache.has(recipeId)) {
+        try {
+          const detail = await getRecipe(recipeId);
+          runtime.detailCache.set(recipeId, detail);
+        } catch (err) {
+          console.warn('[Preply] Rezeptdetail nicht geladen', err);
+        }
+      }
+    }
+    renderApp(root);
+  }));
+
+  /* Swap meal button */
+  root.querySelectorAll('[data-swap-meal]').forEach((button) => button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    if (!runtime.recipes.length) return;
+    const dayIndex = Number(button.dataset.swapDay);
+    const category = button.dataset.swapCat;
+    runtime.replaceTarget = { dayIndex, category };
+    runtime.replaceMode = 'similar';
+    runtime.activeDialog = 'replace';
+    renderDialog(root);
   }));
 }
 
