@@ -18,7 +18,7 @@ export function renderShell(root, { route = 'plan' } = {}) {
       <header class="v8-header">
         <div class="v8-brand">
           <div class="v8-brand-mark">P</div>
-          <div class="v8-brand-copy"><strong>Preply</strong><span>Deine Essensplanung</span></div>
+          <div class="v8-brand-copy"><strong>Preply</strong></div>
         </div>
         <button type="button" class="v8-header-action" aria-label="Profil öffnen" onclick="location.hash='profile'">
           ${ICONS.profile}

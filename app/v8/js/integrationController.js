@@ -54,49 +54,75 @@ function recipeCard(recipe, extra = '') {
 }
 
 function catalogStatusHtml() {
-  if (runtime.catalogStatus === 'loading') return '<div class="v8-status">Rezeptkatalog wird geladen …</div>';
-  if (runtime.catalogStatus === 'error') return `<div class="v8-status error">${escapeHtml(runtime.catalogError || 'Katalog konnte nicht geladen werden.')}</div>`;
-  return `<div class="v8-status">${runtime.recipes.length} geprüfte Rezepte geladen.</div>`;
+  if (runtime.catalogStatus === 'loading') return '<div class="v8-status">Rezepte werden geladen …</div>';
+  if (runtime.catalogStatus === 'error') return `<div class="v8-status error">${escapeHtml(runtime.catalogError || 'Rezepte konnten nicht geladen werden.')}</div>`;
+  return '';
 }
 
 function renderPlanPage() {
   const state = getState();
   const plan = state.currentPlan;
   if (plan && !isPlanExpired(plan)) {
+    const mealLabels = plan.enabledMeals.map((meal) => MEAL_LABELS[meal] || meal).join(', ');
     return `<section class="v8-page">
-      <div class="v8-page-head"><div><p class="eyebrow">Dein Plan</p><h1>${escapeHtml(plan.startDate)} bis ${escapeHtml(plan.endDate)}</h1></div><p>${plan.selectedDates.length} ausgewählte Tage · ${plan.enabledMeals.map((meal) => MEAL_LABELS[meal] || meal).join(', ')}</p></div>
+      <div class="v8-page-head"><div><p class="eyebrow">Dein Plan</p><h1>${escapeHtml(dateLabel(plan.startDate))} – ${escapeHtml(dateLabel(plan.endDate))}</h1></div><p>${plan.selectedDates.length} Tage · ${mealLabels}</p><div class="v8-actions" style="margin-top:var(--space-4)"><button class="v8-button primary" data-action="today-inspiration">Inspiration für heute</button><button class="v8-button" data-action="create-plan">Neuer Plan</button></div></div>
       ${catalogStatusHtml()}
-      <div class="v8-actions"><button class="v8-button primary" data-action="today-inspiration">Inspiration für heute</button><button class="v8-button" data-action="create-plan">Neuen Plan erstellen</button></div>
-      <div class="v8-panel">${plan.days.map((day) => `<section class="plan-day"><h2>${escapeHtml(dateLabel(day.date))}</h2>${Object.entries(day.meals).map(([category, meal]) => `<div class="meal-row"><div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div><div><strong>${escapeHtml(meal.recipe.name)}</strong><div class="recipe-meta"><span>${meal.estimatedKcalPerPerson} kcal</span><span>${meal.estimatedProteinPerPerson} g Protein</span>${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}</div></div></div>`).join('')}</section>`).join('')}</div>
+      ${plan.days.map((day) => `<div class="v8-panel"><section class="plan-day"><h2>${escapeHtml(dateLabel(day.date))}</h2>${Object.entries(day.meals).map(([category, meal]) => `<div class="meal-row"><div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div><div><strong>${escapeHtml(meal.recipe.name)}</strong><div class="recipe-meta"><span>${meal.estimatedKcalPerPerson} kcal</span><span>${meal.estimatedProteinPerPerson} g Protein</span>${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}</div></div></div>`).join('')}</section></div>`).join('')}
     </section>`;
   }
 
   const returnOptions = getReturnOptions(state);
   return `<section class="v8-page">
-    <div class="v8-page-head"><div><p class="eyebrow">Planen</p><h1>Was passt heute?</h1></div><p>Direkte Inspiration oder ein Plan für frei ausgewählte Tage.</p></div>
+    <div class="v8-page-head"><div><p class="eyebrow">Planen</p><h1>Was kochst du?</h1></div><p>Hol dir Inspiration oder plane gleich mehrere Tage.</p></div>
     ${catalogStatusHtml()}
-    ${returnOptions.actions.includes('open_history') ? '<div class="v8-status">Dein alter Plan ist abgelaufen. Du kannst neu starten oder die Historie öffnen.</div>' : ''}
+    ${returnOptions.actions.includes('open_history') ? '<div class="v8-status" style="background:var(--paper);color:var(--ink-secondary)">Dein letzter Plan ist abgelaufen — starte einen neuen oder schau in die Historie.</div>' : ''}
     <div class="v8-start-grid">
-      <button class="v8-start-card primary" data-action="today-inspiration"><strong>Was esse ich heute?</strong><span>Drei passende Vorschläge anhand deines Profils.</span></button>
-      <button class="v8-start-card" data-action="create-plan"><strong>Essensplan erstellen</strong><span>Wähle Tage und Mahlzeiten selbst aus.</span></button>
+      <button class="v8-start-card primary" data-action="today-inspiration"><strong>Was esse ich heute?</strong><span>Passende Vorschläge für dein Profil.</span></button>
+      <button class="v8-start-card" data-action="create-plan"><strong>Essensplan erstellen</strong><span>Tage und Mahlzeiten frei wählen.</span></button>
     </div>
-    ${runtime.suggestions.length ? `<div class="v8-panel"><h2>Drei Vorschläge für heute</h2><div class="v8-grid">${runtime.suggestions.map((recipe) => recipeCard(recipe, '<button class="v8-button primary" data-action="use-suggestion">Für heute wählen</button>')).join('')}</div></div>` : ''}
+    ${runtime.suggestions.length ? `<div class="v8-panel" style="margin-top:var(--space-5)"><h2>Vorschläge für heute</h2><div class="v8-grid">${runtime.suggestions.map((recipe) => recipeCard(recipe, '<button class="v8-button primary" data-action="use-suggestion">Auswählen</button>')).join('')}</div></div>` : ''}
   </section>`;
 }
 
 function renderRecipesPage() {
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Rezepte</p><h1>Alle Gerichte</h1></div><p>Die vollständigen Filter werden auf dieser Datenbasis angeschlossen.</p></div>${catalogStatusHtml()}<div class="v8-panel"><label for="recipe-search"><strong>Suche</strong></label><input id="recipe-search" type="search" placeholder="Name, Zutat oder Tag"><div id="recipe-results" class="v8-grid" style="margin-top:14px">${runtime.recipes.slice(0, 48).map((recipe) => recipeCard(recipe)).join('')}</div></div></section>`;
+  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Rezepte</p><h1>Alle Gerichte</h1></div><p>${runtime.recipes.length} Rezepte zum Durchstöbern.</p></div>${catalogStatusHtml()}<div class="v8-panel"><div class="form-field"><span>Suche</span><input id="recipe-search" type="search" placeholder="Name, Zutat oder Tag …"></div><div id="recipe-results" class="v8-grid" style="margin-top:var(--space-4)">${runtime.recipes.slice(0, 48).map((recipe) => recipeCard(recipe)).join('')}</div></div></section>`;
 }
 
 function renderShoppingPage() {
   const plan = getState().currentPlan;
-  if (!plan || isPlanExpired(plan)) return '<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Noch kein aktiver Plan</h1></div><p>Erstelle zuerst einen Plan. Danach erscheinen hier die auswählbaren Tage.</p></div></section>';
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Welche Tage kaufst du ein?</h1></div><p>Die Tagesauswahl wird aus deinem aktuellen Plan erzeugt.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div></section>`;
+  if (!plan || isPlanExpired(plan)) return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Einkaufsliste</h1></div><p>Sobald du einen Plan hast, wird hier deine Einkaufsliste erstellt.</p></div><div class="v8-start-grid"><button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Erstelle zuerst einen Essensplan.</span></button></div></section>`;
+  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Einkaufsliste</h1></div><p>Wähle die Tage, für die du einkaufen willst.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div></section>`;
+}
+
+function profileRow(label, value) {
+  if (!value) return '';
+  return `<div class="profile-row"><span class="profile-label">${escapeHtml(label)}</span><span class="profile-value">${escapeHtml(value)}</span></div>`;
 }
 
 function renderProfilePage() {
   const state = getState();
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Profil</p><h1>Deine Einstellungen</h1></div><p>Diese Angaben steuern Vorschläge und Pläne.</p></div><div class="v8-panel"><p>${escapeHtml(buildProfileSummary(state.profile))}</p><div class="v8-actions"><button class="v8-button primary" data-action="open-onboarding">Profil bearbeiten</button></div></div></section>`;
+  const profile = state.profile || {};
+  const DIET_LABELS = { omnivore: 'Omnivor', vegetarian: 'Vegetarisch', vegan: 'Vegan', pescatarian: 'Pescetarisch' };
+  const COOK_LABELS = { fresh: 'Frisch kochen', meal_prep: 'Meal Prep', mixed: 'Gemischt' };
+  const SIMPLE_LABELS = { simple: 'Simpel', balanced: 'Ausgewogen', experimental: 'Experimentell' };
+  const GOAL_LABELS = { lose: 'Abnehmen', maintain: 'Gewicht halten', gain: 'Zunehmen' };
+  const enabledMeals = Object.entries(profile.enabledMeals || {}).filter(([, v]) => v).map(([k]) => MEAL_LABELS[k] || k).join(', ');
+
+  return `<section class="v8-page">
+    <div class="v8-page-head"><div><p class="eyebrow">Profil</p><h1>Dein Profil</h1></div></div>
+    <div class="v8-panel">
+      ${profileRow('Personen', `${profile.persons || 1}`)}
+      ${profileRow('Ernährung', DIET_LABELS[profile.dietStyle])}
+      ${profileRow('Kochstil', COOK_LABELS[profile.cookingStyle])}
+      ${profileRow('Komplexität', SIMPLE_LABELS[profile.simplicity])}
+      ${profileRow('Ziel', GOAL_LABELS[profile.goal])}
+      ${profileRow('Maximale Kochzeit', profile.maxCookingTime ? `${profile.maxCookingTime} Min.` : null)}
+      ${profileRow('Kalorienziel', profile.calorieTarget ? `${profile.calorieTarget} kcal` : null)}
+      ${profileRow('Proteinziel', profile.proteinTarget ? `${profile.proteinTarget} g` : null)}
+      ${profileRow('Mahlzeiten', enabledMeals || null)}
+      <div class="v8-actions" style="margin-top:var(--space-5)"><button class="v8-button primary" data-action="open-onboarding">Profil bearbeiten</button></div>
+    </div>
+  </section>`;
 }
 
 function pageForRoute(route) {
@@ -141,7 +167,8 @@ function onboardingBody(draft) {
   const profile = draft.profile;
   const definition = STEP_DEFINITIONS[step];
   if (definition) return `<h2>${escapeHtml(definition.title)}</h2>${optionButtons(step, definition, profile)}`;
-  if (step === 'restrictions') return `<h2>Was soll ausgeschlossen werden?</h2><div class="option-grid">${['gluten','dairy','eggs','nuts','soy','fish'].map((item) => `<button class="option-card ${(profile.allergies || []).includes(item) ? 'selected' : ''}" data-onboard-field="allergies" data-onboard-value="${item}" data-multiple="true"><strong>${item}</strong></button>`).join('')}</div><div class="form-field" style="margin-top:14px"><label>Weitere ausgeschlossene Zutaten, kommagetrennt</label><input data-onboard-input="excludedIngredients" value="${escapeHtml((profile.excludedIngredients || []).join(', '))}"></div>`;
+  const ALLERGEN_LABELS = { gluten: 'Gluten', dairy: 'Milch', eggs: 'Eier', nuts: 'Nüsse', soy: 'Soja', fish: 'Fisch' };
+  if (step === 'restrictions') return `<h2>Was soll ausgeschlossen werden?</h2><div class="option-grid">${Object.entries(ALLERGEN_LABELS).map(([key, label]) => `<button class="option-card ${(profile.allergies || []).includes(key) ? 'selected' : ''}" data-onboard-field="allergies" data-onboard-value="${key}" data-multiple="true"><strong>${label}</strong></button>`).join('')}</div><div class="form-field" style="margin-top:var(--space-4)"><span>Weitere Ausschlüsse</span><input data-onboard-input="excludedIngredients" value="${escapeHtml((profile.excludedIngredients || []).join(', '))}" placeholder="z. B. Koriander, Sellerie"></div>`;
   if (step === 'meals') return `<h2>Welche Mahlzeiten möchtest du planen?</h2><div class="option-grid">${MEAL_OPTIONS.map(([key,label]) => `<button class="option-card ${profile.enabledMeals[key] ? 'selected' : ''}" data-meal-key="${key}"><strong>${label}</strong></button>`).join('')}</div>`;
   if (step === 'details') return `<h2>Optionale Details</h2><div class="form-grid"><div class="form-field"><label>Personen</label><input type="number" min="1" data-onboard-number="persons" value="${profile.persons}"></div><div class="form-field"><label>Maximale Kochzeit</label><input type="number" min="5" data-onboard-number="maxCookingTime" value="${profile.maxCookingTime || 30}"></div><div class="form-field"><label>Kalorienziel</label><input type="number" min="0" data-onboard-number="calorieTarget" value="${profile.calorieTarget || ''}"></div><div class="form-field"><label>Proteinziel</label><input type="number" min="0" data-onboard-number="proteinTarget" value="${profile.proteinTarget || ''}"></div></div>`;
   return `<h2>So wird geplant</h2><div class="v8-status">${escapeHtml(buildProfileSummary(profile))}</div>`;
@@ -163,7 +190,7 @@ function renderPlanDialog(root) {
   overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
     <p class="eyebrow">Plan konfigurieren</p>
     <h2 id="plan-dialog-title">Welche Tage und Mahlzeiten?</h2>
-    <p>Presets sind nur ein Startpunkt. Jeder Tag lässt sich einzeln entfernen oder ergänzen.</p>
+    <p>Wähle die Tage und Mahlzeiten für deinen Plan.</p>
     <h3>Zeitraum</h3>
     <div class="v8-actions">${[3,5,7].map((count) => `<button class="v8-button ${draft.selectedDates.length === count ? 'primary' : ''}" data-plan-preset="${count}">${count} Tage</button>`).join('')}</div>
     <div class="day-chip-row" style="margin-top:12px">${draft.selectedDates.map((date) => `<button class="day-toggle active" data-plan-date="${date}" title="Tag entfernen">${escapeHtml(dateLabel(date))} ×</button>`).join('')}</div>
@@ -186,7 +213,7 @@ function renderDialog(root) {
   const step = currentStep(draft);
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
-  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Später</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
+  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Überspringen</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
   root.appendChild(overlay);
   bindDialogEvents(root);
 }

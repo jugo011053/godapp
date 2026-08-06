@@ -324,7 +324,7 @@
 
 /* ── Plan day structure ───────────────────────────── */
 .plan-day {
-  margin-bottom: var(--space-5);
+  margin-bottom: 0;
 }
 .plan-day h2 {
   font-size: var(--text-base);
@@ -332,6 +332,7 @@
   padding-bottom: var(--space-3);
   border-bottom: 1px solid var(--border-light);
   margin-bottom: var(--space-3);
+  color: var(--ink);
 }
 
 .meal-row {
@@ -362,27 +363,41 @@
 /* ── Shopping list items ──────────────────────────── */
 label.meal-row {
   grid-template-columns: 24px 1fr;
+  cursor: pointer;
+  border-radius: var(--radius-sm);
+  padding: var(--space-3);
+  margin: 0 calc(-1 * var(--space-3));
+  transition: background var(--duration-fast) var(--ease-out);
+}
+label.meal-row:hover {
+  background: var(--paper);
+}
+label.meal-row:has(input:checked) > div > strong {
+  text-decoration: line-through;
+  color: var(--muted);
 }
 .meal-row input[type="checkbox"] {
-  width: 18px;
-  height: 18px;
+  width: 20px;
+  height: 20px;
   margin: 0;
-  margin-top: 2px;
+  margin-top: 1px;
   accent-color: var(--accent);
   cursor: pointer;
   flex-shrink: 0;
-}
-.meal-row label {
-  cursor: pointer;
+  border-radius: var(--radius-xs);
 }
 .meal-row details {
   margin-top: var(--space-2);
 }
 .meal-row details summary {
   font-size: var(--text-xs);
-  color: var(--muted);
+  color: var(--accent-strong);
   cursor: pointer;
   user-select: none;
+  font-weight: 550;
+}
+.meal-row details summary:hover {
+  text-decoration: underline;
 }
 .meal-row details > div {
   font-size: var(--text-xs);
@@ -390,11 +405,35 @@ label.meal-row {
   padding: var(--space-1) 0;
 }
 
+/* ── Profile rows ────────────────────────────────── */
+.profile-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  padding: var(--space-3) 0;
+  border-bottom: 1px solid var(--border-light);
+}
+.profile-row:last-of-type { border-bottom: 0; }
+.profile-label {
+  font-size: var(--text-sm);
+  color: var(--muted);
+  font-weight: 550;
+}
+.profile-value {
+  font-size: var(--text-sm);
+  font-weight: 650;
+  color: var(--ink);
+  text-align: right;
+}
+
 /* ── Mobile tweaks ────────────────────────────────── */
 @media (max-width: 620px) {
   .meal-row {
     grid-template-columns: 1fr;
     gap: var(--space-1);
+  }
+  label.meal-row {
+    grid-template-columns: 24px 1fr;
   }
   .v8-dialog {
     padding: var(--space-5);
