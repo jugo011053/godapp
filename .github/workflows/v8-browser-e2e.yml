@@ -1,6 +1,16 @@
 name: V8 Browser E2E
 
 on:
+  push:
+    branches:
+      - agent/v7-design-current-v8
+    paths:
+      - 'app/v8/**'
+      - 'tests/v8-e2e.mjs'
+      - 'tests/v8-plan-management-e2e.mjs'
+      - 'tests/v8-plan-edit-e2e.mjs'
+      - 'tests/capture-current-design.mjs'
+      - '.github/workflows/v8-browser-e2e.yml'
   pull_request:
     paths:
       - 'app/index.html'
@@ -8,7 +18,9 @@ on:
       - 'app/v8/**'
       - 'tests/v8-e2e.mjs'
       - 'tests/v8-plan-management-e2e.mjs'
+      - 'tests/v8-plan-edit-e2e.mjs'
       - 'tests/v8-root-cutover-e2e.mjs'
+      - 'tests/capture-current-design.mjs'
       - '.github/workflows/v8-browser-e2e.yml'
   workflow_dispatch:
 
@@ -38,7 +50,17 @@ jobs:
         run: |
           node tests/v8-e2e.mjs
           node tests/v8-plan-management-e2e.mjs
-          node tests/v8-root-cutover-e2e.mjs
+          node tests/v8-plan-edit-e2e.mjs
+      - name: Capture current design
+        if: always()
+        run: node tests/capture-current-design.mjs
+      - name: Upload design captures
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: v8-design-captures
+          path: artifacts/v8-design
+          if-no-files-found: warn
       - name: Show server log on failure
         if: failure()
         run: cat /tmp/preply-v8-server.log

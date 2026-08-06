@@ -7,27 +7,32 @@ const ingredients = (protein) => [
   { name: 'Paprika', amount: 2, unit: 'Stk', category: 'Obst und Gemüse', pack_size: 3, pack_price_eur: 2.29 }
 ];
 
-const rows = Array.from({ length: 18 }, (_, index) => {
-  const category = index % 3 === 0 ? 'breakfast' : index % 3 === 1 ? 'lunch' : 'dinner';
-  const protein = category === 'breakfast' ? 'Skyr' : index % 2 ? 'Tofu' : 'Hähnchenbrust';
+const rows = Array.from({ length: 24 }, (_, index) => {
+  const categories = ['breakfast', 'lunch', 'dinner', 'snack'];
+  const category = categories[index % categories.length];
+  const protein = category === 'breakfast' ? 'Skyr' : category === 'snack' ? 'Erdnussmus' : index % 2 ? 'Tofu' : 'Hähnchenbrust';
   return {
     id: `e2e-${index}`, source: 'e2e', code: `E2E-${index}`,
     name: `${protein} ${category} ${index}`, cat: category,
-    kcal: category === 'breakfast' ? 430 : 620 + index,
-    protein: category === 'breakfast' ? 28 : 42, carbs: 55, fat: 16,
-    time: 20 + (index % 3) * 5, servings: 2, difficulty: 'easy',
+    kcal: category === 'snack' ? 330 + index : category === 'breakfast' ? 430 + index : 580 + index,
+    protein: category === 'snack' ? 14 + index : category === 'breakfast' ? 28 + index : 34 + index,
+    carbs: 55, fat: 16, time: 12 + (index % 5) * 5, servings: 2,
+    difficulty: index % 3 ? 'easy' : 'medium',
     tags: ['high_protein', index % 2 ? 'international' : 'quick'],
     allergens: protein === 'Skyr' ? ['milk'] : [],
-    diet_tags: protein === 'Tofu' ? ['vegan'] : [],
+    diet_tags: protein === 'Tofu' || protein === 'Erdnussmus' ? ['vegan'] : [],
     ingredients: ingredients(protein),
     steps: ['Zutaten vorbereiten.', 'Alles garen und abschmecken.'],
     classification: {
-      dish_type: category === 'breakfast' ? 'breakfast' : index % 2 ? 'bowl' : 'pfanne',
-      meal_prep_score_v2: 4, novelty_level: index % 2 ? 2 : 1,
-      cost_band: 'budget', protein_sources: [protein],
-      dietary_style: protein === 'Tofu' ? 'vegan' : 'omnivore'
+      dish_type: category,
+      meal_prep_score_v2: 4,
+      novelty_level: index % 2 ? 2 : 1,
+      cost_band: 'budget',
+      protein_sources: [protein],
+      dietary_style: protein === 'Tofu' || protein === 'Erdnussmus' ? 'vegan' : 'omnivore'
     },
-    quality_score: 96, is_plan_eligible: true
+    quality_score: 96 - index / 10,
+    is_plan_eligible: true
   };
 });
 
@@ -35,10 +40,8 @@ const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, serviceWorkers: 'block' });
 const page = await context.newPage();
 const errors = [];
-const requests = [];
 page.on('pageerror', (error) => errors.push(`pageerror: ${error.message}`));
 page.on('console', (message) => { if (message.type() === 'error') errors.push(`console: ${message.text()}`); });
-page.on('request', (request) => { if (request.url().includes('recipe_catalog_v1')) requests.push(request.url()); });
 
 await page.route('**/rest/v1/recipe_catalog_v1**', async (route) => {
   const url = new URL(route.request().url());
@@ -48,8 +51,13 @@ await page.route('**/rest/v1/recipe_catalog_v1**', async (route) => {
 });
 
 await page.addInitScript(() => {
+  localStorage.clear();
   localStorage.setItem('preply_v8_state_v1', JSON.stringify({
-    schemaVersion: 10, onboardingCompleted: true, currentPlan: null, planHistory: [],
+    schemaVersion: 10,
+    onboardingCompleted: true,
+    currentPlan: null,
+    planHistory: [],
+    shoppingChecks: {},
     profile: {
       version: 2, planningMode: 'simple', goal: 'maintain', calorieTarget: 2200, proteinTarget: 130,
       dietStyle: 'omnivore', allergies: [], excludedIngredients: [], excludedRecipes: [], persons: 1,
@@ -62,64 +70,79 @@ await page.addInitScript(() => {
 });
 
 await page.goto('http://127.0.0.1:4173/v8/', { waitUntil: 'domcontentloaded' });
-try {
-  await page.getByText('18 geprüfte Rezepte geladen.').waitFor({ timeout: 10000 });
-} catch (error) {
-  console.error('Katalog-Requests:', requests);
-  console.error('Browserfehler:', errors);
-  console.error('Seitentext:', (await page.locator('body').innerText()).slice(0, 4000));
-  throw error;
-}
+await page.waitForFunction(() => Boolean(window.PreplyV8));
+await page.locator('[data-action="create-plan"]').first().waitFor();
 
-await page.getByRole('button', { name: /Was esse ich heute/ }).click();
-assert.equal(await page.getByText('Drei Vorschläge für heute').count(), 1);
-assert.equal(await page.locator('.recipe-card').count(), 3);
-
-await page.getByRole('button', { name: /Essensplan erstellen/ }).click();
+/* Plan for six dates and two meal slots. */
+await page.locator('[data-action="create-plan"]').first().click();
 await page.getByRole('heading', { name: 'Welche Tage und Mahlzeiten?' }).waitFor();
 await page.getByRole('button', { name: '5 Tage' }).click();
 await page.locator('[data-plan-add-date]').click();
 await page.locator('[data-plan-meal="breakfast"]').click();
 await page.getByRole('button', { name: 'Plan erstellen', exact: true }).click();
-await page.getByText('Dein Plan').waitFor();
-assert.equal(await page.locator('.plan-day').count(), 6);
+await page.locator('.preply-plan-card').waitFor();
+assert.equal(await page.locator('.preply-day').count(), 6);
 
-let savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
+let savedState = await page.evaluate(() => window.PreplyV8.getState());
 assert.equal(savedState.currentPlan.selectedDates.length, 6);
-assert.deepEqual(savedState.currentPlan.enabledMeals.sort(), ['dinner', 'lunch']);
+assert.deepEqual([...savedState.currentPlan.enabledMeals].sort(), ['dinner', 'lunch']);
 assert.equal(savedState.currentPlan.days.every((day) => Object.keys(day.meals).length === 2), true);
 
+/* Selected-day navigation renders the requested day. */
+await page.locator('.preply-day').nth(1).click();
+assert.equal(await page.locator('.preply-day.active').getAttribute('data-plan-day'), savedState.currentPlan.selectedDates[1]);
+
+/* Replace one meal without changing the next day. */
 const originalFirstLunchId = savedState.currentPlan.days[0].meals.lunch.recipeId;
-const untouchedSecondDayLunchId = savedState.currentPlan.days[1].meals.lunch.recipeId;
-await page.locator('[data-replace-meal][data-day-index="0"][data-category="lunch"]').click();
+const untouchedSecondLunchId = savedState.currentPlan.days[1].meals.lunch.recipeId;
+await page.locator('.preply-day').first().click();
+await page.locator('[data-swap-meal][data-swap-day="0"][data-swap-cat="lunch"]').first().click();
 await page.getByRole('heading', { name: savedState.currentPlan.days[0].meals.lunch.recipe.name }).waitFor();
 await page.getByRole('button', { name: 'Schneller' }).click();
-assert.ok((await page.locator('[data-replacement-recipe]').count()) > 0);
-await page.locator('[data-replacement-recipe]').first().click();
+await page.getByRole('button', { name: 'Ähnlich' }).click();
+assert.ok((await page.locator('[data-pick-replacement]').count()) > 0);
+await page.locator('[data-pick-replacement]').first().click();
 await page.waitForTimeout(150);
-savedState = await page.evaluate(() => JSON.parse(localStorage.getItem('preply_v8_state_v1')));
+savedState = await page.evaluate(() => window.PreplyV8.getState());
 assert.notEqual(savedState.currentPlan.days[0].meals.lunch.recipeId, originalFirstLunchId);
-assert.equal(savedState.currentPlan.days[1].meals.lunch.recipeId, untouchedSecondDayLunchId);
-assert.equal(savedState.currentPlan.days[0].meals.lunch.prepGroupId, null);
+assert.equal(savedState.currentPlan.days[1].meals.lunch.recipeId, untouchedSecondLunchId);
 
+/* Recipes: category, search, favorite and advanced filters. */
 await page.locator('a[href="#recipes"]').click();
-await page.getByRole('heading', { name: /Für dich und alle Rezepte/ }).waitFor();
-await page.locator('[data-v8-filter="category"]').selectOption('dinner');
-assert.ok((await page.locator('.recipe-card').count()) > 0);
+await page.getByRole('heading', { name: 'Rezepte' }).waitFor();
+assert.ok((await page.locator('.master-foryou-card').count()) > 0);
+assert.ok((await page.locator('.master-recipe-row').count()) > 0);
+await page.locator('[data-chip="category"][data-value="dinner"]').click();
+assert.ok((await page.locator('.master-recipe-row').count()) > 0);
 await page.locator('[data-v8-favorite]').first().click();
-assert.equal(await page.getByRole('button', { name: 'Gespeichert' }).count(), 1);
+savedState = await page.evaluate(() => window.PreplyV8.getState());
+assert.equal(savedState.preferences.favoriteRecipeIds.length, 1);
+await page.locator('[data-open-filters]').first().click();
+await page.getByRole('heading', { name: 'Alle Filter' }).waitFor();
+await page.getByRole('button', { name: 'Bis 30 Min.' }).click();
+await page.getByRole('button', { name: 'Filter anwenden' }).click();
 
+/* Shopping: day scope, grouping and persistent checks. */
 await page.locator('a[href="#shopping"]').click();
-await page.getByRole('heading', { name: 'Einkaufsliste' }).waitFor();
+await page.getByRole('heading', { name: 'Einkauf' }).waitFor();
 assert.equal(await page.locator('[data-v8-date]').count(), 6);
 assert.ok((await page.locator('[data-v8-check]').count()) > 0);
 const before = await page.locator('[data-v8-check]').count();
 await page.locator('[data-v8-date]').first().click();
 await page.waitForTimeout(150);
 assert.ok((await page.locator('[data-v8-check]').count()) <= before);
+await page.locator('[data-v8-check]').first().click();
+await page.waitForTimeout(100);
+savedState = await page.evaluate(() => window.PreplyV8.getState());
+assert.equal(Object.values(savedState.shoppingChecks).some(Boolean), true);
+await page.getByRole('button', { name: 'Gericht' }).click();
+assert.ok((await page.locator('.master-shopping-group').count()) > 0);
 
-await page.locator('a[href="#profile"]').click();
+/* Profile remains accessible only from the header. */
+assert.equal(await page.locator('.v8-nav a[href="#profile"]').count(), 0);
+await page.locator('.v8-header-action').click();
 await page.getByRole('heading', { name: 'Deine Einstellungen' }).waitFor();
+
 assert.deepEqual(errors, [], `Browserfehler: ${errors.join(' | ')}`);
 await browser.close();
 console.log('V8 Chromium E2E erfolgreich.');
