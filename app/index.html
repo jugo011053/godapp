@@ -8,6 +8,12 @@
   <link rel="canonical" href="./v8/">
   <meta http-equiv="refresh" content="0;url=./v8/">
   <script>
+    // Clean up old root-scope service worker before redirecting
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.getRegistrations().then(regs => {
+        regs.forEach(r => { if (!r.scope.includes('/v8')) r.unregister(); });
+      });
+    }
     const target = new URL('./v8/', window.location.href);
     target.hash = window.location.hash;
     window.location.replace(target.href);

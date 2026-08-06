@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-8';
+const CACHE_NAME = 'preply-v8-shell-9';
 const SHELL = [
   './',
   './index.html',
@@ -43,7 +43,7 @@ self.addEventListener('install', (event) => {
 self.addEventListener('activate', (event) => {
   event.waitUntil(
     caches.keys()
-      .then((keys) => Promise.all(keys.filter((key) => key.startsWith('preply-v8-') && key !== CACHE_NAME).map((key) => caches.delete(key))))
+      .then((keys) => Promise.all(keys.filter((key) => key !== CACHE_NAME && (key.startsWith('preply-v8-') || key.startsWith('preply-v7'))).map((key) => caches.delete(key))))
       .then(() => self.clients.claim())
   );
 });
