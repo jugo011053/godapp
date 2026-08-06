@@ -10,10 +10,15 @@ import { initializePlanManagement, refreshPlanManagement } from './planManagemen
 
 const appRoot = document.getElementById('app');
 
+function renderProfileLayer() {
+  refreshProfileMaster(appRoot);
+  appRoot.querySelector('.master-profile-intro h1')?.setAttribute('aria-label', 'Deine Einstellungen');
+}
+
 async function renderAll() {
   rerenderIntegratedApp(appRoot);
   await refreshFeatureEnhancements(appRoot);
-  refreshProfileMaster(appRoot);
+  renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   await refreshPlanReplacementEnhancement(appRoot);
   refreshPlanManagement(appRoot);
@@ -28,7 +33,7 @@ try {
   await startIntegratedApp(appRoot);
   await initializeFeatureEnhancements();
   await refreshFeatureEnhancements(appRoot);
-  refreshProfileMaster(appRoot);
+  renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   await refreshPlanReplacementEnhancement(appRoot);
   refreshPlanManagement(appRoot);
