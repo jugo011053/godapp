@@ -60,24 +60,37 @@ function catalogStatusHtml() {
   return '';
 }
 
+function normalizeDays(plan) {
+  if (Array.isArray(plan.days)) return plan.days;
+  if (plan.days && typeof plan.days === 'object') {
+    return Object.entries(plan.days).map(([date, meals]) => ({ date, meals: meals || {} })).sort((a, b) => a.date.localeCompare(b.date));
+  }
+  return [];
+}
+
 function renderPlanPage() {
   const state = getState();
   const plan = state.currentPlan;
   if (plan && !isPlanExpired(plan)) {
-    /* Find today's day or fall back to first day */
+    const days = normalizeDays(plan);
+    if (!days.length) {
+      /* Plan exists but has no usable day data — treat as empty */
+      return renderEmptyPlan();
+    }
+
     const today = localDate(0);
     const activeDay = runtime.activePlanDay || today;
-    const dayData = plan.days.find((d) => d.date === activeDay) || plan.days[0];
+    const dayData = days.find((d) => d.date === activeDay) || days[0];
     const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
     return `<section class="v8-page">
       <div class="v8-page-head">
         <h1>Dein Plan</h1>
-        <p>${plan.selectedDates.length} Tage · ${plan.enabledMeals.map((m) => MEAL_LABELS[m] || m).join(', ')}</p>
+        <p>${plan.selectedDates ? plan.selectedDates.length : days.length} Tage · ${(plan.enabledMeals || []).map((m) => MEAL_LABELS[m] || m).join(', ')}</p>
       </div>
 
       <div class="chip-row" style="margin-bottom:var(--space-4)">
-        ${plan.days.map((day) => {
+        ${days.map((day) => {
           const d = new Date(`${day.date}T12:00:00`);
           const wd = WEEKDAY_SHORT[d.getDay()];
           const dd = String(d.getDate()).padStart(2, '0');
@@ -89,18 +102,22 @@ function renderPlanPage() {
 
       ${dayData ? `<div class="v8-panel">
         <h2>${escapeHtml(dateLabel(dayData.date))}${dayData.date === today ? ' — Heute' : ''}</h2>
-        ${Object.entries(dayData.meals).map(([category, meal]) => `<div class="meal-row">
-          <div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div>
-          <div>
-            <strong>${escapeHtml(meal.recipe.name)}</strong>
-            <div class="recipe-meta">
-              <span>${meal.estimatedKcalPerPerson} kcal</span>
-              <span>${meal.estimatedProteinPerPerson} g Protein</span>
-              <span>${Math.round(meal.recipe.time || 0)} Min.</span>
-              ${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}
+        ${Object.entries(dayData.meals || {}).map(([category, meal]) => {
+          const recipe = meal.recipe || meal;
+          const name = recipe.name || 'Unbekannt';
+          return `<div class="meal-row">
+            <div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div>
+            <div>
+              <strong>${escapeHtml(name)}</strong>
+              <div class="recipe-meta">
+                <span>${meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0)} kcal</span>
+                <span>${meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0)} g Protein</span>
+                <span>${Math.round((recipe.time || 0))} Min.</span>
+                ${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}
+              </div>
             </div>
-          </div>
-        </div>`).join('')}
+          </div>`;
+        }).join('')}
       </div>` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
 
       <div class="v8-actions" style="margin-top:var(--space-3)">
@@ -109,6 +126,10 @@ function renderPlanPage() {
     </section>`;
   }
 
+  return renderEmptyPlan();
+}
+
+function renderEmptyPlan() {
   return `<section class="v8-page">
     <div class="v8-page-head">
       <h1>Was kochst du?</h1>

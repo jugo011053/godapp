@@ -129,10 +129,17 @@ async function showDetail(root,id) {
   } catch(error){ console.error('[Preply V8] Rezeptdetail',error); }
 }
 
+function normalizeDays(plan) {
+  if (Array.isArray(plan.days)) return plan.days;
+  if (plan.days && typeof plan.days === 'object') return Object.entries(plan.days).map(([date, meals]) => ({ date, meals: meals || {} })).sort((a, b) => a.date.localeCompare(b.date));
+  return [];
+}
+
 async function detailedPlan(plan) {
-  const ids=[...new Set((plan.days||[]).flatMap((day)=>Object.values(day.meals||{}).map((meal)=>meal.recipeId||meal.recipe?.id)).filter(Boolean))];
+  const days = normalizeDays(plan);
+  const ids=[...new Set(days.flatMap((day)=>Object.values(day.meals||{}).map((meal)=>meal.recipeId||meal.recipe?.id).filter(Boolean)))];
   await Promise.all(ids.map(async(id)=>{ if(!ui.details.has(id)) ui.details.set(id,await getRecipe(id)); }));
-  return { ...plan, days:plan.days.map((day)=>({ ...day, meals:Object.fromEntries(Object.entries(day.meals).map(([slot,meal])=>[slot,{...meal,recipe:ui.details.get(meal.recipeId||meal.recipe?.id)||meal.recipe}])) })) };
+  return { ...plan, days:days.map((day)=>({ ...day, meals:Object.fromEntries(Object.entries(day.meals||{}).map(([slot,meal])=>[slot,{...meal,recipe:ui.details.get(meal.recipeId||meal.recipe?.id)||meal.recipe}])) })) };
 }
 
 async function renderShopping(root) {
