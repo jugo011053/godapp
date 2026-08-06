@@ -8,6 +8,7 @@ on:
       - 'app/v8/**'
       - 'tests/v8-e2e.mjs'
       - 'tests/v8-plan-management-e2e.mjs'
+      - 'tests/v8-plan-edit-e2e.mjs'
       - 'tests/capture-current-design.mjs'
       - '.github/workflows/v8-browser-e2e.yml'
   pull_request:
@@ -17,6 +18,7 @@ on:
       - 'app/v8/**'
       - 'tests/v8-e2e.mjs'
       - 'tests/v8-plan-management-e2e.mjs'
+      - 'tests/v8-plan-edit-e2e.mjs'
       - 'tests/v8-root-cutover-e2e.mjs'
       - 'tests/capture-current-design.mjs'
       - '.github/workflows/v8-browser-e2e.yml'
@@ -48,6 +50,7 @@ jobs:
         run: |
           node tests/v8-e2e.mjs
           node tests/v8-plan-management-e2e.mjs
+          node tests/v8-plan-edit-e2e.mjs
       - name: Capture current design
         if: always()
         run: node tests/capture-current-design.mjs
