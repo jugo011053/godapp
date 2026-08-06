@@ -48,7 +48,6 @@ function makeRecipe(category, index) {
 
 const rows = slots.flatMap((slot) => Array.from({ length: 6 }, (_, index) => makeRecipe(slot, index)));
 const byId = new Map(rows.map((recipe) => [recipe.id, recipe]));
-
 const days = dates.map((date, dayIndex) => ({
   date,
   meals: Object.fromEntries(slots.map((slot, slotIndex) => {
@@ -126,23 +125,35 @@ await page.locator('.preply-plan-card').waitFor({ timeout: 15000 });
 await page.screenshot({ path: 'artifacts/v8-design/01-heute.png', fullPage: true });
 
 await page.locator('a[href="#recipes"]').click();
-await page.waitForTimeout(500);
+await page.locator('.master-recipe-row').first().waitFor();
 await page.screenshot({ path: 'artifacts/v8-design/02-rezepte.png', fullPage: true });
 
 await page.locator('a[href="#shopping"]').click();
-await page.waitForTimeout(500);
+await page.locator('.master-shopping-group').first().waitFor();
 await page.screenshot({ path: 'artifacts/v8-design/03-einkauf.png', fullPage: true });
 
 await page.locator('a[href="#plan"]').click();
 await page.locator('.preply-plan-card').waitFor();
 await page.locator('[data-swap-meal]').first().click();
-await page.waitForTimeout(350);
+await page.locator('[data-pick-replacement]').first().waitFor();
 await page.screenshot({ path: 'artifacts/v8-design/04-austauschen.png', fullPage: true });
+await page.locator('[data-replace-close]').click();
 
-await page.keyboard.press('Escape');
+await page.locator('[data-plan-menu]').click();
+await page.getByRole('heading', { name: 'Neu zusammenstellen' }).waitFor();
+await page.screenshot({ path: 'artifacts/v8-design/05-plan-menue.png', fullPage: true });
+await page.locator('[data-plan-menu-close]').click();
+
 await page.locator('.v8-header-action').click();
-await page.waitForTimeout(350);
-await page.screenshot({ path: 'artifacts/v8-design/05-profil.png', fullPage: true });
+await page.getByRole('heading', { name: 'Deine Einstellungen' }).waitFor();
+await page.screenshot({ path: 'artifacts/v8-design/06-profil.png', fullPage: true });
+
+await page.evaluate(() => window.PreplyV8.updateState((current) => ({
+  ...current,
+  profile: { ...current.profile, maxCookingTime: Number(current.profile.maxCookingTime || 45) - 5 }
+})));
+await page.getByRole('heading', { name: 'Dein Profil wurde geändert.' }).waitFor();
+await page.screenshot({ path: 'artifacts/v8-design/07-profil-geaendert.png', fullPage: true });
 
 await browser.close();
 if (errors.length) throw new Error(errors.join('\n'));
