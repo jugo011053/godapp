@@ -3435,6 +3435,80 @@ body{background:#e9e9e4;color:var(--ink);font-family:Inter,system-ui,-apple-syst
 .preply-discover-card{display:flex;align-items:center;gap:10px;width:100%;border:1px solid #deded9;border-radius:13px;background:#fff;padding:9px;text-align:left;color:var(--ink)}.preply-discover-card+.preply-discover-card{margin-top:7px}.preply-mark{position:relative;display:grid;place-items:center;flex:0 0 48px;width:48px;height:48px;overflow:hidden;border-radius:10px}.preply-mark:before{content:"";width:25px;height:25px;border:6px solid rgba(17,17,17,.75);border-radius:50%}.preply-mark i{position:absolute;right:6px;bottom:6px;width:11px;height:11px;border-radius:50%;background:rgba(255,255,255,.72)}.preply-discover-card>span{display:flex;flex:1;min-width:0;flex-direction:column;gap:2px}.preply-discover-card small{overflow:hidden;color:#62625b;font-size:8px;font-weight:800;letter-spacing:.06em;text-overflow:ellipsis;text-transform:uppercase;white-space:nowrap}.preply-discover-card strong{overflow:hidden;font-size:14px;letter-spacing:-.035em;text-overflow:ellipsis;white-space:nowrap}.preply-discover-card em{overflow:hidden;color:var(--muted);font-size:9px;font-style:normal;text-overflow:ellipsis;white-space:nowrap}.preply-discover-card>b{display:grid;place-items:center;flex:0 0 23px;width:23px;height:23px;border-radius:50%;background:var(--ink);color:#fff;font-size:15px}
 .preply-shopping-summary{display:flex;justify-content:space-between;gap:12px;margin:18px 0 19px;padding:13px;border-radius:13px;background:var(--lavender);font-size:11px;line-height:1.3}.preply-shopping-summary b{font-size:11px}.preply-shopping-summary span{display:block;margin-top:3px;color:#4d4a70;font-size:10px}
 .preply-shopping-group{margin-top:20px}.preply-shopping-group h2{margin:0 0 5px;font-size:18px;letter-spacing:-.04em}
+/* ── Für dich horizontal scroll ── */
+.preply-foryou{display:flex;gap:10px;overflow-x:auto;margin:0 -20px;padding:0 20px 8px;scrollbar-width:none}.preply-foryou::-webkit-scrollbar{display:none}
+.preply-foryou-card{position:relative;flex:0 0 160px;min-height:175px;overflow:hidden;border-radius:14px;padding:0;border:0;text-align:left;color:var(--ink);cursor:pointer}
+.preply-foryou-card .foryou-img{display:block;width:100%;height:110px;border-radius:14px 14px 0 0;object-fit:cover}
+.preply-foryou-card .foryou-placeholder{display:flex;align-items:center;justify-content:center;width:100%;height:110px;border-radius:14px 14px 0 0}
+.preply-foryou-card .foryou-placeholder:after{content:"";width:40px;height:40px;border:7px solid rgba(17,17,17,.18);border-radius:50%}
+.preply-foryou-card .foryou-heart{position:absolute;top:8px;right:8px;width:28px;height:28px;border:0;border-radius:50%;background:rgba(255,255,255,.82);display:grid;place-items:center;font-size:14px;color:#444;cursor:pointer;z-index:2;line-height:1}
+.preply-foryou-card .foryou-heart.liked{color:#d94b4b}
+.preply-foryou-card .foryou-info{padding:7px 9px 9px}
+.preply-foryou-card .foryou-info strong{display:block;font-size:12px;letter-spacing:-.02em;line-height:1.2;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preply-foryou-card .foryou-info em{display:block;margin-top:2px;color:var(--muted);font-size:9px;font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ── Recipe list item (Alle Rezepte) ── */
+.preply-recipe-list-item{display:flex;align-items:center;width:100%;border:1px solid #deded9;border-radius:13px;background:#fff;padding:12px 10px;text-align:left;color:var(--ink)}.preply-recipe-list-item+.preply-recipe-list-item{margin-top:7px}
+.preply-recipe-list-item .rli-body{flex:1;min-width:0}
+.preply-recipe-list-item .rli-body strong{display:block;font-size:14px;letter-spacing:-.035em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preply-recipe-list-item .rli-body em{display:block;margin-top:2px;color:var(--muted);font-size:9px;font-style:normal;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.preply-recipe-list-item .rli-actions{display:flex;align-items:center;gap:4px;flex-shrink:0}
+.preply-recipe-list-item .rli-heart{border:0;background:none;font-size:16px;color:#888;padding:4px;cursor:pointer;line-height:1}.preply-recipe-list-item .rli-heart.liked{color:#d94b4b}
+.preply-recipe-list-item .rli-menu{border:0;background:none;font-size:18px;color:#aaa;padding:4px;cursor:pointer;line-height:1}
+/* ── Shopping: category collapse + items + buy button ── */
+.preply-shop-category{margin-top:18px}
+.preply-shop-category .shop-cat-header{display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0 0 6px;border-bottom:1px solid var(--line)}
+.preply-shop-category .shop-cat-header h2{margin:0;font-size:16px;letter-spacing:-.04em;font-weight:800}
+.preply-shop-category .shop-cat-header .shop-cat-arrow{font-size:14px;color:var(--muted);transition:transform .2s;padding:4px}
+.preply-shop-category.collapsed .shop-cat-arrow{transform:rotate(180deg)}
+.preply-shop-category.collapsed .shop-cat-items{display:none}
+.preply-shop-item{display:flex;align-items:center;gap:10px;padding:10px 2px;border-bottom:1px solid #f0f0eb}
+.preply-shop-item:last-child{border-bottom:0}
+.preply-shop-item .shop-check{width:22px;height:22px;border-radius:50%;border:1.5px solid #c8c8bf;background:#fff;display:grid;place-items:center;flex-shrink:0;cursor:pointer;font-size:12px;color:transparent}
+.preply-shop-item .shop-check.checked{background:var(--accent);border-color:var(--accent);color:#fff}
+.preply-shop-item .shop-item-name{flex:1;font-size:13px;font-weight:500;color:var(--ink)}
+.preply-shop-item .shop-item-name.done{text-decoration:line-through;color:var(--muted)}
+.preply-shop-item .shop-item-amount{font-size:12px;color:var(--muted);white-space:nowrap;font-weight:600}
+.preply-shop-buy-row{display:flex;gap:8px;margin-top:18px;padding-bottom:8px}
+.preply-shop-buy-btn{flex:1;border:0;border-radius:13px;background:var(--accent);padding:14px;color:#fff;font-size:13px;font-weight:800;cursor:pointer}
+.preply-shop-more-btn{width:48px;border:1px solid var(--line);border-radius:13px;background:#fff;color:var(--ink);font-size:18px;cursor:pointer;display:grid;place-items:center}
+/* ── Neu zusammenstellen modal ── */
+.preply-modal-overlay{position:fixed;inset:0;z-index:9999;background:rgba(17,17,17,.42);display:flex;align-items:flex-end;justify-content:center;animation:preplyIn .15s ease both}
+.preply-modal-sheet{width:100%;max-width:420px;background:var(--paper);border-radius:18px 18px 0 0;padding:20px 20px calc(20px + env(safe-area-inset-bottom,0px))}
+.preply-modal-sheet-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
+.preply-modal-sheet-header h2{margin:0;font-size:18px;letter-spacing:-.04em;font-weight:800}
+.preply-modal-sheet-header button{width:30px;height:30px;border:0;border-radius:50%;background:#ececea;display:grid;place-items:center;font-size:15px;color:var(--ink);cursor:pointer}
+.preply-modal-option{display:flex;align-items:flex-start;gap:12px;width:100%;border:0;background:none;padding:13px 0;text-align:left;color:var(--ink);cursor:pointer;border-bottom:1px solid #f0f0eb}
+.preply-modal-option:last-child{border-bottom:0}
+.preply-modal-option .mo-icon{flex:0 0 36px;width:36px;height:36px;border-radius:10px;background:#f0f0eb;display:grid;place-items:center;font-size:16px}
+.preply-modal-option .mo-text{flex:1;min-width:0}
+.preply-modal-option .mo-text strong{display:block;font-size:13px;font-weight:700}
+.preply-modal-option .mo-text span{display:block;margin-top:2px;color:var(--muted);font-size:11px}
+.preply-modal-option.danger .mo-text strong{color:var(--danger)}
+.preply-modal-option.danger .mo-icon{color:var(--danger)}
+/* ── Profile edit form modal ── */
+.preply-profile-form{display:flex;flex-direction:column;gap:0}
+.preply-profile-form .pf-row{display:flex;align-items:center;justify-content:space-between;padding:13px 0;border-bottom:1px solid #f0f0eb}
+.preply-profile-form .pf-row:last-child{border-bottom:0}
+.preply-profile-form .pf-row label{font-size:13px;font-weight:600;color:var(--ink)}
+.preply-profile-form .pf-row .pf-val{display:flex;align-items:center;gap:4px;font-size:13px;color:var(--muted);font-weight:500}
+.preply-profile-form .pf-row .pf-val span{font-size:14px;color:#bbb}
+.preply-profile-form .pf-row input[type="number"]{width:70px;border:1px solid var(--line);border-radius:8px;padding:6px 8px;font-size:13px;text-align:right;background:#fff;color:var(--ink)}
+.preply-profile-save{width:100%;border:0;border-radius:13px;background:var(--ink);padding:14px;color:#fff;font-size:13px;font-weight:800;margin-top:14px;cursor:pointer}
+.preply-profile-confirm{text-align:center;padding:10px 0}
+.preply-profile-confirm .pfc-icon{display:inline-flex;align-items:center;justify-content:center;width:48px;height:48px;border-radius:50%;background:#f0f0eb;margin-bottom:12px;font-size:24px}
+.preply-profile-confirm h3{margin:0 0 6px;font-size:16px;font-weight:800}
+.preply-profile-confirm p{margin:0 0 16px;color:var(--muted);font-size:11px;line-height:1.4}
+.preply-profile-confirm .pfc-btn{display:block;width:100%;border:0;border-radius:11px;padding:13px;font-size:13px;font-weight:700;cursor:pointer;margin-bottom:8px}
+.preply-profile-confirm .pfc-btn.dark{background:var(--ink);color:#fff}
+.preply-profile-confirm .pfc-btn.outline{background:#fff;color:var(--ink);border:1px solid var(--line)}
+.preply-profile-confirm .pfc-cancel{border:0;background:none;color:var(--muted);font-size:12px;cursor:pointer;margin-top:4px}
+/* ── Search bar with icon + filter button ── */
+.preply-search-row{display:flex;gap:8px;align-items:center;margin:17px 0 12px}
+.preply-search-wrap{position:relative;flex:1}
+.preply-search-wrap .search-icon{position:absolute;left:12px;top:50%;transform:translateY(-50%);color:#999;pointer-events:none}
+.preply-search-wrap .search-icon svg{width:16px;height:16px}
+.preply-search-wrap input{width:100%;border:1px solid #d8d8d1;border-radius:11px;background:#fff;padding:13px 13px 13px 36px;color:var(--ink);font-size:13px}
+.preply-filter-settings{width:44px;height:44px;border:1px solid #d8d8d1;border-radius:11px;background:#fff;display:grid;place-items:center;color:var(--ink);cursor:pointer;flex-shrink:0}
 .preply-empty{margin:34px 3px;color:var(--muted);font-size:12px;line-height:1.45}
 .preply-settings-card{margin-top:10px;border:1px solid var(--line);border-radius:15px;background:#fff;padding:15px;color:var(--ink)}
 .preply-settings-card h2{margin:0;font-size:17px;letter-spacing:-.04em}.preply-settings-card p{margin:5px 0 0;color:var(--muted);font-size:10px;line-height:1.45}.preply-settings-row{display:flex;align-items:flex-start;justify-content:space-between;gap:12px}.preply-settings-actions{display:flex;gap:7px;margin-top:12px}.preply-settings-actions .btn{margin:0;padding:11px 12px;font-size:11px}.preply-status{display:inline-flex;align-items:center;gap:6px;color:#4b7608;font-size:9px;font-weight:850;letter-spacing:.06em;text-transform:uppercase}.preply-status:before{content:"";width:7px;height:7px;border-radius:50%;background:var(--accent)}.preply-code{display:inline-flex;margin-top:9px;border:0;border-radius:8px;background:var(--accent-soft);padding:8px 10px;color:#3f6500;font-family:var(--mono);font-size:12px;font-weight:800;letter-spacing:.04em}.preply-sync-time{margin-top:7px!important;font-size:9px!important}.preply-household-form{display:flex;gap:7px;margin-top:10px}.preply-household-form input{margin:0!important;background:#fff!important;color:var(--ink)!important;border-color:var(--line)!important;font-family:var(--mono);font-size:12px!important;text-transform:uppercase}.preply-household-form button{width:auto;white-space:nowrap}.preply-profile-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin:16px 0}.preply-profile-stat{border:1px solid var(--line);border-radius:13px;background:#fff;padding:13px}.preply-profile-stat span{display:block;color:var(--muted);font-size:8px;font-weight:850;letter-spacing:.08em;text-transform:uppercase}.preply-profile-stat b{display:block;margin-top:5px;font-size:22px;letter-spacing:-.06em}.preply-profile-stat b small{font-size:10px}.preply-profile-section{margin-top:18px}.preply-profile-section>h2{margin-bottom:8px;font-size:17px;letter-spacing:-.04em}
@@ -3596,7 +3670,7 @@ select option{background:var(--card);color:var(--text)}
 (function(){
   var preplyTab='plan';
   var preplyScreen='main';
-  var preplyDiscover={cat:'breakfast',filter:'',query:''};
+  var preplyDiscover={cat:'all',filter:'',query:''};
   var preplySwapState=null;
   var preplyPlanView='today';
   var preplySelectedDay=0;
@@ -3736,25 +3810,53 @@ select option{background:var(--card);color:var(--text)}
     return '<div class="preply-page">'+intro+preplyDayPicker(mw)+'<div class="preply-note"><i>i</i><p><b>'+dayName+'.</b> Tausche jedes Gericht direkt aus – Plan und Einkaufsliste werden gemeinsam aktualisiert.</p></div><div class="preply-section"><h2>Deine Mahlzeiten</h2><button onclick="preplyGeneratePlan()">Neu zusammenstellen</button></div><div class="preply-plan-card"><header><div><p>'+dayName+' · '+preplyDateLabel(day.date)+'</p><h2>Einfach loskochen</h2></div><span class="preply-day-total">'+total.kcal+' kcal</span></header>'+rows+'</div><button class="preply-outline" onclick="preplyGo(\'discover\')">Weitere Rezepte entdecken <span>→</span></button></div>';
   }
   function discoverPage(){
-    var cats=['breakfast','lunch','dinner','snack','shake'],p=state.profile;
-    var catRow=cats.map(function(cat){return '<button class="preply-filter '+(preplyDiscover.cat===cat?'active':'')+'" onclick="preplySetDiscoverCat(\''+cat+'\')">'+labels(cat)+'</button>';}).join('');
-    var quick=[['','Alle'],['protein','Proteinreich'],['quick','Schnell'],['meal_prep','Meal Prep']].map(function(item){return '<button class="preply-filter '+(preplyDiscover.filter===item[0]?'active':'')+'" onclick="preplySetDiscoverFilter(\''+item[0]+'\')">'+item[1]+'</button>';}).join('');
+    var p=state.profile;
+    state.favorites=state.favorites||{};
+    var activeCat=preplyDiscover.cat||'all';
+    var catRow=['all','breakfast','lunch','dinner','snack'].map(function(cat){var lbl=cat==='all'?'Alle':labels(cat);return '<button class="preply-filter '+(activeCat===cat?'active':'')+'" onclick="preplySetDiscoverCat(\''+cat+'\')">'+lbl+'</button>';}).join('');
+    var quick=[['quick','Schnell'],['protein','Proteinreich'],['favorites','Favoriten']].map(function(item){return '<button class="preply-filter '+(preplyDiscover.filter===item[0]?'active':'')+'" onclick="preplySetDiscoverFilter(\''+item[0]+'\')">'+item[1]+'</button>';}).join('');
+    quick+='<button class="preply-filter" onclick="void 0"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" style="vertical-align:-1px;margin-right:3px"><path d="M4 6h16M7 12h10M10 18h4" stroke-linecap="round"/></svg>Alle Filter</button>';
     var q=(preplyDiscover.query||'').toLowerCase();
-    var pool=RECIPES.filter(function(r){return r.cat===preplyDiscover.cat&&recipeAllowed(r,p,activeDietFor())&&(!preplyDiscover.filter||(r.tags||[]).includes(preplyDiscover.filter))&&(!q||String(r.name).toLowerCase().includes(q));}).slice(0,60);
-    var cards=pool.map(function(r,i){return '<button class="preply-discover-card" onclick="showRecipe(\''+e(r.id)+'\',\''+r.cat+'\')"><span class="preply-mark '+tone(i)+'"><i></i></span><span><small>'+labels(r.cat)+' · '+r.time+' Min</small><strong>'+e(r.name)+'</strong><em>'+r.kcal+' kcal · '+r.protein+' g Protein</em></span><b>›</b></button>';}).join('');
-    return '<div class="preply-page"><div class="preply-kicker">Rezepte</div><h1 class="preply-title">Was möchtest<br>du kochen?</h1><input class="preply-search" placeholder="Rezept suchen..." value="'+e(preplyDiscover.query)+'" oninput="preplySearch(this.value)"><div class="preply-filter-row">'+catRow+'</div><div class="preply-filter-row">'+quick+'</div><p class="preply-copy">'+pool.length+' passende Rezepte – bereits nach deinem Profil gefiltert.</p><div style="margin-top:14px">'+(cards||'<p class="preply-empty">Dafür gibt es mit deinen aktuellen Filtern noch kein passendes Rezept.</p>')+'</div></div>';
+    var pool=RECIPES.filter(function(r){
+      if(activeCat!=='all'&&r.cat!==activeCat)return false;
+      if(!recipeAllowed(r,p,activeDietFor()))return false;
+      if(preplyDiscover.filter==='favorites'&&!state.favorites[r.id])return false;
+      if(preplyDiscover.filter==='protein'&&!(r.tags||[]).includes('protein'))return false;
+      if(preplyDiscover.filter==='quick'&&!(r.tags||[]).includes('quick'))return false;
+      if(q&&!String(r.name).toLowerCase().includes(q))return false;
+      return true;
+    }).slice(0,60);
+    // "Für dich" recommendations — top 5 shuffled
+    var foryouPool=RECIPES.filter(function(r){return recipeAllowed(r,p,activeDietFor());});
+    var foryou=[];var used={};for(var fi=0;fi<foryouPool.length&&foryou.length<5;fi++){var fr=foryouPool[(fi*7+3)%foryouPool.length];if(!used[fr.id]){used[fr.id]=true;foryou.push(fr);}}
+    var foryouCards=foryou.map(function(r,i){var isFav=!!state.favorites[r.id];return '<button class="preply-foryou-card" onclick="showRecipe(\''+e(r.id)+'\',\''+r.cat+'\')">'+'<div class="foryou-placeholder '+tone(i)+'"></div>'+'<button class="foryou-heart'+(isFav?' liked':'')+'" onclick="event.stopPropagation();preplyToggleFav(\''+e(r.id)+'\')">'+( isFav?'♥':'♡')+'</button>'+'<div class="foryou-info"><strong>'+e(r.name)+'</strong><em>'+r.kcal+' kcal · '+r.protein+' g Protein · '+r.time+' Min.</em></div></button>';}).join('');
+    var listCards=pool.map(function(r){var isFav=!!state.favorites[r.id];return '<div class="preply-recipe-list-item" onclick="showRecipe(\''+e(r.id)+'\',\''+r.cat+'\')">'+'<div class="rli-body"><strong>'+e(r.name)+'</strong><em>'+r.kcal+' kcal · '+r.protein+' g Protein · '+r.time+' Min.</em></div>'+'<div class="rli-actions"><button class="rli-heart'+(isFav?' liked':'')+'" onclick="event.stopPropagation();preplyToggleFav(\''+e(r.id)+'\')">'+(isFav?'♥':'♡')+'</button><button class="rli-menu" onclick="event.stopPropagation();">⋮</button></div></div>';}).join('');
+    return '<div class="preply-page"><h1 class="preply-title" style="margin-bottom:2px">Rezepte</h1>'+'<div class="preply-search-row"><div class="preply-search-wrap"><span class="search-icon"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="6"/><path d="m16 16 4 4" stroke-linecap="round"/></svg></span><input placeholder="Rezepte suchen..." value="'+e(preplyDiscover.query)+'" oninput="preplySearch(this.value)"></div><button class="preply-filter-settings"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M4 6h16M7 12h10M10 18h4" stroke-linecap="round"/></svg></button></div>'+'<div class="preply-filter-row">'+catRow+'</div>'+'<div class="preply-filter-row">'+quick+'</div>'+'<div class="preply-section"><h2>Für dich</h2><button onclick="void 0">Alle anzeigen</button></div>'+'<div class="preply-foryou">'+foryouCards+'</div>'+'<div class="preply-section"><h2>Alle Rezepte</h2></div>'+'<div style="margin-top:2px">'+(listCards||'<p class="preply-empty">Dafür gibt es mit deinen aktuellen Filtern noch kein passendes Rezept.</p>')+'</div></div>';
   }
   function shopPage(){
     var p=state.profile,mw=state.mealWeek;
     if(!mw){generatePlan();mw=state.mealWeek;}
+    preplyNormalizeDay(mw);
+    state.shopViewMode=state.shopViewMode||'category';
     var raw=accumulateIngredients(mw.days,mw,p,mw.days.map(function(_,i){return i;})).raw;
     var items=Object.keys(raw).map(function(k){return computeBuyItem(raw[k],p.persons||1);}).sort(function(a,b){return a.name.localeCompare(b.name);});
-    var cost=items.reduce(function(sum,item){return sum+(item.estimatedPrice||0);},0);
-    var by={};items.forEach(function(item){var key=item.category||'Sonstiges';(by[key]||(by[key]=[])).push(item);});
-    var order=['Protein','Milchprodukte','Gemüse','Obst','Kohlenhydrate','Fett/Öl','Tiefkühl','Sonstiges'];
-    var groups=Object.keys(by).sort(function(a,b){return (order.indexOf(a)<0?99:order.indexOf(a))-(order.indexOf(b)<0?99:order.indexOf(b));}).map(function(cat){return '<div class="preply-shopping-group"><h2>'+e(cat)+'</h2>'+by[cat].map(function(item){return renderShopRow(item);}).join('')+'</div>';}).join('');
-    var done=items.filter(function(i){return state.shopChecked[i.ingredientId+'_'+(i.needUnit||'g')];}).length;
-    return '<div class="preply-page"><div class="preply-kicker">Einkaufen</div><h1 class="preply-title">Alles, was<br>du brauchst.</h1><div class="preply-shopping-summary"><div><b>'+done+' von '+items.length+' erledigt</b><span>für deinen aktuellen Essensplan</span></div><div style="text-align:right"><b>'+money(cost)+'</b><span>ca. Einkauf</span></div></div>'+groups+'<button class="preply-outline" onclick="copyShoppingList()">Liste kopieren <span>→</span></button></div>';
+    // Map old categories to design master categories
+    var catMap={'Gemüse':'Gemüse','Obst':'Gemüse','Protein':'Sonstiges','Milchprodukte':'Milchprodukte & Eier','Kohlenhydrate':'Hülsenfrüchte & Getreide','Fett/Öl':'Sonstiges','Tiefkühl':'Sonstiges','Sonstiges':'Sonstiges','Pflanzliche Proteine':'Hülsenfrüchte & Getreide','Nüsse / Samen':'Sonstiges','Gewürze':'Sonstiges','Saucen':'Sonstiges','Fette / Öle':'Sonstiges','Fleisch':'Sonstiges','Fisch':'Sonstiges'};
+    var by={};items.forEach(function(item){var key=catMap[item.category||'Sonstiges']||'Sonstiges';(by[key]||(by[key]=[])).push(item);});
+    var designOrder=['Gemüse','Hülsenfrüchte & Getreide','Milchprodukte & Eier','Sonstiges'];
+    state.shopCollapsed=state.shopCollapsed||{};
+    var groups=designOrder.filter(function(cat){return by[cat]&&by[cat].length;}).map(function(cat){
+      var collapsed=!!state.shopCollapsed[cat];
+      var itemsHtml=by[cat].map(function(item){
+        var k=item.ingredientId+'_'+(item.needUnit||'g');var chk=!!state.shopChecked[k];
+        return '<div class="preply-shop-item">'+'<div class="shop-check'+(chk?' checked':'')+'" onclick="toggleShop(\''+k+'\')">'+(chk?'✓':'')+'</div>'+'<span class="shop-item-name'+(chk?' done':'')+'">'+e(item.name)+'</span>'+'<span class="shop-item-amount">'+item.buyAmount+' '+e(item.buyUnit)+'</span></div>';
+      }).join('');
+      return '<div class="preply-shop-category'+(collapsed?' collapsed':'')+'">'+'<div class="shop-cat-header" onclick="preplyToggleShopCat(\''+e(cat)+'\')">'+'<h2>'+e(cat)+'</h2><span class="shop-cat-arrow">^</span></div>'+'<div class="shop-cat-items">'+itemsHtml+'</div></div>';
+    }).join('');
+    var shopToggle='<div class="preply-view-toggle"><button class="'+(state.shopViewMode==='category'?'active':'')+'" onclick="preplySetShopView(\'category\')">Kategorie</button><button class="'+(state.shopViewMode==='dish'?'active':'')+'" onclick="preplySetShopView(\'dish\')">Gericht</button></div>';
+    var checkedCount=items.filter(function(i){return state.shopChecked[i.ingredientId+'_'+(i.needUnit||'g')];}).length;
+    var buyBtn='<div class="preply-shop-buy-row"><button class="preply-shop-buy-btn" onclick="preplyBuyChecked()">Markierte einkaufen</button><button class="preply-shop-more-btn" onclick="copyShoppingList()">⋯</button></div>';
+    return '<div class="preply-page"><h1 class="preply-title" style="margin-bottom:2px">Einkauf</h1>'+preplyDayPicker(mw)+shopToggle+groups+buyBtn+'</div>';
   }
   function swapPage(){
     var info=preplySwapState,day=state.mealWeek&&state.mealWeek.days[info&&info.dayIndex!=null?info.dayIndex:preplySelectedDay];if(!info||!day)return planPage();
@@ -3773,7 +3875,7 @@ select option{background:var(--card);color:var(--text)}
   function renderPreplyProfile(){
     var p=state.profile,el=document.getElementById('profile-content');if(!el||!p)return;
     var restrictions=(p.restrictions||[]).length?(p.restrictions||[]).join(' · '):'Keine Ausschlüsse hinterlegt';
-    el.innerHTML='<div class="preply-page"><div class="preply-kicker">Profil</div><h1 class="preply-title">Deine<br>Einstellungen.</h1><div class="preply-profile-grid"><div class="preply-profile-stat"><span>Tagesziel</span><b>'+effectiveKcal(p)+' <small>kcal</small></b></div><div class="preply-profile-stat"><span>Protein</span><b>'+p.proteinTargetG+' <small>g</small></b></div><div class="preply-profile-stat"><span>Gewicht</span><b>'+p.weightKg+' <small>kg</small></b></div><div class="preply-profile-stat"><span>Portion</span><b>'+Math.round((p.portionFactor||1)*100)+' <small>%</small></b></div></div><div class="preply-settings-card"><h2>Ernährungsprofil</h2><p>'+e(restrictions)+'</p><button class="preply-outline" onclick="editCalorieTarget()">Kalorienziel anpassen <span>→</span></button></div><div id="preply-sync-mount"></div><div id="preply-household-mount"></div><button class="preply-outline" onclick="preplyGo(\'plan\')">Zurück zu deinem Plan <span>→</span></button></div>';
+    el.innerHTML='<div class="preply-page"><div class="preply-kicker">Profil</div><h1 class="preply-title">Deine<br>Einstellungen.</h1><div class="preply-profile-grid"><div class="preply-profile-stat"><span>Tagesziel</span><b>'+effectiveKcal(p)+' <small>kcal</small></b></div><div class="preply-profile-stat"><span>Protein</span><b>'+p.proteinTargetG+' <small>g</small></b></div><div class="preply-profile-stat"><span>Gewicht</span><b>'+p.weightKg+' <small>kg</small></b></div><div class="preply-profile-stat"><span>Portion</span><b>'+Math.round((p.portionFactor||1)*100)+' <small>%</small></b></div></div><div class="preply-settings-card"><h2>Ernährungsprofil</h2><p>'+e(restrictions)+'</p><button class="preply-outline" onclick="preplyOpenProfileEdit()">Profil bearbeiten <span>→</span></button></div><div id="preply-sync-mount"></div><div id="preply-household-mount"></div><button class="preply-outline" onclick="preplyGo(\'plan\')">Zurück zu deinem Plan <span>→</span></button></div>';
   }
   function obRender(){
     var host=document.getElementById('ob-content');if(!host)return;
@@ -3800,7 +3902,22 @@ select option{background:var(--card);color:var(--text)}
     setTab('plan');
   }
   window.preplyGo=function(tab){setTab(tab);};
-  window.preplyGeneratePlan=function(){if(confirm('Essensplan neu zusammenstellen?')){generatePlan();setTab('plan');toast('Dein neuer Essensplan ist bereit.');}};
+  window.preplyGeneratePlan=function(){
+    var html='<div class="preply-modal-overlay" id="modal-replan" onclick="if(event.target===this)preplyCloseModal(\'modal-replan\')">'+'<div class="preply-modal-sheet">'+'<div class="preply-modal-sheet-header"><h2>Neu zusammenstellen</h2><button onclick="preplyCloseModal(\'modal-replan\')">✕</button></div>'+'<div class="preply-modal-option" onclick="preplyReplanDay()"><div class="mo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2"/><path d="M16 2v4M8 2v4M3 10h18"/><path d="M14 15l-2.5 2.5L14 20" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="mo-text"><strong>Diesen Tag neu planen</strong><span>Neue Gerichte nur für den ausgewählten Tag</span></div></div>'+'<div class="preply-modal-option" onclick="preplyReplanAll()"><div class="mo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 2v6h-6M3 12a9 9 0 0 1 15-6.7L21 8M3 22v-6h6M21 12a9 9 0 0 1-15 6.7L3 16" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="mo-text"><strong>Gesamten Plan neu erstellen</strong><span>Alle Tage neu planen</span></div></div>'+'<div class="preply-modal-option" onclick="preplyCloseModal(\'modal-replan\');preplyOpenProfileEdit()"><div class="mo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg></div><div class="mo-text"><strong>Plan bearbeiten</strong><span>Zeitraum, Mahlzeiten oder Personen ändern</span></div></div>'+'<div class="preply-modal-option danger" onclick="preplyDeletePlan()"><div class="mo-icon"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="3 6 5 6 21 6"/><path d="M19 6v14a2 2 0 0 1-2 2H7a2 2 0 0 1-2-2V6m3 0V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"/></svg></div><div class="mo-text"><strong>Plan löschen</strong><span>Diesen Plan vollständig entfernen</span></div></div>'+'</div></div>';
+    var old=document.getElementById('modal-replan');if(old)old.remove();
+    document.body.insertAdjacentHTML('beforeend',html);
+  };
+  window.preplyCloseModal=function(id){var el=document.getElementById(id);if(el)el.remove();};
+  window.preplyReplanDay=function(){
+    preplyCloseModal('modal-replan');
+    var mw=state.mealWeek,p=state.profile;if(!mw||!mw.days)return;
+    var day=mw.days[preplySelectedDay];if(!day)return;
+    var cats=Object.keys(day.meals||{});
+    cats.forEach(function(cat){var pool=RECIPES.filter(function(r){return r.cat===cat&&recipeAllowed(r,p,activeDietFor());});if(pool.length){day.meals[cat]=pool[Math.floor(Math.random()*pool.length)];}});
+    save();renderPreply();toast('Tag neu geplant.');
+  };
+  window.preplyReplanAll=function(){preplyCloseModal('modal-replan');generatePlan();setTab('plan');toast('Dein neuer Essensplan ist bereit.');};
+  window.preplyDeletePlan=function(){preplyCloseModal('modal-replan');state.mealWeek=null;state.shopChecked={};save();generatePlan();setTab('plan');toast('Plan gelöscht und neu erstellt.');};
   window.preplySetPlanView=function(view){preplyPlanView=view==='week'?'week':'today';if(preplyPlanView==='today'&&state.mealWeek)preplyNormalizeDay(state.mealWeek);renderPreply();};
   window.preplySelectDay=function(index){preplySelectedDay=index;preplyPlanView='today';preplyScreen='main';renderPreply();};
   window.preplyOpenSwap=function(cat,dayIndex){preplySwapState={cat:cat,dayIndex:dayIndex==null?preplySelectedDay:dayIndex};preplyScreen='swap';renderPreply();};
@@ -3808,8 +3925,40 @@ select option{background:var(--card);color:var(--text)}
   window.preplyChooseSwap=function(id){var idx=preplySwapState&&preplySwapState.dayIndex!=null?preplySwapState.dayIndex:preplySelectedDay,day=state.mealWeek.days[idx],cat=preplySwapState.cat,r=RECIPES.find(function(x){return x.id===id;});if(!day||!r)return;var grp=mealGroupsFor(state.profile.prepDays||2).find(function(g){return g.indexOf(idx)>=0;})||[idx];grp.forEach(function(i){if(state.mealWeek.days[i])state.mealWeek.days[i].meals[cat]=r;});save();preplyScreen='main';renderPreply();toast('Gericht ersetzt.');};
   window.preplyRefreshHousehold=function(){return preplyRefreshHousehold(false);};
   window.preplySetDiscoverCat=function(cat){preplyDiscover.cat=cat;preplyDiscover.filter='';renderPreply();};
-  window.preplySetDiscoverFilter=function(filter){preplyDiscover.filter=filter;renderPreply();};
+  window.preplySetDiscoverFilter=function(filter){preplyDiscover.filter=(preplyDiscover.filter===filter)?'':filter;renderPreply();};
   window.preplySearch=function(query){preplyDiscover.query=query;renderPreply();};
+  window.preplyToggleFav=function(id){state.favorites=state.favorites||{};if(state.favorites[id])delete state.favorites[id];else state.favorites[id]=true;save();renderPreply();};
+  window.preplyToggleShopCat=function(cat){state.shopCollapsed=state.shopCollapsed||{};state.shopCollapsed[cat]=!state.shopCollapsed[cat];renderPreply();};
+  window.preplySetShopView=function(mode){state.shopViewMode=mode;renderPreply();};
+  window.preplyBuyChecked=function(){toast('Markierte Artikel eingekauft.');};
+  window.preplyOpenProfileEdit=function(){
+    var p=state.profile;if(!p)return;
+    var goalLabels={weightloss:'Abnehmen',balanced:'Gewicht erhalten',muscle:'Muskelaufbau'};
+    var dietLabels={normal:'Mischkost',vegetarian:'Vegetarisch',vegan:'Vegan'};
+    var actLabels={low:'Wenig',normal:'Ausgewogen',active:'Aktiv',very_active:'Sehr aktiv'};
+    var mealCount=(p.enabledMeals||['breakfast','lunch','dinner','snack']).length;
+    var mealLabel=mealCount+' Mahlzeiten'+(p.snacksEnabled||((p.enabledMeals||[]).indexOf('snack')>=0)?' + Snack':'');
+    var cookTimeLabel=(p.cookTime||'30-45')+' Min.';
+    var restrictionLabel=(p.restrictions||[]).length?(p.restrictions||[]).map(function(r){return {nofish:'Fisch',nopork:'Schwein',halal:'Halal',glutenfree:'Gluten',lactosefree:'Laktose'}[r]||r;}).join(', '):'Keine';
+    var html='<div class="preply-modal-overlay" id="modal-profile-edit" onclick="if(event.target===this)preplyCloseModal(\'modal-profile-edit\')">'+'<div class="preply-modal-sheet">'+'<div class="preply-modal-sheet-header"><h2>Profil bearbeiten</h2><button onclick="preplyCloseModal(\'modal-profile-edit\')">✕</button></div>'+'<div class="preply-profile-form">'+'<div class="pf-row"><label>Personen</label><div class="pf-val"><input type="number" id="pf-persons" min="1" max="8" value="'+(p.persons||1)+'"> <span>›</span></div></div>'+'<div class="pf-row"><label>Ziel</label><div class="pf-val">'+(goalLabels[p.mainGoal]||'Gewicht erhalten')+' <span>›</span></div></div>'+'<div class="pf-row"><label>Kalorienziel</label><div class="pf-val"><input type="number" id="pf-kcal" min="800" max="6000" value="'+effectiveKcal(p)+'"></div></div>'+'<div class="pf-row"><label>Proteinziel</label><div class="pf-val"><input type="number" id="pf-protein" min="20" max="400" value="'+(p.proteinTargetG||130)+'"> g</div></div>'+'<div class="pf-row"><label>Ernährungsweise</label><div class="pf-val">'+(dietLabels[p.dietStyle]||'Mischkost')+' <span>›</span></div></div>'+'<div class="pf-row"><label>Kochstil</label><div class="pf-val">'+(actLabels[p.activity]||'Ausgewogen')+' <span>›</span></div></div>'+'<div class="pf-row"><label>Kochzeit</label><div class="pf-val">'+cookTimeLabel+' <span>›</span></div></div>'+'<div class="pf-row"><label>Mahlzeiten</label><div class="pf-val">'+mealLabel+' <span>›</span></div></div>'+'<div class="pf-row"><label>Ausschlüsse</label><div class="pf-val">'+restrictionLabel+' <span>›</span></div></div>'+'</div>'+'<button class="preply-profile-save" onclick="preplyProfileSave()">Speichern</button>'+'</div></div>';
+    var old=document.getElementById('modal-profile-edit');if(old)old.remove();
+    document.body.insertAdjacentHTML('beforeend',html);
+  };
+  window.preplyProfileSave=function(){
+    var p=state.profile;
+    var persons=parseInt(document.getElementById('pf-persons').value);
+    var kcal=parseInt(document.getElementById('pf-kcal').value);
+    var protein=parseInt(document.getElementById('pf-protein').value);
+    if(!isNaN(persons)&&persons>=1&&persons<=8)p.persons=persons;
+    if(!isNaN(kcal)&&kcal>=800&&kcal<=6000)p.calorieOverride=kcal;
+    if(!isNaN(protein)&&protein>=20&&protein<=400)p.proteinTargetG=protein;
+    save();
+    // Show confirmation
+    var sheet=document.querySelector('#modal-profile-edit .preply-modal-sheet');
+    if(sheet){
+      sheet.innerHTML='<div class="preply-modal-sheet-header"><h2>Profil bearbeiten</h2><button onclick="preplyCloseModal(\'modal-profile-edit\')">✕</button></div>'+'<div class="preply-profile-confirm">'+'<div class="pfc-icon"><svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg></div>'+'<h3>Dein Profil wurde geändert.</h3>'+'<p>Deine Änderungen können Einfluss auf deinen Plan haben.</p>'+'<button class="pfc-btn dark" onclick="preplyCloseModal(\'modal-profile-edit\');renderPreply();renderPreplyProfile();">Plan behalten</button>'+'<button class="pfc-btn outline" onclick="preplyCloseModal(\'modal-profile-edit\');generatePlan();setTab(\'plan\');toast(\'Plan neu erstellt.\');">Plan neu erstellen</button>'+'<button class="pfc-cancel" onclick="preplyCloseModal(\'modal-profile-edit\')">Abbrechen</button>'+'</div>';
+    }
+  };
   window.preplyObValue=function(k,v){preplyOnboarding[k]=v;};
   window.preplyObSet=function(k,v){preplyOnboarding[k]=v;obRender();};
   window.preplyObToggle=function(v){var a=preplyOnboarding.restrictions,i=a.indexOf(v);if(i>=0)a.splice(i,1);else a.push(v);obRender();};
