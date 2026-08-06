@@ -22,7 +22,8 @@ const runtime = {
   suggestions: [],
   onboardingDraft: null,
   planDraft: null,
-  activeDialog: null
+  activeDialog: null,
+  activePlanDay: null
 };
 
 const MEAL_LABELS = Object.fromEntries(MEAL_OPTIONS);
@@ -63,35 +64,74 @@ function renderPlanPage() {
   const state = getState();
   const plan = state.currentPlan;
   if (plan && !isPlanExpired(plan)) {
-    const mealLabels = plan.enabledMeals.map((meal) => MEAL_LABELS[meal] || meal).join(', ');
+    /* Find today's day or fall back to first day */
+    const today = localDate(0);
+    const activeDay = runtime.activePlanDay || today;
+    const dayData = plan.days.find((d) => d.date === activeDay) || plan.days[0];
+    const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
     return `<section class="v8-page">
-      <div class="v8-page-head"><div><p class="eyebrow">Dein Plan</p><h1>${escapeHtml(dateLabel(plan.startDate))} – ${escapeHtml(dateLabel(plan.endDate))}</h1></div><p>${plan.selectedDates.length} Tage · ${mealLabels}</p><div class="v8-actions" style="margin-top:var(--space-4)"><button class="v8-button primary" data-action="today-inspiration">Inspiration für heute</button><button class="v8-button" data-action="create-plan">Neuer Plan</button></div></div>
-      ${catalogStatusHtml()}
-      ${plan.days.map((day) => `<div class="v8-panel"><section class="plan-day"><h2>${escapeHtml(dateLabel(day.date))}</h2>${Object.entries(day.meals).map(([category, meal]) => `<div class="meal-row"><div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div><div><strong>${escapeHtml(meal.recipe.name)}</strong><div class="recipe-meta"><span>${meal.estimatedKcalPerPerson} kcal</span><span>${meal.estimatedProteinPerPerson} g Protein</span>${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}</div></div></div>`).join('')}</section></div>`).join('')}
+      <div class="v8-page-head">
+        <h1>Dein Plan</h1>
+        <p>${plan.selectedDates.length} Tage · ${plan.enabledMeals.map((m) => MEAL_LABELS[m] || m).join(', ')}</p>
+      </div>
+
+      <div class="chip-row" style="margin-bottom:var(--space-4)">
+        ${plan.days.map((day) => {
+          const d = new Date(`${day.date}T12:00:00`);
+          const wd = WEEKDAY_SHORT[d.getDay()];
+          const dd = String(d.getDate()).padStart(2, '0');
+          const isToday = day.date === today;
+          const isActive = day.date === (dayData ? dayData.date : '');
+          return `<button class="chip ${isActive ? 'active' : ''}" data-plan-day="${day.date}">${wd} ${dd}${isToday ? ' ·' : ''}</button>`;
+        }).join('')}
+      </div>
+
+      ${dayData ? `<div class="v8-panel">
+        <h2>${escapeHtml(dateLabel(dayData.date))}${dayData.date === today ? ' — Heute' : ''}</h2>
+        ${Object.entries(dayData.meals).map(([category, meal]) => `<div class="meal-row">
+          <div class="meal-label">${escapeHtml(MEAL_LABELS[category] || category)}</div>
+          <div>
+            <strong>${escapeHtml(meal.recipe.name)}</strong>
+            <div class="recipe-meta">
+              <span>${meal.estimatedKcalPerPerson} kcal</span>
+              <span>${meal.estimatedProteinPerPerson} g Protein</span>
+              <span>${Math.round(meal.recipe.time || 0)} Min.</span>
+              ${meal.repeatedForMealPrep ? '<span>Meal Prep</span>' : ''}
+            </div>
+          </div>
+        </div>`).join('')}
+      </div>` : '<div class="empty-state">Kein Plan für diesen Tag.</div>'}
+
+      <div class="v8-actions" style="margin-top:var(--space-3)">
+        <button class="v8-button primary" data-action="create-plan">Neuer Plan</button>
+      </div>
     </section>`;
   }
 
-  const returnOptions = getReturnOptions(state);
   return `<section class="v8-page">
-    <div class="v8-page-head"><div><p class="eyebrow">Planen</p><h1>Was kochst du?</h1></div><p>Hol dir Inspiration oder plane gleich mehrere Tage.</p></div>
-    ${catalogStatusHtml()}
-    ${returnOptions.actions.includes('open_history') ? '<div class="v8-status" style="background:var(--paper);color:var(--ink-secondary)">Dein letzter Plan ist abgelaufen — starte einen neuen oder schau in die Historie.</div>' : ''}
-    <div class="v8-start-grid">
-      <button class="v8-start-card primary" data-action="today-inspiration"><strong>Was esse ich heute?</strong><span>Passende Vorschläge für dein Profil.</span></button>
-      <button class="v8-start-card" data-action="create-plan"><strong>Essensplan erstellen</strong><span>Tage und Mahlzeiten frei wählen.</span></button>
+    <div class="v8-page-head">
+      <h1>Was kochst du?</h1>
+      <p>Erstelle einen Essensplan für die nächsten Tage.</p>
     </div>
-    ${runtime.suggestions.length ? `<div class="v8-panel" style="margin-top:var(--space-5)"><h2>Vorschläge für heute</h2><div class="v8-grid">${runtime.suggestions.map((recipe) => recipeCard(recipe, '<button class="v8-button primary" data-action="use-suggestion">Auswählen</button>')).join('')}</div></div>` : ''}
+    ${catalogStatusHtml()}
+    <div class="v8-start-grid">
+      <button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Wir führen dich Schritt für Schritt.</span></button>
+      <button class="v8-start-card" data-action="today-inspiration"><strong>Inspiration für heute</strong><span>Schnelle Vorschläge passend zu dir.</span></button>
+    </div>
+    ${runtime.suggestions.length ? `<div class="v8-panel" style="margin-top:var(--space-4)"><h2>Vorschläge</h2><div class="v8-grid">${runtime.suggestions.map((recipe) => recipeCard(recipe)).join('')}</div></div>` : ''}
   </section>`;
 }
 
 function renderRecipesPage() {
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Rezepte</p><h1>Alle Gerichte</h1></div><p>${runtime.recipes.length} Rezepte zum Durchstöbern.</p></div>${catalogStatusHtml()}<div class="v8-panel"><div class="form-field"><span>Suche</span><input id="recipe-search" type="search" placeholder="Name, Zutat oder Tag …"></div><div id="recipe-results" class="v8-grid" style="margin-top:var(--space-4)">${runtime.recipes.slice(0, 48).map((recipe) => recipeCard(recipe)).join('')}</div></div></section>`;
+  /* Recipes rendering is handled by featureEnhancementsV2.renderRecipes() */
+  return `<section class="v8-page"><div class="v8-page-head"><h1>Rezepte</h1><p>Werden geladen …</p></div></section>`;
 }
 
 function renderShoppingPage() {
   const plan = getState().currentPlan;
-  if (!plan || isPlanExpired(plan)) return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Einkaufsliste</h1></div><p>Sobald du einen Plan hast, wird hier deine Einkaufsliste erstellt.</p></div><div class="v8-start-grid"><button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Erstelle zuerst einen Essensplan.</span></button></div></section>`;
-  return `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Einkaufsliste</h1></div><p>Wähle die Tage, für die du einkaufen willst.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div></section>`;
+  if (!plan || isPlanExpired(plan)) return `<section class="v8-page"><div class="v8-page-head"><h1>Einkaufsliste</h1><p>Erstelle zuerst einen Plan.</p></div><div class="v8-start-grid"><button class="v8-start-card primary" data-action="create-plan"><strong>Plan erstellen</strong><span>Dann wird deine Einkaufsliste automatisch erstellt.</span></button></div></section>`;
+  return `<section class="v8-page"><div class="v8-page-head"><h1>Einkaufsliste</h1><p>Wähle Tage aus, für die du einkaufen willst.</p></div><div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div></section>`;
 }
 
 function profileRow(label, value) {
@@ -109,7 +149,7 @@ function renderProfilePage() {
   const enabledMeals = Object.entries(profile.enabledMeals || {}).filter(([, v]) => v).map(([k]) => MEAL_LABELS[k] || k).join(', ');
 
   return `<section class="v8-page">
-    <div class="v8-page-head"><div><p class="eyebrow">Profil</p><h1>Dein Profil</h1></div></div>
+    <div class="v8-page-head"><h1>Profil</h1></div>
     <div class="v8-panel">
       ${profileRow('Personen', `${profile.persons || 1}`)}
       ${profileRow('Ernährung', DIET_LABELS[profile.dietStyle])}
@@ -120,7 +160,7 @@ function renderProfilePage() {
       ${profileRow('Kalorienziel', profile.calorieTarget ? `${profile.calorieTarget} kcal` : null)}
       ${profileRow('Proteinziel', profile.proteinTarget ? `${profile.proteinTarget} g` : null)}
       ${profileRow('Mahlzeiten', enabledMeals || null)}
-      <div class="v8-actions" style="margin-top:var(--space-5)"><button class="v8-button primary" data-action="open-onboarding">Profil bearbeiten</button></div>
+      <div class="v8-actions" style="margin-top:var(--space-4)"><button class="v8-button primary" data-action="open-onboarding">Bearbeiten</button></div>
     </div>
   </section>`;
 }
@@ -176,9 +216,9 @@ function onboardingBody(draft) {
 
 function createPlanDraft(profile) {
   return {
+    step: 0,   /* 0 = days, 1 = meals, 2 = confirm */
     selectedDates: [localDate(0), localDate(1), localDate(2)],
     enabledMeals: Object.entries(profile.enabledMeals || {}).filter(([, enabled]) => enabled).map(([meal]) => meal),
-    customDate: localDate(3),
     error: null
   };
 }
@@ -187,19 +227,49 @@ function renderPlanDialog(root) {
   const draft = runtime.planDraft;
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
-  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true" aria-labelledby="plan-dialog-title">
-    <p class="eyebrow">Plan konfigurieren</p>
-    <h2 id="plan-dialog-title">Welche Tage und Mahlzeiten?</h2>
-    <p>Wähle die Tage und Mahlzeiten für deinen Plan.</p>
-    <h3>Zeitraum</h3>
-    <div class="v8-actions">${[3,5,7].map((count) => `<button class="v8-button ${draft.selectedDates.length === count ? 'primary' : ''}" data-plan-preset="${count}">${count} Tage</button>`).join('')}</div>
-    <div class="day-chip-row" style="margin-top:12px">${draft.selectedDates.map((date) => `<button class="day-toggle active" data-plan-date="${date}" title="Tag entfernen">${escapeHtml(dateLabel(date))} ×</button>`).join('')}</div>
-    <div class="form-field" style="margin-top:14px"><label for="plan-custom-date">Weiteres Datum</label><div class="v8-actions"><input id="plan-custom-date" type="date" min="${localDate(0)}" value="${escapeHtml(draft.customDate)}" data-plan-custom-date><button class="v8-button" data-plan-add-date>Hinzufügen</button></div></div>
-    <h3>Mahlzeiten</h3>
-    <div class="option-grid">${MEAL_OPTIONS.map(([key, label]) => `<button class="option-card ${draft.enabledMeals.includes(key) ? 'selected' : ''}" data-plan-meal="${key}"><strong>${escapeHtml(label)}</strong></button>`).join('')}</div>
-    <div class="v8-status">${draft.selectedDates.length} Tage · ${draft.enabledMeals.length} Mahlzeiten pro Tag · ${draft.selectedDates.length * draft.enabledMeals.length} Gerichte</div>
+  const stepLabels = ['Zeitraum', 'Mahlzeiten', 'Fertig'];
+  const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+
+  let body = '';
+  if (draft.step === 0) {
+    body = `
+      <h2>Wie viele Tage?</h2>
+      <p style="color:var(--muted);font-size:var(--text-sm);margin-bottom:var(--space-3)">Wähle einen Zeitraum für deinen Plan.</p>
+      <div class="chip-row" style="justify-content:center;margin-bottom:var(--space-4)">
+        ${[3,5,7].map((n) => `<button class="chip ${draft.selectedDates.length === n ? 'active' : ''}" data-plan-preset="${n}" style="padding:var(--space-3) var(--space-5);font-size:var(--text-sm)">${n} Tage</button>`).join('')}
+      </div>
+      <div class="chip-row" style="justify-content:center">
+        ${draft.selectedDates.map((date) => {
+          const d = new Date(`${date}T12:00:00`);
+          return `<span class="chip active" style="pointer-events:none">${WEEKDAY_SHORT[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}</span>`;
+        }).join('')}
+      </div>`;
+  } else if (draft.step === 1) {
+    body = `
+      <h2>Welche Mahlzeiten?</h2>
+      <p style="color:var(--muted);font-size:var(--text-sm);margin-bottom:var(--space-3)">Was soll geplant werden?</p>
+      <div class="option-grid">${MEAL_OPTIONS.map(([key, label]) =>
+        `<button class="option-card ${draft.enabledMeals.includes(key) ? 'selected' : ''}" data-plan-meal="${key}"><strong>${escapeHtml(label)}</strong></button>`
+      ).join('')}</div>`;
+  } else {
+    body = `
+      <h2>Alles klar!</h2>
+      <div class="v8-status" style="text-align:center;font-size:var(--text-base)">
+        <strong>${draft.selectedDates.length}</strong> Tage · <strong>${draft.enabledMeals.length}</strong> Mahlzeiten<br>
+        <span style="font-size:var(--text-sm);color:var(--muted)">${draft.selectedDates.length * draft.enabledMeals.length} Gerichte werden für dich zusammengestellt</span>
+      </div>`;
+  }
+
+  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true">
+    <p class="eyebrow">Schritt ${draft.step + 1} / 3 · ${stepLabels[draft.step]}</p>
+    <div class="v8-progress"><div style="width:${((draft.step + 1) / 3) * 100}%"></div></div>
+    ${body}
     <p class="v8-status error" data-plan-error ${draft.error ? '' : 'hidden'}>${escapeHtml(draft.error || '')}</p>
-    <div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-plan-action="close">Abbrechen</button><button class="v8-button primary" data-plan-action="create">Plan erstellen</button></div>
+    <div class="v8-actions" style="margin-top:var(--space-5)">
+      <button class="v8-button ghost" data-plan-action="close">Abbrechen</button>
+      ${draft.step > 0 ? '<button class="v8-button" data-plan-action="back">Zurück</button>' : ''}
+      <button class="v8-button primary" data-plan-action="${draft.step === 2 ? 'create' : 'next'}">${draft.step === 2 ? 'Plan erstellen' : 'Weiter'}</button>
+    </div>
   </section>`;
   root.appendChild(overlay);
   bindPlanDialogEvents(root);
@@ -219,36 +289,40 @@ function renderDialog(root) {
 }
 
 function bindPlanDialogEvents(root) {
+  const draft = runtime.planDraft;
+
+  /* Step 0: day presets */
   root.querySelectorAll('[data-plan-preset]').forEach((button) => button.addEventListener('click', () => {
     const count = Number(button.dataset.planPreset);
-    runtime.planDraft.selectedDates = Array.from({ length: count }, (_, index) => localDate(index));
-    runtime.planDraft.customDate = localDate(count);
-    runtime.planDraft.error = null;
+    draft.selectedDates = Array.from({ length: count }, (_, i) => localDate(i));
+    draft.error = null;
     renderDialog(root);
   }));
-  root.querySelectorAll('[data-plan-date]').forEach((button) => button.addEventListener('click', () => {
-    runtime.planDraft.selectedDates = runtime.planDraft.selectedDates.filter((date) => date !== button.dataset.planDate);
-    runtime.planDraft.error = null;
-    renderDialog(root);
-  }));
-  root.querySelector('[data-plan-custom-date]')?.addEventListener('change', (event) => { runtime.planDraft.customDate = event.target.value; });
-  root.querySelector('[data-plan-add-date]')?.addEventListener('click', () => {
-    const date = root.querySelector('[data-plan-custom-date]')?.value;
-    if (date && !runtime.planDraft.selectedDates.includes(date)) runtime.planDraft.selectedDates = [...runtime.planDraft.selectedDates, date].sort();
-    runtime.planDraft.customDate = date || runtime.planDraft.customDate;
-    runtime.planDraft.error = null;
-    renderDialog(root);
-  });
+
+  /* Step 1: meal toggles */
   root.querySelectorAll('[data-plan-meal]').forEach((button) => button.addEventListener('click', () => {
     const meal = button.dataset.planMeal;
-    runtime.planDraft.enabledMeals = runtime.planDraft.enabledMeals.includes(meal)
-      ? runtime.planDraft.enabledMeals.filter((item) => item !== meal)
-      : [...runtime.planDraft.enabledMeals, meal];
-    runtime.planDraft.error = null;
+    draft.enabledMeals = draft.enabledMeals.includes(meal)
+      ? draft.enabledMeals.filter((m) => m !== meal)
+      : [...draft.enabledMeals, meal];
+    draft.error = null;
     renderDialog(root);
   }));
+
+  /* Navigation */
   root.querySelectorAll('[data-plan-action]').forEach((button) => button.addEventListener('click', () => {
-    if (button.dataset.planAction === 'close') { runtime.activeDialog = null; runtime.planDraft = null; renderApp(root); return; }
+    const action = button.dataset.planAction;
+    if (action === 'close') { runtime.activeDialog = null; runtime.planDraft = null; renderApp(root); return; }
+    if (action === 'back') { draft.step = Math.max(0, draft.step - 1); draft.error = null; renderDialog(root); return; }
+    if (action === 'next') {
+      if (draft.step === 0 && !draft.selectedDates.length) { draft.error = 'Wähle mindestens einen Zeitraum.'; renderDialog(root); return; }
+      if (draft.step === 1 && !draft.enabledMeals.length) { draft.error = 'Wähle mindestens eine Mahlzeit.'; renderDialog(root); return; }
+      draft.step += 1;
+      draft.error = null;
+      renderDialog(root);
+      return;
+    }
+    /* action === 'create' */
     createConfiguredPlan(root);
   }));
 }
@@ -351,12 +425,12 @@ function bindPageEvents(root) {
     if (!runtime.recipes.length) return;
     openPlanDialog(root);
   }));
-  root.querySelector('#recipe-search')?.addEventListener('input', (event) => {
-    const query = event.target.value.trim().toLowerCase();
-    const results = runtime.recipes.filter((recipe) => [recipe.name, ...(recipe.ingredientNames || []), ...(recipe.tags || [])].join(' ').toLowerCase().includes(query)).slice(0, 60);
-    const container = root.querySelector('#recipe-results');
-    if (container) container.innerHTML = results.map((recipe) => recipeCard(recipe)).join('');
-  });
+
+  /* Plan day chips */
+  root.querySelectorAll('[data-plan-day]').forEach((chip) => chip.addEventListener('click', () => {
+    runtime.activePlanDay = chip.dataset.planDay;
+    renderApp(root);
+  }));
 }
 
 export async function startIntegratedApp(root) {

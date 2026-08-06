@@ -13,14 +13,18 @@ const ui = {
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({ '&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;' }[char]));
 const CATEGORY_DE = { breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen', snack: 'Snack', shake: 'Shake' };
 
-function select(name, label, options, selected = '') {
-  return `<label class="form-field"><span>${label}</span><select data-v8-filter="${name}"><option value="">Alle</option>${options.map(([value,text]) => `<option value="${value}" ${String(selected)===value?'selected':''}>${text}</option>`).join('')}</select></label>`;
+/* ── Chip helper ──────────────────────────────────── */
+function chipRow(name, options, selected, toggle = false) {
+  return `<div class="chip-row">${options.map(([value, label]) => {
+    const active = toggle ? selected === value : selected === value;
+    return `<button class="chip ${active ? 'active' : ''}" data-chip="${name}" data-value="${esc(value)}">${esc(label)}</button>`;
+  }).join('')}</div>`;
 }
 
 function recipeCard(recipe, preferences) {
   const favorite = (preferences.favoriteRecipeIds || []).includes(recipe.id);
   const excluded = (preferences.excludedRecipeIds || []).includes(recipe.id);
-  return `<article class="recipe-card"><div><p class="eyebrow">${esc(CATEGORY_DE[recipe.category] || recipe.category)}</p><h3>${esc(recipe.name)}</h3></div><div class="recipe-meta"><span>${Math.round(recipe.kcal)} kcal</span><span>${Math.round(recipe.protein)} g Protein</span><span>${Math.round(recipe.time)} Min.</span><span>${esc(recipe.simplicity)}</span></div><div class="v8-actions"><button class="v8-button ${favorite?'primary':''}" data-v8-favorite="${esc(recipe.id)}">${favorite?'Gespeichert':'Speichern'}</button><button class="v8-button ghost" data-v8-exclude="${esc(recipe.id)}">${excluded?'Wieder zulassen':'Nicht vorschlagen'}</button><button class="v8-button ghost" data-v8-detail="${esc(recipe.id)}">Details</button></div></article>`;
+  return `<article class="recipe-card"><div><p class="eyebrow">${esc(CATEGORY_DE[recipe.category] || recipe.category)}</p><h3>${esc(recipe.name)}</h3></div><div class="recipe-meta"><span>${Math.round(recipe.kcal)} kcal</span><span>${Math.round(recipe.protein)} g Protein</span><span>${Math.round(recipe.time)} Min.</span></div><div class="v8-actions"><button class="v8-button ${favorite?'primary':'ghost'}" data-v8-favorite="${esc(recipe.id)}">${favorite?'★ Gespeichert':'Speichern'}</button><button class="v8-button ghost" data-v8-detail="${esc(recipe.id)}">Details</button></div></article>`;
 }
 
 function renderRecipes(root) {
@@ -28,22 +32,89 @@ function renderRecipes(root) {
   if (!main || !ui.recipes.length) return;
   const state = getState();
   const results = sortRecipes(filterRecipes(ui.recipes, ui.filters, state.preferences), ui.sort, state.preferences);
-  main.innerHTML = `<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Rezepte</p><h1>Alle Gerichte</h1></div><p>${results.length} Rezepte gefunden</p></div><div class="v8-panel"><div class="form-grid"><label class="form-field"><span>Suche</span><input type="search" data-v8-filter="query" value="${esc(ui.filters.query)}" placeholder="Name, Zutat oder Tag …"></label>${select('category','Mahlzeit',[['breakfast','Frühstück'],['lunch','Mittagessen'],['dinner','Abendessen'],['snack','Snack']],ui.filters.category)}${select('maxTime','Zeit',[['15','15 Min.'],['30','30 Min.'],['45','45 Min.'],['60','60 Min.']],ui.filters.maxTime || '')}${select('simplicity','Stil',[['simple','Simpel'],['balanced','Ausgewogen'],['experimental','Experimentell']],ui.filters.simplicity)}${select('diet','Ernährung',[['vegetarian','Vegetarisch'],['vegan','Vegan'],['pescatarian','Pescetarisch']],ui.filters.diet)}${select('minProtein','Protein',[['20','ab 20 g'],['30','ab 30 g'],['40','ab 40 g']],ui.filters.minProtein || '')}<label class="form-field"><span>Sortierung</span><select data-v8-sort><option value="recommended">Empfohlen</option><option value="quick" ${ui.sort==='quick'?'selected':''}>Schnell</option><option value="protein" ${ui.sort==='protein'?'selected':''}>Protein</option><option value="meal_prep" ${ui.sort==='meal_prep'?'selected':''}>Meal Prep</option></select></label></div><div class="v8-actions" style="margin-top:var(--space-3)"><button class="v8-button ${ui.filters.favoritesOnly?'primary':''}" data-v8-favorites-only>Nur Favoriten</button><button class="v8-button ghost" data-v8-reset>Zurücksetzen</button></div></div><div class="v8-grid">${results.slice(0,120).map((recipe) => recipeCard(recipe,state.preferences)).join('') || '<div class="empty-state">Keine passenden Rezepte gefunden.</div>'}</div></section>`;
+
+  const hasFilters = ui.filters.category || ui.filters.maxTime || ui.filters.diet || ui.filters.simplicity || ui.filters.favoritesOnly;
+
+  main.innerHTML = `<section class="v8-page">
+    <div class="v8-page-head">
+      <h1>Rezepte</h1>
+      <p>${results.length} Gerichte${hasFilters ? ' gefiltert' : ''}</p>
+    </div>
+
+    <div style="margin-bottom:var(--space-3)">
+      <input type="search" data-v8-filter="query" value="${esc(ui.filters.query)}" placeholder="🔍 Suchen …" style="width:100%;padding:var(--space-3);border:1.5px solid var(--border);border-radius:var(--radius-full);background:var(--surface);color:var(--ink);font-size:var(--text-sm)">
+    </div>
+
+    ${chipRow('category', [['','Alle'],['breakfast','Frühstück'],['lunch','Mittag'],['dinner','Abend'],['snack','Snack']], ui.filters.category)}
+
+    <div style="margin-top:var(--space-2)">
+      ${chipRow('maxTime', [['','Egal'],['15','≤ 15 Min'],['30','≤ 30 Min'],['45','≤ 45 Min']], String(ui.filters.maxTime || ''))}
+    </div>
+
+    <div style="margin-top:var(--space-2)">
+      ${chipRow('extra', [
+        ['fav', ui.filters.favoritesOnly ? '★ Favoriten' : 'Favoriten'],
+        ['vegetarian','Vegetarisch'],
+        ['vegan','Vegan'],
+        ['simple','Simpel'],
+        ['quick','Schnellste zuerst'],
+        ['protein','Meistes Protein']
+      ], ui.filters.favoritesOnly ? 'fav' : ui.filters.diet === 'vegetarian' ? 'vegetarian' : ui.filters.diet === 'vegan' ? 'vegan' : ui.filters.simplicity === 'simple' ? 'simple' : ui.sort === 'quick' ? 'quick' : ui.sort === 'protein' ? 'protein' : '')}
+    </div>
+
+    <div class="v8-grid" style="margin-top:var(--space-4)">
+      ${results.slice(0,80).map((recipe) => recipeCard(recipe, state.preferences)).join('') || '<div class="empty-state">Keine passenden Rezepte.</div>'}
+    </div>
+  </section>`;
+
   bindRecipeEvents(root);
 }
 
 function bindRecipeEvents(root) {
-  root.querySelectorAll('[data-v8-filter]').forEach((node) => node.addEventListener(node.tagName === 'INPUT' ? 'input' : 'change', () => {
-    const key = node.dataset.v8Filter;
-    ui.filters = { ...ui.filters, [key]: ['maxTime','minProtein'].includes(key) ? (node.value ? Number(node.value) : null) : node.value };
+  /* Search input */
+  root.querySelector('[data-v8-filter="query"]')?.addEventListener('input', (e) => {
+    ui.filters = { ...ui.filters, query: e.target.value };
+    renderRecipes(root);
+  });
+
+  /* Category chips */
+  root.querySelectorAll('[data-chip="category"]').forEach((chip) => chip.addEventListener('click', () => {
+    ui.filters = { ...ui.filters, category: chip.dataset.value || '' };
     renderRecipes(root);
   }));
-  root.querySelector('[data-v8-sort]')?.addEventListener('change', (event) => { ui.sort = event.target.value; renderRecipes(root); });
-  root.querySelector('[data-v8-favorites-only]')?.addEventListener('click', () => { ui.filters.favoritesOnly = !ui.filters.favoritesOnly; renderRecipes(root); });
-  root.querySelector('[data-v8-reset]')?.addEventListener('click', () => { ui.filters = createDefaultFilters(); renderRecipes(root); });
-  root.querySelectorAll('[data-v8-favorite]').forEach((button) => button.addEventListener('click', () => updateState((state) => ({ ...state, preferences: toggleFavorite(state.preferences,button.dataset.v8Favorite) }))));
-  root.querySelectorAll('[data-v8-exclude]').forEach((button) => button.addEventListener('click', () => updateState((state) => { const id=button.dataset.v8Exclude; return { ...state, preferences:(state.preferences.excludedRecipeIds||[]).includes(id)?restoreRecipe(state.preferences,id):excludeRecipe(state.preferences,id,[]) }; })));
-  root.querySelectorAll('[data-v8-detail]').forEach((button) => button.addEventListener('click', () => showDetail(root,button.dataset.v8Detail)));
+
+  /* Time chips */
+  root.querySelectorAll('[data-chip="maxTime"]').forEach((chip) => chip.addEventListener('click', () => {
+    ui.filters = { ...ui.filters, maxTime: chip.dataset.value ? Number(chip.dataset.value) : null };
+    renderRecipes(root);
+  }));
+
+  /* Extra chips (toggle-style: tap to activate, tap again to deactivate) */
+  root.querySelectorAll('[data-chip="extra"]').forEach((chip) => chip.addEventListener('click', () => {
+    const val = chip.dataset.value;
+    const isActive = chip.classList.contains('active');
+
+    /* Reset all extra-controlled filters */
+    let next = { ...ui.filters, favoritesOnly: false, diet: '', simplicity: '' };
+    let nextSort = 'recommended';
+
+    if (!isActive) {
+      if (val === 'fav') next.favoritesOnly = true;
+      else if (val === 'vegetarian') next.diet = 'vegetarian';
+      else if (val === 'vegan') next.diet = 'vegan';
+      else if (val === 'simple') next.simplicity = 'simple';
+      else if (val === 'quick') nextSort = 'quick';
+      else if (val === 'protein') nextSort = 'protein';
+    }
+
+    ui.filters = next;
+    ui.sort = nextSort;
+    renderRecipes(root);
+  }));
+
+  /* Favorite + detail buttons */
+  root.querySelectorAll('[data-v8-favorite]').forEach((button) => button.addEventListener('click', () => { updateState((state) => ({ ...state, preferences: toggleFavorite(state.preferences, button.dataset.v8Favorite) })); renderRecipes(root); }));
+  root.querySelectorAll('[data-v8-detail]').forEach((button) => button.addEventListener('click', () => showDetail(root, button.dataset.v8Detail)));
 }
 
 async function showDetail(root,id) {
@@ -67,14 +138,14 @@ async function detailedPlan(plan) {
 async function renderShopping(root) {
   const main=root.querySelector('.v8-main'); const state=getState();
   if(!main||!state.currentPlan) return;
-  main.innerHTML='<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Einkaufsliste</h1></div></div><div class="v8-status">Zutaten werden zusammengestellt …</div></section>';
+  main.innerHTML='<section class="v8-page"><div class="v8-page-head"><h1>Einkaufsliste</h1></div><div class="v8-status">Zutaten werden zusammengestellt …</div></section>';
   try {
     const plan=await detailedPlan(state.currentPlan);
     if(!ui.selectedDates.length) ui.selectedDates=plan.selectedDates||plan.days.map((day)=>day.date);
     const list=buildShoppingList(plan,ui.selectedDates,ui.checks);
     const fmtAmt = (item) => { const amt = item.packs ? item.buyAmount : item.amount; const unit = item.buyUnit || item.unit; const packInfo = item.packs ? ` (${item.packs}× ${item.buyAmount} ${esc(item.buyUnit || item.unit)})` : ''; return `${amt} ${esc(unit)}${packInfo}`; };
     const content=ui.shoppingView==='category' ? list.groups.map((group)=>`<section class="v8-panel"><h2>${esc(group.category)}</h2>${group.items.map((item)=>`<label class="meal-row"><input type="checkbox" data-v8-check="${esc(item.id)}" ${item.checked?'checked':''}><div><strong>${esc(item.name)}</strong> · ${fmtAmt(item)}<details><summary>Wofür?</summary>${item.sources.map((source)=>`<div>${esc(source.dayLabel)} · ${esc(source.recipeName)}: ${source.amount} ${esc(source.unit)}</div>`).join('')}</details></div></label>`).join('')}</section>`).join('') : list.byRecipe.map((group)=>`<section class="v8-panel"><h2>${esc(group.dayLabel)} · ${esc(group.recipeName)}</h2>${group.ingredients.map((item)=>`<div>${esc(item.name)}: ${item.amount} ${esc(item.unit)}</div>`).join('')}</section>`).join('');
-    main.innerHTML=`<section class="v8-page"><div class="v8-page-head"><div><p class="eyebrow">Einkauf</p><h1>Einkaufsliste</h1></div><p>${list.items.length} Zutaten · ca. ${list.estimatedTotal.toFixed(2)} €</p></div><div class="v8-panel"><div class="day-chip-row">${list.availableDates.map(({date,label})=>`<button class="day-toggle ${list.selectedDates.includes(date)?'active':''}" data-v8-date="${date}">${esc(label)}</button>`).join('')}</div><div class="v8-actions" style="margin-top:12px"><button class="v8-button ${ui.shoppingView==='category'?'primary':''}" data-v8-view="category">Kategorie</button><button class="v8-button ${ui.shoppingView==='recipe'?'primary':''}" data-v8-view="recipe">Gericht</button><button class="v8-button ghost" data-v8-copy>Kopieren</button></div></div>${content}</section>`;
+    main.innerHTML=`<section class="v8-page"><div class="v8-page-head"><h1>Einkaufsliste</h1><p>${list.items.length} Zutaten · ca. ${list.estimatedTotal.toFixed(2)} €</p></div><div class="v8-panel"><div class="chip-row">${list.availableDates.map(({date,label})=>`<button class="chip ${list.selectedDates.includes(date)?'active':''}" data-v8-date="${date}">${esc(label)}</button>`).join('')}</div><div class="v8-actions" style="margin-top:12px"><button class="v8-button ${ui.shoppingView==='category'?'primary':''}" data-v8-view="category">Kategorie</button><button class="v8-button ${ui.shoppingView==='recipe'?'primary':''}" data-v8-view="recipe">Gericht</button><button class="v8-button ghost" data-v8-copy>Kopieren</button></div></div>${content}</section>`;
     main.querySelectorAll('[data-v8-date]').forEach((button)=>button.addEventListener('click',()=>{ui.selectedDates=toggleShoppingDate(ui.selectedDates,button.dataset.v8Date,plan);renderShopping(root);}));
     main.querySelectorAll('[data-v8-view]').forEach((button)=>button.addEventListener('click',()=>{ui.shoppingView=button.dataset.v8View;renderShopping(root);}));
     main.querySelectorAll('[data-v8-check]').forEach((input)=>input.addEventListener('change',()=>{ui.checks[input.dataset.v8Check]=input.checked;}));
