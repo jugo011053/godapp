@@ -69,6 +69,68 @@ function catalogStatusHtml() {
   return '';
 }
 
+function showToast(root, message) {
+  const existing = root.querySelector('.preply-toast');
+  if (existing) existing.remove();
+  const toast = document.createElement('div');
+  toast.className = 'preply-toast';
+  toast.textContent = message;
+  root.appendChild(toast);
+  requestAnimationFrame(() => toast.classList.add('visible'));
+  setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 2800);
+}
+
+function catalogNotReadyFeedback(root) {
+  if (runtime.catalogStatus === 'loading') {
+    showToast(root, 'Rezepte werden noch geladen …');
+    return true;
+  }
+  if (runtime.catalogStatus === 'error') {
+    showToast(root, runtime.catalogError || 'Rezepte konnten nicht geladen werden.');
+    return true;
+  }
+  if (!runtime.recipes.length) {
+    showToast(root, 'Keine Rezepte verfügbar.');
+    return true;
+  }
+  return false;
+}
+
+async function showRecipeDetail(root, recipeId) {
+  try {
+    let recipe = runtime.detailCache.get(recipeId);
+    if (!recipe) {
+      recipe = await getRecipe(recipeId);
+      runtime.detailCache.set(recipeId, recipe);
+    }
+    const overlay = document.createElement('div');
+    overlay.className = 'v8-overlay';
+    const stepsHtml = (recipe.steps || []).length
+      ? `<div class="meal-steps-list">${recipe.steps.map((step, i) => `<div class="meal-step"><span class="step-num">${i + 1}</span><span>${escapeHtml(step)}</span></div>`).join('')}</div>`
+      : '<p style="color:var(--muted);font-size:var(--text-sm)">Keine Zubereitungsschritte hinterlegt.</p>';
+    overlay.innerHTML = `<section class="v8-dialog">
+      <button class="v8-button ghost" data-detail-close style="margin-bottom:var(--space-2)">← Zurück</button>
+      <h2>${escapeHtml(recipe.name)}</h2>
+      <div style="display:flex;gap:6px;flex-wrap:wrap;margin-bottom:var(--space-3)">
+        <span class="preply-filter" style="pointer-events:none">${Math.round(recipe.kcal)} kcal</span>
+        <span class="preply-filter" style="pointer-events:none">${Math.round(recipe.protein)} g Protein</span>
+        <span class="preply-filter" style="pointer-events:none">${Math.round(recipe.time)} Min.</span>
+      </div>
+      <h3>Zutaten</h3>
+      <div class="meal-ing-list">${(recipe.ingredients || []).map((item) =>
+        `<div class="meal-ing-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(item.amount ?? item.quantity ?? '')} ${escapeHtml(item.unit || '')}</b></div>`
+      ).join('')}</div>
+      <h3>Zubereitung</h3>
+      ${stepsHtml}
+    </section>`;
+    root.appendChild(overlay);
+    overlay.querySelector('[data-detail-close]').addEventListener('click', () => overlay.remove());
+    overlay.addEventListener('click', (e) => { if (e.target === overlay) overlay.remove(); });
+  } catch (err) {
+    console.warn('[Preply] Rezeptdetail nicht geladen', err);
+  }
+}
+
 function normalizeDays(plan) {
   if (Array.isArray(plan.days)) return plan.days;
   if (plan.days && typeof plan.days === 'object') {
@@ -214,7 +276,7 @@ function renderPlanPage() {
       <div class="preply-section"><h2>Deine Mahlzeiten</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
 
       <!-- Day card with meals -->
-      <div class="preply-plan-card">
+      <div class="preply-plan-card" data-active-day-index="${dayIndex}" data-active-day-date="${dayData.date}">
         <header>
           <div>
             <p>${escapeHtml(dayName)} · ${escapeHtml(dayDateLabel)}</p>
@@ -664,7 +726,7 @@ function bindPageEvents(root) {
 
   /* "Was esse ich heute?" — quick suggestion */
   root.querySelectorAll('[data-action="today-inspiration"]').forEach((el) => el.addEventListener('click', () => {
-    if (!runtime.recipes.length) return;
+    if (catalogNotReadyFeedback(root)) return;
     const state = getState();
     const profile = state.profile || {};
     const enabledMeals = profile.enabledMeals || {};
@@ -678,7 +740,7 @@ function bindPageEvents(root) {
   /* Create multi-day plan */
   root.querySelectorAll('[data-action="create-plan"]').forEach((button) => button.addEventListener('click', () => {
     if (!getState().onboardingCompleted) { openOnboarding(root); return; }
-    if (!runtime.recipes.length) return;
+    if (catalogNotReadyFeedback(root)) return;
     openPlanDialog(root);
   }));
 
@@ -686,7 +748,7 @@ function bindPageEvents(root) {
   root.querySelectorAll('[data-action="single-day-plan"]').forEach((button) => button.addEventListener('click', () => {
     const state = getState();
     if (!state.onboardingCompleted) { openOnboarding(root); return; }
-    if (!runtime.recipes.length) return;
+    if (catalogNotReadyFeedback(root)) return;
     const profile = state.profile || {};
     const enabledMeals = Object.entries(profile.enabledMeals || {}).filter(([, v]) => v).map(([k]) => k);
     if (!enabledMeals.length) { openOnboarding(root); return; }
@@ -749,10 +811,16 @@ function bindPageEvents(root) {
     renderApp(root);
   }));
 
+  /* Suggestion / discover cards — open detail overlay */
+  root.querySelectorAll('.preply-discover-card[data-recipe-id]').forEach((card) => card.addEventListener('click', () => {
+    const id = card.dataset.recipeId;
+    if (id) showRecipeDetail(root, id);
+  }));
+
   /* Swap meal button */
   root.querySelectorAll('[data-swap-meal]').forEach((button) => button.addEventListener('click', (event) => {
     event.stopPropagation();
-    if (!runtime.recipes.length) return;
+    if (catalogNotReadyFeedback(root)) return;
     const dayIndex = Number(button.dataset.swapDay);
     const category = button.dataset.swapCat;
     runtime.replaceTarget = { dayIndex, category };
