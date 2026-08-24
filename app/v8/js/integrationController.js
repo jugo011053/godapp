@@ -14,7 +14,8 @@ import {
 import { MEAL_OPTIONS, STEP_DEFINITIONS } from './features/onboarding/onboardingSteps.js';
 import { buildProfileSummary } from './features/profile/profileSummary.js';
 import { buildPlan, suggestForToday, replacementSuggestions } from './features/planner/plannerEngine.js';
-import { getReturnOptions, isPlanExpired } from './features/history/history.js';
+import { getReturnOptions, isPlanExpired, replaceCurrentPlan } from './features/history/history.js';
+import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
 const runtime = {
   recipes: [],
   catalogStatus: 'loading',
@@ -207,8 +208,8 @@ function renderPlanPage() {
     const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
     const profile = state.profile || {};
-    const kcalTarget = profile.calorieTarget || 2000;
-    const proteinTarget = profile.proteinTarget || 120;
+    const kcalTarget = Math.round(resolveCalorieTarget(profile));
+    const proteinTarget = Math.round(resolveProteinTarget(profile));
     const summary = dayData ? computeDaySummary(dayData) : { totalKcal: 0, totalProtein: 0, mealCount: 0 };
 
     const isWeekView = days.length > 1;
@@ -376,8 +377,8 @@ function renderProfilePage() {
     <div class="preply-kicker">Profil</div>
     <h1 class="preply-title">Deine<br>Einstellungen.</h1>
     <div class="preply-profile-grid">
-      <div class="preply-profile-stat"><span>Tagesziel</span><b>${profile.calorieTarget || 2000} <small>kcal</small></b></div>
-      <div class="preply-profile-stat"><span>Protein</span><b>${profile.proteinTarget || 120} <small>g</small></b></div>
+      <div class="preply-profile-stat"><span>Tagesziel</span><b>${Math.round(resolveCalorieTarget(profile))} <small>kcal</small></b></div>
+      <div class="preply-profile-stat"><span>Protein</span><b>${Math.round(resolveProteinTarget(profile))} <small>g</small></b></div>
     </div>
     <div class="preply-settings-card">
       <h2>Ernährungsprofil</h2>
@@ -438,7 +439,7 @@ function onboardingBody(draft) {
   const ALLERGEN_LABELS = { gluten: 'Gluten', dairy: 'Milch', eggs: 'Eier', nuts: 'Nüsse', soy: 'Soja', fish: 'Fisch' };
   if (step === 'restrictions') return `<h2>Was soll ausgeschlossen werden?</h2><div class="option-grid">${Object.entries(ALLERGEN_LABELS).map(([key, label]) => `<button class="option-card ${(profile.allergies || []).includes(key) ? 'selected' : ''}" data-onboard-field="allergies" data-onboard-value="${key}" data-multiple="true"><strong>${label}</strong></button>`).join('')}</div><div class="form-field" style="margin-top:var(--space-4)"><span>Weitere Ausschlüsse</span><input data-onboard-input="excludedIngredients" value="${escapeHtml((profile.excludedIngredients || []).join(', '))}" placeholder="z. B. Koriander, Sellerie"></div>`;
   if (step === 'meals') return `<h2>Welche Mahlzeiten möchtest du planen?</h2><div class="option-grid">${MEAL_OPTIONS.map(([key,label]) => `<button class="option-card ${profile.enabledMeals[key] ? 'selected' : ''}" data-meal-key="${key}"><strong>${label}</strong></button>`).join('')}</div>`;
-  if (step === 'details') return `<h2>Optionale Details</h2><div class="form-grid"><div class="form-field"><label>Personen</label><input type="number" min="1" data-onboard-number="persons" value="${profile.persons}"></div><div class="form-field"><label>Maximale Kochzeit</label><input type="number" min="5" data-onboard-number="maxCookingTime" value="${profile.maxCookingTime || 30}"></div><div class="form-field"><label>Kalorienziel</label><input type="number" min="0" data-onboard-number="calorieTarget" value="${profile.calorieTarget || ''}"></div><div class="form-field"><label>Proteinziel</label><input type="number" min="0" data-onboard-number="proteinTarget" value="${profile.proteinTarget || ''}"></div></div>`;
+  if (step === 'details') return `<h2>Optionale Details</h2><div class="form-grid"><div class="form-field"><label>Personen</label><input type="number" min="1" data-onboard-number="persons" value="${profile.persons}"></div><div class="form-field"><label>Maximale Kochzeit</label><input type="number" min="5" data-onboard-number="maxCookingTime" value="${profile.maxCookingTime || 30}"></div><div class="form-field"><label>Kalorienziel</label><input type="number" min="0" data-onboard-number="calorieTarget" value="${profile.calorieTarget || ''}" placeholder="${Math.round(resolveCalorieTarget(profile))}"></div><div class="form-field"><label>Proteinziel</label><input type="number" min="0" data-onboard-number="proteinTarget" value="${profile.proteinTarget || ''}" placeholder="${Math.round(resolveProteinTarget(profile))}"></div></div><p style="color:var(--muted);font-size:var(--text-sm);margin-top:var(--space-3)">Leer lassen — dann rechnet Preply mit den grau angezeigten Werten aus deinem Ziel.</p>`;
   return `<h2>So wird geplant</h2><div class="v8-status">${escapeHtml(buildProfileSummary(profile))}</div>`;
 }
 
@@ -706,13 +707,7 @@ function createConfiguredPlan(root) {
       profile: state.profile
     }, state.preferences, { seed: Date.now() % 100000 });
 
-    updateState((current) => ({
-      ...current,
-      currentPlan: plan,
-      planHistory: current.currentPlan
-        ? [current.currentPlan, ...(current.planHistory || [])].slice(0, 12)
-        : current.planHistory || []
-    }));
+    updateState((current) => replaceCurrentPlan(current, plan));
     runtime.activeDialog = null;
     runtime.planDraft = null;
     renderApp(root);
@@ -761,13 +756,7 @@ function bindPageEvents(root) {
         mode: 'single_day',
         profile
       }, state.preferences, { seed: Date.now() % 100000 });
-      updateState((current) => ({
-        ...current,
-        currentPlan: plan,
-        planHistory: current.currentPlan
-          ? [current.currentPlan, ...(current.planHistory || [])].slice(0, 12)
-          : current.planHistory || []
-      }));
+      updateState((current) => replaceCurrentPlan(current, plan));
       renderApp(root);
     } catch (error) {
       console.error('[Preply] Tagesplan-Fehler', error);

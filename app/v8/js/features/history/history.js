@@ -66,9 +66,25 @@ export function replaceCurrentPlan(state, nextPlan, options = {}) {
   return { ...nextState, currentPlan: nextPlan || null };
 }
 
+/* Historieneinträge existieren in zwei Formen: archivePlan() schreibt meals{date},
+   während direkt abgelegte Pläne noch days[] tragen. Beides muss lesbar sein. */
+function mealsForDate(entry, date) {
+  if (entry.meals?.[date]) return entry.meals[date];
+  if (Array.isArray(entry.days)) return entry.days.find((day) => day.date === date)?.meals || {};
+  if (entry.days && typeof entry.days === 'object') return entry.days[date] || {};
+  return {};
+}
+
+function historyDates(entry) {
+  if (Array.isArray(entry.selectedDates) && entry.selectedDates.length) return sortDates(entry.selectedDates);
+  if (Array.isArray(entry.days)) return sortDates(entry.days.map((day) => day.date));
+  if (entry.days && typeof entry.days === 'object') return sortDates(Object.keys(entry.days));
+  return sortDates(Object.keys(entry.meals || {}));
+}
+
 export function reuseHistoryEntry(entry, startDate) {
   if (!entry) throw new TypeError('Historieneintrag fehlt.');
-  const oldDates = sortDates(entry.selectedDates || Object.keys(entry.meals || {}));
+  const oldDates = historyDates(entry);
   if (!oldDates.length) throw new TypeError('Historieneintrag enthält keine Tage.');
 
   const targetStart = new Date(`${startDate}T12:00:00`);
@@ -82,7 +98,7 @@ export function reuseHistoryEntry(entry, startDate) {
     date.setDate(date.getDate() + offsetDays);
     const newDate = date.toISOString().slice(0, 10);
     selectedDates.push(newDate);
-    days.push({ date: newDate, meals: clone(entry.meals?.[oldDate] || {}) });
+    days.push({ date: newDate, meals: clone(mealsForDate(entry, oldDate)) });
   }
 
   const enabledMeals = [...new Set(days.flatMap((day) =>

@@ -7,14 +7,18 @@ import { buildShoppingList, copyShoppingText, toggleShoppingDate } from './featu
 
 const ui = {
   recipes: [],
+  catalogError: null,
   filters: createDefaultFilters(),
   sort: 'recommended',
   selectedDates: [],
   checks: {},
+  shoppingPlanId: null,
   shoppingView: 'category',
   collapsedGroups: new Set(),
   details: new Map()
 };
+
+let searchTimer;
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -112,7 +116,19 @@ function renderRecipes(root) {
   const main = root.querySelector('.v8-main');
   if (!main) return;
   if (!ui.recipes.length) {
-    main.innerHTML = '<section class="v8-page preply-page"><h1 class="master-screen-title">Rezepte</h1><p class="master-empty">Rezepte werden geladen …</p></section>';
+    main.innerHTML = `<section class="v8-page preply-page">
+      <h1 class="master-screen-title">Rezepte</h1>
+      ${ui.catalogError
+        ? `<p class="master-empty">${esc(ui.catalogError)}</p>
+           <button class="sheet-action primary" type="button" data-retry-catalog>Erneut versuchen</button>`
+        : '<p class="master-empty">Rezepte werden geladen …</p>'}
+    </section>`;
+    main.querySelector('[data-retry-catalog]')?.addEventListener('click', async (event) => {
+      event.currentTarget.disabled = true;
+      event.currentTarget.textContent = 'Wird geladen …';
+      await initializeFeatureEnhancements();
+      renderRecipes(root);
+    });
     return;
   }
 
@@ -168,11 +184,18 @@ function renderRecipes(root) {
 
 function bindRecipeEvents(root) {
   root.querySelector('[data-v8-filter="query"]')?.addEventListener('input', (event) => {
-    ui.filters = { ...ui.filters, query: event.currentTarget.value };
-    renderRecipes(root);
-    const input = root.querySelector('[data-v8-filter="query"]');
-    input?.focus();
-    input?.setSelectionRange(input.value.length, input.value.length);
+    const value = event.currentTarget.value;
+    const caret = event.currentTarget.selectionStart;
+    ui.filters = { ...ui.filters, query: value };
+    /* Ohne Entprellung wird bei jedem Tastendruck die ganze Liste neu gebaut. */
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      renderRecipes(root);
+      const input = root.querySelector('[data-v8-filter="query"]');
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    }, 180);
   });
 
   root.querySelectorAll('[data-chip="category"]').forEach((button) => button.addEventListener('click', () => {
@@ -360,12 +383,20 @@ function amountText(item) {
   return `${Math.round(Number(amount || 0) * 100) / 100} ${esc(item.buyUnit || item.unit || '')}`;
 }
 
+function packText(item) {
+  const parts = [];
+  if (item.packs) parts.push(`${item.packs} Pack.`);
+  if (item.estimatedPrice) parts.push(`ca. ${item.estimatedPrice.toFixed(2).replace('.', ',')} €`);
+  return parts.join(' · ');
+}
+
 function shoppingItem(item) {
   const checked = Boolean(ui.checks[item.id] ?? item.checked);
+  const pack = packText(item);
   return `<div class="master-shopping-row">
     <button class="master-shopping-check ${checked ? 'checked' : ''}" type="button" data-v8-check="${esc(item.id)}" aria-label="${checked ? 'Als offen markieren' : 'Als erledigt markieren'}">${checked ? '✓' : ''}</button>
     <span class="master-shopping-name ${checked ? 'done' : ''}">${esc(item.name)}</span>
-    <span class="master-shopping-amount">${amountText(item)}</span>
+    <span class="master-shopping-amount">${amountText(item)}${pack ? `<small>${esc(pack)}</small>` : ''}</span>
   </div>`;
 }
 
@@ -393,14 +424,32 @@ async function renderShopping(root) {
     return;
   }
 
-  main.innerHTML = '<section class="v8-page preply-page"><h1 class="master-screen-title">Einkauf</h1><p class="master-empty">Einkaufsliste wird zusammengestellt …</p></section>';
+  /* Der Platzhalter erscheint nur, wenn noch keine Liste steht — sonst würde
+     jeder Tages-Toggle die fertige Liste kurz gegen "wird zusammengestellt" tauschen. */
+  if (!main.querySelector('.master-shopping-groups')) {
+    main.innerHTML = '<section class="v8-page preply-page"><h1 class="master-screen-title">Einkauf</h1><p class="master-empty">Einkaufsliste wird zusammengestellt …</p></section>';
+  }
 
   try {
     const plan = await detailedPlan(state.currentPlan);
+    const planId = plan.id || plan.startDate || null;
+
+    /* Neuer Plan: Tagesauswahl und Haken gehören zum alten Plan und müssen weg,
+       sonst bleibt die Liste leer (alte Daten sind nicht mehr verfügbar). */
+    if (ui.shoppingPlanId !== planId) {
+      ui.shoppingPlanId = planId;
+      ui.selectedDates = [];
+      ui.checks = {};
+      ui.collapsedGroups = new Set();
+      silentUpdate((current) => ({ ...current, shoppingChecks: {} }));
+    } else {
+      ui.checks = { ...(state.shoppingChecks || {}), ...ui.checks };
+    }
+
     if (!ui.selectedDates.length) ui.selectedDates = plan.selectedDates || plan.days.map((day) => day.date);
-    ui.checks = { ...(state.shoppingChecks || {}), ...ui.checks };
     const list = buildShoppingList(plan, ui.selectedDates, ui.checks);
     const groups = groupedShoppingItems(list.items);
+    const openCount = list.items.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
 
     main.innerHTML = `<section class="v8-page preply-page">
       <h1 class="master-screen-title">Einkauf</h1>
@@ -419,6 +468,11 @@ async function renderShopping(root) {
       <div class="master-shopping-groups">
         ${ui.shoppingView === 'category' ? groups.map(categoryGroup).join('') : list.byRecipe.map(recipeShoppingGroup).join('')}
       </div>
+
+      ${ui.shoppingView === 'category' ? `<div class="master-shopping-summary">
+        <span data-open-count>${openCount} von ${list.items.length} offen</span>
+        ${list.estimatedTotal ? `<strong>ca. ${list.estimatedTotal.toFixed(2).replace('.', ',')} €</strong>` : ''}
+      </div>` : ''}
 
       <div class="master-shopping-actions">
         <button class="master-shopping-copy" type="button" data-v8-copy>Einkauf kopieren</button>
@@ -443,13 +497,19 @@ async function renderShopping(root) {
       renderShopping(root);
     }));
 
+    const openLabel = main.querySelector('[data-open-count]');
     main.querySelectorAll('[data-v8-check]').forEach((button) => button.addEventListener('click', () => {
       const id = button.dataset.v8Check;
       const checked = !Boolean(ui.checks[id]);
       ui.checks[id] = checked;
       button.classList.toggle('checked', checked);
       button.textContent = checked ? '✓' : '';
+      button.setAttribute('aria-label', checked ? 'Als offen markieren' : 'Als erledigt markieren');
       button.nextElementSibling?.classList.toggle('done', checked);
+      if (openLabel) {
+        const open = list.items.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
+        openLabel.textContent = `${open} von ${list.items.length} offen`;
+      }
       silentUpdate((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: checked } }));
     }));
 
@@ -495,8 +555,10 @@ function openShoppingMenu(root, plan) {
 export async function initializeFeatureEnhancements() {
   try {
     ui.recipes = await loadCards();
+    ui.catalogError = null;
   } catch (error) {
     console.error('[Preply V8] Erweiterungskatalog', error);
+    ui.catalogError = error.message || 'Rezepte konnten nicht geladen werden.';
   }
 }
 

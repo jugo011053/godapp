@@ -464,9 +464,35 @@
   text-decoration: line-through;
 }
 .master-shopping-amount {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
   color: var(--ink-secondary);
   font-size: .61rem;
   white-space: nowrap;
+}
+.master-shopping-amount small {
+  color: var(--muted);
+  font-size: .55rem;
+}
+
+.master-shopping-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: .64rem;
+}
+.master-shopping-summary strong {
+  color: var(--ink);
+  font-size: .72rem;
+  font-weight: 900;
 }
 
 .master-shopping-actions {
