@@ -57,8 +57,8 @@ function renderProfile(root) {
     </div>
 
     <div class="master-profile-summary">
-      <div class="master-profile-stat dark"><small>Kalorienziel</small><strong>${Math.round(profile.calorieTarget || 0)} kcal</strong></div>
-      <div class="master-profile-stat dark"><small>Proteinziel</small><strong>${Math.round(profile.proteinTarget || 0)} g</strong></div>
+      <div class="master-profile-stat dark"><small>Kalorienziel</small><strong>${Math.round(profile.calorieTarget || 2000)} kcal</strong></div>
+      <div class="master-profile-stat dark"><small>Proteinziel</small><strong>${Math.round(profile.proteinTarget || 120)} g</strong></div>
       <div class="master-profile-stat"><small>Personen</small><strong>${Math.max(1, Number(profile.persons || 1))}</strong></div>
       <div class="master-profile-stat"><small>Kochzeit</small><strong>${Math.round(profile.maxCookingTime || 0)} Min.</strong></div>
     </div>

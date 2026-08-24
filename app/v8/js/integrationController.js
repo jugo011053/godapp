@@ -188,7 +188,7 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex) {
       <strong>${escapeHtml(name)}</strong>
       <em>${kcal} kcal · ${protein} g Protein · ${time} Min</em>
     </button>
-    <button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>
+    ${isExpanded ? '' : `<button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>`}
     ${isExpanded ? expandedHtml : ''}
   </div>`;
 }
@@ -329,6 +329,9 @@ function renderEmptyPlan() {
             <b>›</b>
           </div>
         `).join('')}
+        <div class="v8-start-grid" style="margin-top:12px">
+          <button class="v8-start-card primary" data-action="single-day-plan"><strong>Direkt loslegen</strong><span>Plan für heute erstellen</span></button>
+        </div>
       </div>
     ` : ''}
   </section>`;
@@ -350,10 +353,8 @@ function renderShoppingPage() {
     </div>
   </section>`;
   return `<section class="v8-page preply-page">
-    <div class="preply-kicker">Einkaufen</div>
-    <h1 class="preply-title">Alles, was<br>du brauchst.</h1>
-    <p class="preply-copy">Wähle Tage aus, für die du einkaufen willst.</p>
-    <div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div>
+    <h1 class="master-screen-title">Einkauf</h1>
+    <p class="master-empty">Einkaufsliste wird zusammengestellt …</p>
   </section>`;
 }
 
@@ -595,7 +596,7 @@ function renderDialog(root) {
   const step = currentStep(draft);
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
-  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Überspringen</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
+  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Später</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
   root.appendChild(overlay);
   bindDialogEvents(root);
 }
@@ -770,6 +771,7 @@ function bindPageEvents(root) {
       renderApp(root);
     } catch (error) {
       console.error('[Preply] Tagesplan-Fehler', error);
+      showToast(root, error.message || 'Der Plan konnte nicht erstellt werden.');
     }
   }));
 

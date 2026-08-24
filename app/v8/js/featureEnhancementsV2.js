@@ -1,5 +1,5 @@
 import { getRoute } from './core/router.js';
-import { getState, updateState } from './core/store.js';
+import { getState, updateState, silentUpdate } from './core/store.js';
 import { loadCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
 import { toggleFavorite, excludeRecipe } from './features/favorites/preferenceSignals.js';
@@ -332,9 +332,17 @@ function dateParts(date) {
 
 function displayCategory(category = '') {
   const value = category.toLowerCase();
-  if (value.includes('gemüse') || value.includes('obst')) return 'Gemüse';
-  if (value.includes('hülsen') || value.includes('getreide') || value.includes('trocken')) return 'Hülsenfrüchte & Getreide';
-  if (value.includes('milch') || value.includes('ei') || value.includes('kühl')) return 'Milchprodukte & Eier';
+  if (value.includes('gemüse') || value.includes('obst') || value.includes('salat')) return 'Obst & Gemüse';
+  if (value.includes('fleisch') || value.includes('geflügel') || value.includes('wurst') || value.includes('rind') || value.includes('schwein') || value.includes('hack')) return 'Fleisch & Wurst';
+  if (value.includes('fisch') || value.includes('meeres') || value.includes('garnele') || value.includes('lachs') || value.includes('thunfisch')) return 'Fisch';
+  if (value.includes('milch') || value.includes('käse') || value.includes('joghurt') || value.includes('ei') || value.includes('kühl') || value.includes('quark') || value.includes('sahne') || value.includes('butter') || value.includes('schmand')) return 'Milchprodukte & Eier';
+  if (value.includes('brot') || value.includes('back') || value.includes('mehl') || value.includes('teig')) return 'Brot & Backwaren';
+  if (value.includes('nudel') || value.includes('pasta') || value.includes('reis') || value.includes('getreide') || value.includes('hülsen') || value.includes('trocken') || value.includes('linse') || value.includes('bohne') || value.includes('couscous') || value.includes('haferflocken')) return 'Trockenware & Beilagen';
+  if (value.includes('gewürz') || value.includes('kräuter') || value.includes('soße') || value.includes('sauce') || value.includes('essig') || value.includes('senf') || value.includes('dressing') || value.includes('würz')) return 'Gewürze & Soßen';
+  if (value.includes('öl') || value.includes('fett') || value.includes('margarine')) return 'Öle & Fette';
+  if (value.includes('konserv') || value.includes('dose') || value.includes('passiert') || value.includes('tomatenmark')) return 'Konserven';
+  if (value.includes('tiefkühl') || value.includes('gefroren') || value.includes('tk')) return 'Tiefkühl';
+  if (value.includes('nuss') || value.includes('nüsse') || value.includes('samen') || value.includes('kerne') || value.includes('mandel')) return 'Nüsse & Samen';
   return 'Sonstiges';
 }
 
@@ -437,8 +445,12 @@ async function renderShopping(root) {
 
     main.querySelectorAll('[data-v8-check]').forEach((button) => button.addEventListener('click', () => {
       const id = button.dataset.v8Check;
-      ui.checks[id] = !Boolean(ui.checks[id]);
-      updateState((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: ui.checks[id] } }));
+      const checked = !Boolean(ui.checks[id]);
+      ui.checks[id] = checked;
+      button.classList.toggle('checked', checked);
+      button.textContent = checked ? '✓' : '';
+      button.nextElementSibling?.classList.toggle('done', checked);
+      silentUpdate((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: checked } }));
     }));
 
     main.querySelector('[data-v8-copy]')?.addEventListener('click', async (event) => {

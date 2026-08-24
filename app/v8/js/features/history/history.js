@@ -74,7 +74,7 @@ export function reuseHistoryEntry(entry, startDate) {
   const targetStart = new Date(`${startDate}T12:00:00`);
   const sourceStart = new Date(`${oldDates[0]}T12:00:00`);
   const offsetDays = Math.round((targetStart - sourceStart) / 86400000);
-  const days = {};
+  const days = [];
   const selectedDates = [];
 
   for (const oldDate of oldDates) {
@@ -82,12 +82,19 @@ export function reuseHistoryEntry(entry, startDate) {
     date.setDate(date.getDate() + offsetDays);
     const newDate = date.toISOString().slice(0, 10);
     selectedDates.push(newDate);
-    days[newDate] = clone(entry.meals?.[oldDate] || {});
+    days.push({ date: newDate, meals: clone(entry.meals?.[oldDate] || {}) });
   }
+
+  const enabledMeals = [...new Set(days.flatMap((day) =>
+    Object.keys(day.meals || {})
+  ))];
 
   return {
     id: `plan-${selectedDates[0]}-${Date.now()}`,
+    startDate: selectedDates[0],
+    endDate: selectedDates[selectedDates.length - 1],
     selectedDates,
+    enabledMeals,
     days,
     reusedFromHistoryId: entry.id,
     createdAt: new Date().toISOString()
