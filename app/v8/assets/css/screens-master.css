@@ -522,6 +522,18 @@
   font-size: 1.1rem;
 }
 
+.master-load-more {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .68rem;
+  font-weight: 800;
+}
+
 .master-empty {
   padding: 28px 10px;
   color: var(--muted);

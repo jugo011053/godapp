@@ -2,6 +2,7 @@ import { getRoute } from './core/router.js';
 import { getState, updateState, silentUpdate } from './core/store.js';
 import { loadCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
+import { scoreRecipe } from './data/recipeScoring.js';
 import { toggleFavorite, excludeRecipe } from './features/favorites/preferenceSignals.js';
 import { buildShoppingList, copyShoppingText, toggleShoppingDate } from './features/shopping/shoppingEngine.js';
 
@@ -10,6 +11,7 @@ const ui = {
   catalogError: null,
   filters: createDefaultFilters(),
   sort: 'recommended',
+  visibleCount: 40,
   selectedDates: [],
   checks: {},
   shoppingPlanId: null,
@@ -112,6 +114,49 @@ function hasAdvancedFilters() {
   return Boolean(ui.filters.maxTime || ui.filters.diet || ui.filters.simplicity || ui.filters.difficulty);
 }
 
+const PAGE_SIZE = 40;
+
+/* "Für dich" nutzt jetzt dieselbe Bewertung wie der Planer — Kalorienziel,
+   Protein, Prioritäten, Kochzeit. Vorher wurde nur alphabetisch sortiert. */
+function recommendFor(profile, preferences) {
+  const pool = filterRecipes(ui.recipes, {
+    ...createDefaultFilters(),
+    category: ui.filters.category,
+    maxTime: ui.filters.maxTime,
+    diet: ui.filters.diet,
+    simplicity: ui.filters.simplicity
+  }, preferences);
+
+  const scored = pool
+    .map((recipe) => ({
+      recipe,
+      score: scoreRecipe(recipe, {
+        category: recipe.category,
+        profile,
+        preferences,
+        usedRecipeIds: new Set(),
+        usedFamilies: new Set()
+      })
+    }))
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((a, b) => b.score - a.score);
+
+  /* Fällt das Profil komplett durch (z. B. sehr enge Kochzeit), lieber die
+     bestbewerteten Rezepte zeigen als eine leere Zeile. */
+  const ranked = scored.length ? scored.map((entry) => entry.recipe) : sortRecipes(pool, 'recommended', preferences);
+
+  const seen = new Set();
+  const picked = [];
+  for (const recipe of ranked) {
+    const family = recipe.familyKey || recipe.id;
+    if (seen.has(family)) continue;
+    seen.add(family);
+    picked.push(recipe);
+    if (picked.length === 6) break;
+  }
+  return picked;
+}
+
 function renderRecipes(root) {
   const main = root.querySelector('.v8-main');
   if (!main) return;
@@ -136,13 +181,15 @@ function renderRecipes(root) {
   const preferences = state.preferences || {};
   const filtered = filterRecipes(ui.recipes, ui.filters, preferences);
   const results = sortRecipes(filtered, ui.sort, preferences);
-  const recommendations = sortRecipes(filterRecipes(ui.recipes, {
-    ...createDefaultFilters(),
-    category: ui.filters.category,
-    maxTime: ui.filters.maxTime,
-    diet: ui.filters.diet,
-    simplicity: ui.filters.simplicity
-  }, preferences), 'recommended', preferences).slice(0, 6);
+
+  /* Beim Suchen oder Filtern nach Favoriten sucht man gezielt — eine
+     unveränderte Empfehlungszeile darüber sieht dann aus, als hinge sie fest. */
+  const showRecommendations = !ui.filters.query && !ui.filters.favoritesOnly;
+  const recommendations = showRecommendations
+    ? recommendFor(state.profile || {}, preferences)
+    : [];
+
+  const visible = Math.min(ui.visibleCount, results.length);
 
   main.innerHTML = `<section class="v8-page preply-page">
     <h1 class="master-screen-title">Rezepte</h1>
@@ -168,18 +215,43 @@ function renderRecipes(root) {
       <button class="master-chip ${hasAdvancedFilters() ? 'active' : ''}" type="button" data-open-filters>Alle Filter</button>
     </div>
 
-    <div class="master-section-head"><h2>Für dich</h2><span>${recommendations.length} Vorschläge</span></div>
+    ${recommendations.length ? `
+    <div class="master-section-head"><h2>Für dich</h2><span>Passend zu deinem Profil</span></div>
     <div class="master-foryou">
-      ${recommendations.map((recipe) => forYouCard(recipe, preferences)).join('') || '<p class="master-empty">Noch keine passenden Empfehlungen.</p>'}
-    </div>
+      ${recommendations.map((recipe) => forYouCard(recipe, preferences)).join('')}
+    </div>` : ''}
 
-    <div class="master-section-head"><h2>Alle Rezepte</h2><span>${results.length}</span></div>
+    <div class="master-section-head"><h2>Alle Rezepte</h2><span>${visible < results.length ? `${visible} von ${results.length}` : results.length}</span></div>
     <div class="master-recipe-list">
-      ${results.slice(0, 80).map((recipe) => recipeRow(recipe, preferences)).join('') || '<p class="master-empty">Mit diesen Filtern wurde kein Rezept gefunden.</p>'}
+      ${results.slice(0, visible).map((recipe) => recipeRow(recipe, preferences)).join('') || '<p class="master-empty">Mit diesen Filtern wurde kein Rezept gefunden.</p>'}
     </div>
+    ${visible < results.length
+      ? `<button class="master-load-more" type="button" data-load-more>Weitere ${Math.min(PAGE_SIZE, results.length - visible)} anzeigen</button>`
+      : ''}
   </section>`;
 
   bindRecipeEvents(root);
+}
+
+/* Ein Herz-Klick darf die Seite nicht neu aufbauen: updateState() löst
+   renderAll() aus, das die ganze Shell ersetzt — die Liste springt dann
+   zurück nach oben. Also Zustand still sichern und nur das Icon umschalten. */
+function applyFavorite(root, id) {
+  if (!id) return;
+  const next = silentUpdate((state) => ({
+    ...state,
+    preferences: toggleFavorite(state.preferences || {}, id)
+  }));
+  const active = (next.preferences?.favoriteRecipeIds || []).includes(id);
+
+  /* Dasselbe Rezept kann in "Für dich" und in der Liste stehen. */
+  root.querySelectorAll(`[data-v8-favorite="${CSS.escape(id)}"]`).forEach((button) => {
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-label', active ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen');
+  });
+
+  /* Nur wenn nach Favoriten gefiltert wird, ändert sich die sichtbare Menge. */
+  if (ui.filters.favoritesOnly) renderRecipes(root);
 }
 
 function bindRecipeEvents(root) {
@@ -187,6 +259,7 @@ function bindRecipeEvents(root) {
     const value = event.currentTarget.value;
     const caret = event.currentTarget.selectionStart;
     ui.filters = { ...ui.filters, query: value };
+    ui.visibleCount = PAGE_SIZE;
     /* Ohne Entprellung wird bei jedem Tastendruck die ganze Liste neu gebaut. */
     clearTimeout(searchTimer);
     searchTimer = setTimeout(() => {
@@ -200,6 +273,7 @@ function bindRecipeEvents(root) {
 
   root.querySelectorAll('[data-chip="category"]').forEach((button) => button.addEventListener('click', () => {
     ui.filters = { ...ui.filters, category: button.dataset.value || '' };
+    ui.visibleCount = PAGE_SIZE;
     renderRecipes(root);
   }));
 
@@ -208,18 +282,20 @@ function bindRecipeEvents(root) {
     if (value === 'favorites') ui.filters = { ...ui.filters, favoritesOnly: !ui.filters.favoritesOnly };
     if (value === 'quick') ui.sort = ui.sort === 'quick' ? 'recommended' : 'quick';
     if (value === 'protein') ui.sort = ui.sort === 'protein' ? 'recommended' : 'protein';
+    ui.visibleCount = PAGE_SIZE;
     renderRecipes(root);
   }));
 
   root.querySelectorAll('[data-open-filters]').forEach((button) => button.addEventListener('click', () => openFilterSheet(root)));
 
+  root.querySelector('[data-load-more]')?.addEventListener('click', () => {
+    ui.visibleCount += PAGE_SIZE;
+    renderRecipes(root);
+  });
+
   root.querySelectorAll('[data-v8-favorite]').forEach((button) => button.addEventListener('click', (event) => {
     event.stopPropagation();
-    updateState((state) => ({
-      ...state,
-      preferences: toggleFavorite(state.preferences || {}, button.dataset.v8Favorite)
-    }));
-    renderRecipes(root);
+    applyFavorite(root, button.dataset.v8Favorite);
   }));
 
   root.querySelectorAll('[data-v8-detail]').forEach((button) => button.addEventListener('click', () => showDetail(root, button.dataset.v8Detail)));
@@ -244,21 +320,29 @@ function openFilterSheet(root) {
     <div class="sheet-actions"><button class="sheet-action primary" type="button" data-filter-apply>Filter anwenden</button><button class="sheet-action" type="button" data-filter-reset>Zurücksetzen</button></div>
   </section>`);
 
-  const select = (selector, key, value) => {
+  /* Verglichen wird gegen den rohen data-Wert des geklickten Knopfes. Vorher
+     wurde der umgewandelte Wert verglichen — bei "Beliebig" wurde aus 0 dann
+     null und "null" traf auf keinen Knopf, also blieb die Gruppe unmarkiert. */
+  const select = (selector, key, button, value) => {
     draft[key] = value;
-    overlay.querySelectorAll(selector).forEach((button) => button.classList.toggle('selected', button.dataset[selector.includes('diet') ? 'filterDiet' : selector.includes('time') ? 'filterTime' : 'filterSimple'] === String(value)));
+    overlay.querySelectorAll(selector).forEach((other) => other.classList.toggle('selected', other === button));
   };
 
-  overlay.querySelectorAll('[data-filter-diet]').forEach((button) => button.addEventListener('click', () => select('[data-filter-diet]', 'diet', button.dataset.filterDiet)));
-  overlay.querySelectorAll('[data-filter-time]').forEach((button) => button.addEventListener('click', () => select('[data-filter-time]', 'maxTime', Number(button.dataset.filterTime) || null)));
-  overlay.querySelectorAll('[data-filter-simple]').forEach((button) => button.addEventListener('click', () => select('[data-filter-simple]', 'simplicity', button.dataset.filterSimple)));
+  overlay.querySelectorAll('[data-filter-diet]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-diet]', 'diet', button, button.dataset.filterDiet)));
+  overlay.querySelectorAll('[data-filter-time]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-time]', 'maxTime', button, Number(button.dataset.filterTime) || null)));
+  overlay.querySelectorAll('[data-filter-simple]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-simple]', 'simplicity', button, button.dataset.filterSimple)));
   overlay.querySelector('[data-filter-apply]').addEventListener('click', () => {
     ui.filters = { ...ui.filters, diet: draft.diet, maxTime: draft.maxTime, simplicity: draft.simplicity };
+    ui.visibleCount = PAGE_SIZE;
     closeOverlay(overlay);
     renderRecipes(root);
   });
   overlay.querySelector('[data-filter-reset]').addEventListener('click', () => {
     ui.filters = { ...ui.filters, diet: '', maxTime: null, simplicity: '', difficulty: '' };
+    ui.visibleCount = PAGE_SIZE;
     closeOverlay(overlay);
     renderRecipes(root);
   });
@@ -272,7 +356,15 @@ async function recipeById(id) {
 }
 
 async function openRecipeMenu(root, id) {
-  const recipe = await recipeById(id);
+  let recipe;
+  try {
+    recipe = await recipeById(id);
+  } catch (error) {
+    /* Ohne diesen Zweig endete ein fehlgeschlagener Abruf in einer stillen
+       Promise-Rejection — der ···-Knopf tat dann einfach nichts. */
+    console.error('[Preply V8] Rezeptmenü', error);
+    recipe = ui.recipes.find((item) => item.id === id) || { id, name: 'Rezept' };
+  }
   const favorite = isFavorite(getState().preferences || {}, id);
   const overlay = appendSheet(root, 'plan-menu-overlay', `<section class="v8-dialog plan-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="recipe-menu-title">
     <div class="sheet-head"><h2 id="recipe-menu-title">${esc(recipe.name)}</h2><button class="sheet-close" type="button" data-sheet-close aria-label="Schließen">×</button></div>
@@ -288,12 +380,12 @@ async function openRecipeMenu(root, id) {
     showDetail(root, id);
   });
   overlay.querySelector('[data-menu-favorite]').addEventListener('click', () => {
-    updateState((state) => ({ ...state, preferences: toggleFavorite(state.preferences || {}, id) }));
     closeOverlay(overlay);
-    renderRecipes(root);
+    applyFavorite(root, id);
   });
   overlay.querySelector('[data-menu-exclude]').addEventListener('click', () => {
-    updateState((state) => ({ ...state, preferences: excludeRecipe(state.preferences || {}, id, []) }));
+    /* Ausblenden entfernt das Rezept aus der Liste — hier muss neu gerendert werden. */
+    silentUpdate((state) => ({ ...state, preferences: excludeRecipe(state.preferences || {}, id, []) }));
     closeOverlay(overlay);
     renderRecipes(root);
   });
@@ -312,9 +404,8 @@ async function showDetail(root, id) {
       <div class="sheet-actions"><button class="sheet-action ${isFavorite(preferences, id) ? '' : 'lime'}" type="button" data-detail-favorite>${isFavorite(preferences, id) ? 'Aus Favoriten entfernen' : 'Favorisieren'}</button></div>
     </section>`);
     overlay.querySelector('[data-detail-favorite]').addEventListener('click', () => {
-      updateState((state) => ({ ...state, preferences: toggleFavorite(state.preferences || {}, id) }));
       closeOverlay(overlay);
-      renderRecipes(root);
+      applyFavorite(root, id);
     });
   } catch (error) {
     console.error('[Preply V8] Rezeptdetail', error);
