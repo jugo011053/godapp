@@ -5,6 +5,13 @@ const MEAL_TARGET_SHARE = Object.freeze({
   snack: 0.10
 });
 
+function normalizedShare(category, enabledMeals) {
+  const share = MEAL_TARGET_SHARE[category] || 0.25;
+  if (!enabledMeals || enabledMeals.length === 0) return share;
+  const totalShare = enabledMeals.reduce((sum, cat) => sum + (MEAL_TARGET_SHARE[cat] || 0.25), 0);
+  return totalShare > 0 ? share / totalShare : share;
+}
+
 const COMPLETE_MEAL_MINIMUMS = Object.freeze({
   breakfast: { kcal: 220, protein: 8 },
   lunch: { kcal: 300, protein: 12 },
@@ -36,10 +43,10 @@ export function normalizedAllergens(values = []) {
   return new Set(values.map(normalizeAllergen).filter(Boolean));
 }
 
-export function targetForMeal(profile, category) {
+export function targetForMeal(profile, category, enabledMeals) {
   const fallbackDaily = profile.goal === 'gain' ? 2600 : profile.goal === 'lose' ? 1800 : 2200;
   const daily = Number(profile.calorieTarget) || fallbackDaily;
-  return daily * (MEAL_TARGET_SHARE[category] || 0.25);
+  return daily * normalizedShare(category, enabledMeals);
 }
 
 function dietCompatible(recipe, dietStyle) {
@@ -107,9 +114,9 @@ export function scoreRecipe(recipe, context) {
   if (!recipeEligible(recipe, context)) return Number.NEGATIVE_INFINITY;
 
   const { category, profile, preferences = {}, usedRecipeIds = new Set(), usedFamilies = new Set() } = context;
-  const targetKcal = targetForMeal(profile, category);
+  const targetKcal = targetForMeal(profile, category, context.enabledMeals);
   const targetProtein = profile.proteinTarget
-    ? Number(profile.proteinTarget) * (MEAL_TARGET_SHARE[category] || 0.25)
+    ? Number(profile.proteinTarget) * normalizedShare(category, context.enabledMeals)
     : category === 'snack' ? 8 : 25;
 
   let score = 100;

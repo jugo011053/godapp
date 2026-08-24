@@ -19,14 +19,14 @@ function recipeFamily(recipe) {
     .join(':') || recipe.id;
 }
 
-function portionFactor(recipe, profile, category) {
-  const target = targetForMeal(profile, category);
+function portionFactor(recipe, profile, category, enabledMeals) {
+  const target = targetForMeal(profile, category, enabledMeals);
   if (!recipe.kcal || !target) return 1;
   return Math.max(0.8, Math.min(1.2, target / recipe.kcal));
 }
 
 function createPlannedMeal(recipe, profile, category, meta = {}) {
-  const factor = portionFactor(recipe, profile, category);
+  const factor = portionFactor(recipe, profile, category, meta.enabledMeals);
   return {
     recipeId: recipe.id,
     recipe,
@@ -110,7 +110,8 @@ export function buildPlan(recipes, request, preferences = {}, options = {}) {
         profile,
         preferences,
         usedRecipeIds,
-        usedFamilies
+        usedFamilies,
+        enabledMeals
       });
       const chosen = chooseAmongTop(ranked, random, 5);
       if (!chosen) {
@@ -128,7 +129,8 @@ export function buildPlan(recipes, request, preferences = {}, options = {}) {
         day.meals[category] = createPlannedMeal(chosen, profile, category, {
           prepGroupId,
           prepSourceDate: days[dayIndex].date,
-          repeatedForMealPrep: offset > 0
+          repeatedForMealPrep: offset > 0,
+          enabledMeals
         });
       }
 

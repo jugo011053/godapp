@@ -51,7 +51,7 @@ function packEstimate(amount, ingredient) {
   const ingredientUnit = (ingredient.unit || '').toLowerCase();
 
   if (!packSize || amount <= 0 || !unitsCompatible(ingredientUnit, packUnit)) {
-    return { packs: null, buyAmount: round(amount), estimatedPrice: packPrice ? round(Math.ceil(amount) * packPrice) : null };
+    return { packs: null, buyAmount: round(amount), estimatedPrice: null };
   }
   const converted = convertToPackUnit(amount, ingredientUnit, packUnit);
   const packs = Math.ceil(converted / packSize);
