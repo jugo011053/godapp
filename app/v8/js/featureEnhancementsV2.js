@@ -486,29 +486,52 @@ function dateParts(date) {
   return { weekday, day: value.getDate(), isToday: date === new Date().toISOString().slice(0, 10) };
 }
 
+/* Feste Zuordnung der Kategorien, die im Katalog wirklich vorkommen. Die
+   frühere Teilstring-Suche verhob sich daran: "Protein", "Pflanzliche
+   Proteine" und "Flüssigkeit" enthalten alle die Buchstabenfolge "ei" und
+   landeten dadurch unter Milchprodukte & Eier. */
+const SHOPPING_CATEGORY_MAP = {
+  'gemüse': 'Obst & Gemüse',
+  'obst': 'Obst & Gemüse',
+  'fleisch': 'Fleisch & Fisch',
+  'fisch': 'Fleisch & Fisch',
+  'protein': 'Fleisch & Fisch',
+  'pflanzliche proteine': 'Tofu & Hülsenfrüchte',
+  'milchprodukte': 'Milchprodukte & Eier',
+  'kohlenhydrate': 'Trockenware & Beilagen',
+  'nüsse / samen': 'Nüsse & Samen',
+  'gewürze': 'Gewürze & Soßen',
+  'gewürz': 'Gewürze & Soßen',
+  'saucen': 'Gewürze & Soßen',
+  'soße': 'Gewürze & Soßen',
+  'fette / öle': 'Öle & Fette',
+  'fett/öl': 'Öle & Fette',
+  'süßungsmittel': 'Backen & Süßes',
+  'flüssigkeit': 'Getränke & Brühe'
+};
+
+const SHOPPING_CATEGORY_ORDER = [
+  'Obst & Gemüse', 'Fleisch & Fisch', 'Milchprodukte & Eier',
+  'Tofu & Hülsenfrüchte', 'Trockenware & Beilagen', 'Nüsse & Samen',
+  'Gewürze & Soßen', 'Öle & Fette', 'Backen & Süßes', 'Getränke & Brühe',
+  'Sonstiges'
+];
+
 function displayCategory(category = '') {
-  const value = category.toLowerCase();
-  if (value.includes('gemüse') || value.includes('obst') || value.includes('salat')) return 'Obst & Gemüse';
-  if (value.includes('fleisch') || value.includes('geflügel') || value.includes('wurst') || value.includes('rind') || value.includes('schwein') || value.includes('hack')) return 'Fleisch & Wurst';
-  if (value.includes('fisch') || value.includes('meeres') || value.includes('garnele') || value.includes('lachs') || value.includes('thunfisch')) return 'Fisch';
-  if (value.includes('milch') || value.includes('käse') || value.includes('joghurt') || value.includes('ei') || value.includes('kühl') || value.includes('quark') || value.includes('sahne') || value.includes('butter') || value.includes('schmand')) return 'Milchprodukte & Eier';
-  if (value.includes('brot') || value.includes('back') || value.includes('mehl') || value.includes('teig')) return 'Brot & Backwaren';
-  if (value.includes('nudel') || value.includes('pasta') || value.includes('reis') || value.includes('getreide') || value.includes('hülsen') || value.includes('trocken') || value.includes('linse') || value.includes('bohne') || value.includes('couscous') || value.includes('haferflocken')) return 'Trockenware & Beilagen';
-  if (value.includes('gewürz') || value.includes('kräuter') || value.includes('soße') || value.includes('sauce') || value.includes('essig') || value.includes('senf') || value.includes('dressing') || value.includes('würz')) return 'Gewürze & Soßen';
-  if (value.includes('öl') || value.includes('fett') || value.includes('margarine')) return 'Öle & Fette';
-  if (value.includes('konserv') || value.includes('dose') || value.includes('passiert') || value.includes('tomatenmark')) return 'Konserven';
-  if (value.includes('tiefkühl') || value.includes('gefroren') || value.includes('tk')) return 'Tiefkühl';
-  if (value.includes('nuss') || value.includes('nüsse') || value.includes('samen') || value.includes('kerne') || value.includes('mandel')) return 'Nüsse & Samen';
-  return 'Sonstiges';
+  return SHOPPING_CATEGORY_MAP[String(category).trim().toLowerCase()] || 'Sonstiges';
 }
 
 function groupedShoppingItems(items) {
-  return Object.values(items.reduce((groups, item) => {
+  const groups = items.reduce((acc, item) => {
     const category = displayCategory(item.category);
-    if (!groups[category]) groups[category] = { category, items: [] };
-    groups[category].items.push(item);
-    return groups;
-  }, {}));
+    if (!acc[category]) acc[category] = { category, items: [] };
+    acc[category].items.push(item);
+    return acc;
+  }, {});
+  /* Reihenfolge nach dem Weg durch den Supermarkt, nicht alphabetisch. */
+  return SHOPPING_CATEGORY_ORDER
+    .filter((category) => groups[category])
+    .map((category) => groups[category]);
 }
 
 function amountText(item) {

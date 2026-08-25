@@ -16,13 +16,62 @@ const ALLERGEN_MAP = Object.freeze({
 const COMPLETE_DISH_TYPES = new Set([
   'bowl', 'pfanne', 'pasta', 'curry', 'eintopf', 'auflauf', 'wrap', 'burger',
   'pizza', 'salat_hauptgericht', 'suppe_hauptgericht', 'sandwich', 'frühstück',
-  'breakfast', 'main', 'hauptgericht'
+  'breakfast', 'main', 'hauptgericht',
+  /* Werte, wie sie tatsächlich in classification.dish_type stehen */
+  'pfannengericht/sonstiges', 'suppe', 'pasta/nudeln', 'salat', 'curry/dal',
+  'ofengericht', 'reis/getreide', 'porridge/müsli', 'eiergericht',
+  'wrap/sandwich', 'bratling/burger', 'wok/pfanne', 'spieß/grill',
+  'pfannkuchen/crêpe', 'smoothie/shake'
 ]);
 
-const BASE_DISH_TYPES = new Set(['brühe', 'basis', 'dip', 'sauce', 'beilage', 'topping']);
+const BASE_DISH_TYPES = new Set([
+  'brühe', 'basis', 'dip', 'sauce', 'beilage', 'topping', 'dip/aufstrich'
+]);
+
+/* Der Katalog liefert die Mahlzeitenrolle auf Deutsch. Ohne diese Zuordnung
+   trifft inferMealRole() nie den expliziten Wert und rät über Kalorien. */
+const MEAL_ROLE_MAP = {
+  hauptmahlzeit: 'complete_meal',
+  'leichte mahlzeit': 'light_meal',
+  frühstück: 'complete_meal',
+  snack: 'light_meal',
+  getränk: 'base',
+  beilage: 'side'
+};
+
+/* novelty_level steht als Wort in der Datenbank, nicht als Zahl. Number()
+   ergab darauf NaN, womit jeder Größenvergleich in inferSimplicity() falsch
+   wurde und alle Rezepte als "balanced" endeten. */
+const NOVELTY_MAP = {
+  vertraut: 1,
+  alltäglich: 1,
+  abwechslungsreich: 3,
+  ausgefallen: 5,
+  experimentell: 5
+};
 
 function token(value) {
   return String(value || '').trim().toLowerCase();
+}
+
+/* dish_type ist ein Array (z. B. ["Pfannengericht/sonstiges"]). */
+export function dishTypeToken(classification = {}) {
+  const raw = classification.dish_type;
+  if (Array.isArray(raw)) return token(raw[0]);
+  if (typeof raw === 'string' && raw.trim().startsWith('[')) {
+    try {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed)) return token(parsed[0]);
+    } catch { /* unten als Klartext behandeln */ }
+  }
+  return token(raw);
+}
+
+export function noveltyLevel(classification = {}) {
+  const raw = classification.novelty_level;
+  const numeric = Number(raw);
+  if (Number.isFinite(numeric)) return numeric;
+  return NOVELTY_MAP[token(raw)] ?? 0;
 }
 
 export function normalizeAllergens(values = []) {
@@ -41,8 +90,9 @@ export function inferMealRole(recipe) {
   const classification = recipe.classification || {};
   const explicit = token(classification.meal_role || recipe.meal_role);
   if (['complete_meal', 'light_meal', 'side', 'base'].includes(explicit)) return explicit;
+  if (MEAL_ROLE_MAP[explicit]) return MEAL_ROLE_MAP[explicit];
 
-  const dishType = token(classification.dish_type);
+  const dishType = dishTypeToken(classification);
   if (BASE_DISH_TYPES.has(dishType)) return 'base';
   if (COMPLETE_DISH_TYPES.has(dishType)) return 'complete_meal';
 
@@ -57,7 +107,7 @@ export function inferMealRole(recipe) {
 
 export function inferSimplicity(recipe) {
   const classification = recipe.classification || {};
-  const novelty = Number(classification.novelty_level || 0);
+  const novelty = noveltyLevel(classification);
   const time = Number(recipe.time || classification.total_time_min || 0);
   const difficulty = token(recipe.difficulty || classification.difficulty);
   const ingredientCount = Array.isArray(recipe.ingredients) ? recipe.ingredients.length : 0;
@@ -109,7 +159,7 @@ function familyKey(recipe) {
   const classification = recipe.classification || {};
   return [
     recipe.cat || recipe.category,
-    token(classification.dish_type),
+    dishTypeToken(classification),
     primaryProtein(recipe)
   ].filter(Boolean).join(':') || String(recipe.id);
 }
@@ -125,14 +175,14 @@ export function normalizeCatalogRecipe(recipe) {
     mealRole: inferMealRole(recipe),
     simplicity: inferSimplicity(recipe),
     mealPrepScore: Number(classification.meal_prep_score_v2 || recipe.mealPrepScore || 0),
-    noveltyLevel: Number(classification.novelty_level || 0),
+    noveltyLevel: noveltyLevel(classification),
     costBand: classification.cost_band || recipe.costBand || 'unknown',
     qualityStatus: quality.status,
     qualityIssues: quality.issues,
     planEligible: Boolean(recipe.is_plan_eligible) && quality.status !== 'blocked',
     familyKey: familyKey(recipe),
     primaryProtein: primaryProtein(recipe),
-    dishType: classification.dish_type || null,
+    dishType: dishTypeToken(classification) || null,
     ingredientNames: (recipe.ingredients || []).map((ingredient) => ingredient.name).filter(Boolean)
   };
 }
