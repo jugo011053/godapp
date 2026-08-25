@@ -78,7 +78,10 @@ export function recipeEligible(recipe, context) {
   const { category, profile, preferences = {} } = context;
   if (!recipe || recipe.category !== category) return false;
   if (recipe.planEligible === false || recipe.qualityStatus === 'blocked') return false;
-  if (category !== 'snack' && recipe.mealRole !== 'complete_meal') return false;
+  /* Beilagen und Basisrezepte (Dips, Soßen) sind nie eine ganze Mahlzeit.
+     "Leichte Mahlzeit" dagegen schon — ein Salat mittags ist ein Mittagessen.
+     Ob genug drin steckt, entscheiden die Mindestwerte unten. */
+  if (recipe.mealRole === 'base' || recipe.mealRole === 'side') return false;
 
   const minimum = COMPLETE_MEAL_MINIMUMS[category];
   if (minimum && (recipe.kcal < minimum.kcal || recipe.protein < minimum.protein)) return false;
@@ -129,6 +132,17 @@ export function scoreRecipe(recipe, context) {
   if (profile.simplicity === recipe.simplicity) score += 18;
   if (profile.simplicity === 'simple' && recipe.difficulty === 'easy') score += 10;
   if (profile.simplicity === 'experimental' && includesAny(recipe, ['international', 'experimental'])) score += 10;
+
+  /* Alltagstauglichkeit. Der Katalog ist zu 65 % "vertraut" (Stufe 1), nur
+     2 % sind "ausgefallen" (Stufe 5) — ohne Abwertung landeten die Ausreißer
+     trotzdem regelmäßig im Plan, weil Vertrautheit gar nicht zählte.
+     Ausgefallenes bleibt möglich, ist aber die Ausnahme. */
+  const novelty = Number(recipe.noveltyLevel || 0);
+  if (novelty > 0) {
+    if (profile.simplicity === 'experimental') score += (novelty - 1) * 6;
+    else if (profile.simplicity === 'simple') score -= (novelty - 1) * 10;
+    else score -= (novelty - 1) * 5;
+  }
 
   const priorities = new Set(profile.priorities || []);
   if (priorities.has('high_protein')) score += Math.min(25, recipe.protein * 0.75);
