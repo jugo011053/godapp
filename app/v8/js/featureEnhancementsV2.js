@@ -77,20 +77,23 @@ function favoriteButton(recipe, preferences, extraClass = '') {
   return `<button class="master-heart ${isFavorite(preferences, recipe.id) ? 'active' : ''} ${extraClass}" type="button" data-v8-favorite="${esc(recipe.id)}" aria-label="${isFavorite(preferences, recipe.id) ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}">${SVG.heart}</button>`;
 }
 
+/* Im Katalog gibt es derzeit kein Bildfeld, also lieferte der Platzhalter auf
+   jeder Karte denselben grauen Block. Bild nur zeigen, wenn wirklich eins da
+   ist — sonst trägt die Karte den Text. */
 function recipeVisual(recipe) {
   const image = recipeImage(recipe);
-  return image
-    ? `<div class="master-recipe-visual"><img src="${esc(image)}" alt="" loading="lazy"></div>`
-    : '<div class="master-recipe-visual placeholder" aria-hidden="true"></div>';
+  return image ? `<span class="master-recipe-visual"><img src="${esc(image)}" alt="" loading="lazy"></span>` : '';
 }
 
 function forYouCard(recipe, preferences) {
   return `<article class="master-foryou-card">
-    <button class="master-recipe-main" type="button" data-v8-detail="${esc(recipe.id)}" style="display:block;width:100%;padding:0">
+    <button class="master-recipe-main" type="button" data-v8-detail="${esc(recipe.id)}">
       ${recipeVisual(recipe)}
       <span class="master-foryou-copy">
+        <span class="master-foryou-cat">${esc(CATEGORY_DE[recipe.category] || recipe.category || 'Rezept')}</span>
         <strong>${esc(recipe.name)}</strong>
-        <small>${Math.round(recipe.kcal || 0)} kcal · ${Math.round(recipe.protein || 0)} g Protein · ${Math.round(recipe.time || 0)} Min.</small>
+        <small>${Math.round(recipe.kcal || 0)} kcal · ${Math.round(recipe.protein || 0)} g Protein</small>
+        <small>${Math.round(recipe.time || 0)} Min.</small>
       </span>
     </button>
     ${favoriteButton(recipe, preferences)}
@@ -115,6 +118,37 @@ function hasAdvancedFilters() {
 }
 
 const PAGE_SIZE = 40;
+
+const DIET_DE = {
+  vegetarian: 'Vegetarisch',
+  vegan: 'Vegan',
+  pescatarian: 'Pescetarisch'
+};
+
+function activeFilterLabels() {
+  const labels = [];
+  if (ui.filters.favoritesOnly) labels.push('Favoriten');
+  if (ui.filters.query) labels.push(`Suche „${ui.filters.query}“`);
+  if (ui.filters.category) labels.push(CATEGORY_DE[ui.filters.category] || ui.filters.category);
+  if (ui.filters.maxTime) labels.push(`bis ${ui.filters.maxTime} Min.`);
+  if (ui.filters.diet) labels.push(DIET_DE[ui.filters.diet] || ui.filters.diet);
+  if (ui.filters.simplicity) labels.push('Simpel');
+  return labels;
+}
+
+/* Vorher stand hier immer derselbe Satz. Wenn ein Filter außerhalb des
+   sichtbaren Bereichs aktiv war, war nicht erkennbar, was die Liste leert. */
+function emptyResultsHtml(preferences) {
+  const labels = activeFilterLabels();
+  const noFavorites = ui.filters.favoritesOnly && !(preferences.favoriteRecipeIds || []).length;
+  const text = noFavorites
+    ? 'Du hast noch keine Rezepte favorisiert. Tippe bei einem Rezept auf das Herz, dann erscheint es hier.'
+    : labels.length
+      ? `Kein Rezept passt zu: ${labels.join(' · ')}.`
+      : 'Es sind keine Rezepte verfügbar.';
+  return `<p class="master-empty">${esc(text)}</p>
+    ${labels.length ? '<button class="master-load-more" type="button" data-clear-filters>Filter zurücksetzen</button>' : ''}`;
+}
 
 /* "Für dich" nutzt jetzt dieselbe Bewertung wie der Planer — Kalorienziel,
    Protein, Prioritäten, Kochzeit. Vorher wurde nur alphabetisch sortiert. */
@@ -223,8 +257,9 @@ function renderRecipes(root) {
 
     <div class="master-section-head"><h2>Alle Rezepte</h2><span>${visible < results.length ? `${visible} von ${results.length}` : results.length}</span></div>
     <div class="master-recipe-list">
-      ${results.slice(0, visible).map((recipe) => recipeRow(recipe, preferences)).join('') || '<p class="master-empty">Mit diesen Filtern wurde kein Rezept gefunden.</p>'}
+      ${results.slice(0, visible).map((recipe) => recipeRow(recipe, preferences)).join('')}
     </div>
+    ${results.length ? '' : emptyResultsHtml(preferences)}
     ${visible < results.length
       ? `<button class="master-load-more" type="button" data-load-more>Weitere ${Math.min(PAGE_SIZE, results.length - visible)} anzeigen</button>`
       : ''}
@@ -290,6 +325,13 @@ function bindRecipeEvents(root) {
 
   root.querySelector('[data-load-more]')?.addEventListener('click', () => {
     ui.visibleCount += PAGE_SIZE;
+    renderRecipes(root);
+  });
+
+  root.querySelector('[data-clear-filters]')?.addEventListener('click', () => {
+    ui.filters = createDefaultFilters();
+    ui.sort = 'recommended';
+    ui.visibleCount = PAGE_SIZE;
     renderRecipes(root);
   });
 
