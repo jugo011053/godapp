@@ -19,6 +19,7 @@ const SHELL = [
   './js/historyEnhancement.js',
   './js/planManagementEnhancement.js',
   './js/core/events.js',
+  './js/core/version.js',
   './js/core/router.js',
   './js/core/store.js',
   './js/core/storage.js',

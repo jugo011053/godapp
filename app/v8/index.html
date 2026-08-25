@@ -26,9 +26,31 @@
   <script type="module" src="js/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      window.addEventListener('load', () => navigator.serviceWorker.register('./sw.js').catch((error) => {
-        console.warn('[Preply V8] Service Worker konnte nicht registriert werden.', error);
-      }));
+      /* Vor der Registrierung merken: gab es schon einen Controller? Beim
+         allerersten Besuch gibt es keinen — dann ist das keine Aktualisierung. */
+      var hadController = Boolean(navigator.serviceWorker.controller);
+
+      function showUpdateBanner() {
+        if (document.querySelector('.preply-update-bar')) return;
+        var bar = document.createElement('div');
+        bar.className = 'preply-update-bar';
+        bar.innerHTML = '<span>Neue Version geladen.</span><button type="button">Jetzt anzeigen</button>';
+        bar.querySelector('button').addEventListener('click', function () { location.reload(); });
+        document.body.appendChild(bar);
+      }
+
+      window.addEventListener('load', function () {
+        navigator.serviceWorker.register('./sw.js').then(function (registration) {
+          /* Der Service Worker ruft skipWaiting(), übernimmt also sofort. Die
+             bereits geladenen Dateien im Tab sind danach veraltet. */
+          navigator.serviceWorker.addEventListener('controllerchange', function () {
+            if (hadController) showUpdateBanner();
+          });
+          setInterval(function () { registration.update().catch(function () {}); }, 3600000);
+        }).catch(function (error) {
+          console.warn('[Preply V8] Service Worker konnte nicht registriert werden.', error);
+        });
+      });
     }
   </script>
 </body>
