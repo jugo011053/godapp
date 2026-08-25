@@ -80,8 +80,6 @@ function renderProfile(root) {
     </section>
 
     <button class="master-profile-edit-button" type="button" data-edit-profile>Profil bearbeiten</button>
-
-    <p class="master-build-stamp">Preply ${esc(APP_BUILD)} · ${esc(APP_BUILD_DATE)}</p>
   </section>`;
 
   main.querySelector('[data-edit-profile]').addEventListener('click', () => openProfileEditor(root));
@@ -184,4 +182,17 @@ async function openExcludedRecipes(root) {
 
 export function refreshProfileMaster(root) {
   renderProfile(root);
+}
+
+/* Muss als letztes laufen: refreshHistoryEnhancement() hängt den Planverlauf
+   an dieselbe Seite an und schob den Stempel sonst in die Mitte. */
+export function appendBuildStamp(root) {
+  if (getRoute() !== 'profile') return;
+  const page = root.querySelector('.v8-main .v8-page');
+  if (!page || page.querySelector('[data-build-stamp]')) return;
+  const stamp = document.createElement('p');
+  stamp.className = 'master-build-stamp';
+  stamp.dataset.buildStamp = 'true';
+  stamp.textContent = `Preply ${APP_BUILD} · ${APP_BUILD_DATE}`;
+  page.appendChild(stamp);
 }
