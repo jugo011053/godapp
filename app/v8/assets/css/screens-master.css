@@ -538,3 +538,42 @@
   font-size: .68rem;
   line-height: 1.5;
 }
+
+.master-build-stamp {
+  margin-top: 18px;
+  padding-bottom: 4px;
+  color: var(--muted);
+  text-align: center;
+  font-size: .55rem;
+  letter-spacing: .04em;
+}
+
+.preply-update-bar {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(var(--nav-height, 64px) + env(safe-area-inset-bottom) + 10px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 11px 12px 11px 15px;
+  border-radius: 13px;
+  background: var(--ink, #111);
+  color: #fff;
+  box-shadow: 0 8px 26px rgba(0,0,0,.24);
+  font-size: .64rem;
+  font-weight: 700;
+}
+.preply-update-bar button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 9px;
+  background: var(--lime, #78a800);
+  color: var(--ink, #111);
+  font-size: .62rem;
+  font-weight: 900;
+}

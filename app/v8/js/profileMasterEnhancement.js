@@ -2,6 +2,7 @@ import { getRoute } from './core/router.js';
 import { getState, updateState } from './core/store.js';
 import { loadCards } from './data/recipeStore.js';
 import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
+import { APP_BUILD, APP_BUILD_DATE } from './core/version.js';
 import { restoreRecipe } from './features/favorites/preferenceSignals.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
@@ -79,6 +80,8 @@ function renderProfile(root) {
     </section>
 
     <button class="master-profile-edit-button" type="button" data-edit-profile>Profil bearbeiten</button>
+
+    <p class="master-build-stamp">Preply ${esc(APP_BUILD)} · ${esc(APP_BUILD_DATE)}</p>
   </section>`;
 
   main.querySelector('[data-edit-profile]').addEventListener('click', () => openProfileEditor(root));
