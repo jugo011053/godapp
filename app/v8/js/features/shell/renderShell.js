@@ -11,6 +11,8 @@ const ROUTES = [
   ['shopping', 'Einkauf', ICONS.shopping]
 ];
 
+import { APP_BUILD } from '../../core/version.js';
+
 export function renderShell(root, { route = 'plan' } = {}) {
   /* Map 'profile' route to show profile but keep nav on 'plan' */
   const activeNav = route === 'profile' ? 'profile' : route;
@@ -20,7 +22,7 @@ export function renderShell(root, { route = 'plan' } = {}) {
       <header class="v8-header">
         <div class="v8-brand">
           <strong>preply</strong>
-          <span>Einfach gesund planen.</span>
+          <span>Einfach gesund planen. · ${APP_BUILD}</span>
         </div>
         <button type="button" class="v8-header-action" aria-label="Profil öffnen" onclick="location.hash='profile'">
           ${ICONS.profile}

@@ -1,6 +1,6 @@
 {
-  "name": "Preply Essensplaner V8",
-  "short_name": "Preply",
+  "name": "Preply V8 (Test)",
+  "short_name": "Preply V8",
   "description": "Persönliche Rezeptinspiration, Essensplanung und Einkaufsliste.",
   "start_url": "./#plan",
   "scope": "./",
@@ -9,7 +9,15 @@
   "theme_color": "#f7f7f4",
   "orientation": "portrait-primary",
   "icons": [
-    { "src": "../icon.png", "sizes": "192x192", "type": "image/png" },
-    { "src": "../icon.png", "sizes": "512x512", "type": "image/png" }
+    {
+      "src": "../icon.png",
+      "sizes": "192x192",
+      "type": "image/png"
+    },
+    {
+      "src": "../icon.png",
+      "sizes": "512x512",
+      "type": "image/png"
+    }
   ]
 }
