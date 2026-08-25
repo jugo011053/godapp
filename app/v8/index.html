@@ -46,7 +46,15 @@
           navigator.serviceWorker.addEventListener('controllerchange', function () {
             if (hadController) showUpdateBanner();
           });
-          setInterval(function () { registration.update().catch(function () {}); }, 3600000);
+
+          var check = function () { registration.update().catch(function () {}); };
+          check();
+          /* Auch beim Zurückkehren in die App prüfen — eine installierte PWA
+             bleibt sonst tagelang offen, ohne je nach einer neuen Version zu sehen. */
+          document.addEventListener('visibilitychange', function () {
+            if (document.visibilityState === 'visible') check();
+          });
+          setInterval(check, 1800000);
         }).catch(function (error) {
           console.warn('[Preply V8] Service Worker konnte nicht registriert werden.', error);
         });

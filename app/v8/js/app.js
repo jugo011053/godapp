@@ -1,9 +1,10 @@
 import { emit, on } from './core/events.js';
 import { getRoute, initializeRouter } from './core/router.js';
+import { APP_BUILD, APP_BUILD_DATE } from './core/version.js';
 import { getState, initializeStore, updateState } from './core/store.js';
 import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
 import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
-import { refreshProfileMaster } from './profileMasterEnhancement.js';
+import { appendBuildStamp, refreshProfileMaster } from './profileMasterEnhancement.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
 import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
 
@@ -20,6 +21,7 @@ async function renderAll() {
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   refreshPlanManagement(appRoot);
+  appendBuildStamp(appRoot);
 }
 
 try {
@@ -34,15 +36,18 @@ try {
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   refreshPlanManagement(appRoot);
+  appendBuildStamp(appRoot);
 
   window.PreplyV8 = Object.freeze({
     getState,
     updateState,
-    getRoute
+    getRoute,
+    build: APP_BUILD,
+    buildDate: APP_BUILD_DATE
   });
 
   emit('app:ready', { state: getState(), route: getRoute() });
-  console.info('[Preply V8] Integrierte Anwendung geladen.');
+  console.info(`[Preply ${APP_BUILD}] Integrierte Anwendung geladen (${APP_BUILD_DATE}).`);
 } catch (error) {
   console.error('[Preply V8] Startfehler:', error);
   if (appRoot) {
