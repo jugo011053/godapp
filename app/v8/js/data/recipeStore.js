@@ -10,8 +10,15 @@ let cards = [];
 
 export async function loadCards() {
   if (!cardsPromise) cardsPromise = repository.listCards();
-  cards = await cardsPromise;
-  return cards;
+  try {
+    cards = await cardsPromise;
+    return cards;
+  } catch (error) {
+    /* Ein abgelehntes Promise darf nicht im Cache bleiben, sonst scheitert
+       jeder spätere Versuch mit demselben alten Fehler. */
+    cardsPromise = null;
+    throw error;
+  }
 }
 
 export function getCards() {

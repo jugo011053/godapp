@@ -14,7 +14,8 @@ import {
 import { MEAL_OPTIONS, STEP_DEFINITIONS } from './features/onboarding/onboardingSteps.js';
 import { buildProfileSummary } from './features/profile/profileSummary.js';
 import { buildPlan, suggestForToday, replacementSuggestions } from './features/planner/plannerEngine.js';
-import { getReturnOptions, isPlanExpired } from './features/history/history.js';
+import { getReturnOptions, isPlanExpired, replaceCurrentPlan } from './features/history/history.js';
+import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
 const runtime = {
   recipes: [],
   catalogStatus: 'loading',
@@ -188,7 +189,7 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex) {
       <strong>${escapeHtml(name)}</strong>
       <em>${kcal} kcal · ${protein} g Protein · ${time} Min</em>
     </button>
-    <button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>
+    ${isExpanded ? '' : `<button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>`}
     ${isExpanded ? expandedHtml : ''}
   </div>`;
 }
@@ -207,8 +208,8 @@ function renderPlanPage() {
     const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
     const profile = state.profile || {};
-    const kcalTarget = profile.calorieTarget || 2000;
-    const proteinTarget = profile.proteinTarget || 120;
+    const kcalTarget = Math.round(resolveCalorieTarget(profile));
+    const proteinTarget = Math.round(resolveProteinTarget(profile));
     const summary = dayData ? computeDaySummary(dayData) : { totalKcal: 0, totalProtein: 0, mealCount: 0 };
 
     const isWeekView = days.length > 1;
@@ -329,6 +330,9 @@ function renderEmptyPlan() {
             <b>›</b>
           </div>
         `).join('')}
+        <div class="v8-start-grid" style="margin-top:12px">
+          <button class="v8-start-card primary" data-action="single-day-plan"><strong>Direkt loslegen</strong><span>Plan für heute erstellen</span></button>
+        </div>
       </div>
     ` : ''}
   </section>`;
@@ -350,10 +354,8 @@ function renderShoppingPage() {
     </div>
   </section>`;
   return `<section class="v8-page preply-page">
-    <div class="preply-kicker">Einkaufen</div>
-    <h1 class="preply-title">Alles, was<br>du brauchst.</h1>
-    <p class="preply-copy">Wähle Tage aus, für die du einkaufen willst.</p>
-    <div class="v8-panel"><div class="day-chip-row">${plan.selectedDates.map((date) => `<button class="day-toggle active" data-shop-date="${date}">${escapeHtml(dateLabel(date))}</button>`).join('')}</div></div>
+    <h1 class="master-screen-title">Einkauf</h1>
+    <p class="master-empty">Einkaufsliste wird zusammengestellt …</p>
   </section>`;
 }
 
@@ -375,8 +377,8 @@ function renderProfilePage() {
     <div class="preply-kicker">Profil</div>
     <h1 class="preply-title">Deine<br>Einstellungen.</h1>
     <div class="preply-profile-grid">
-      <div class="preply-profile-stat"><span>Tagesziel</span><b>${profile.calorieTarget || 2000} <small>kcal</small></b></div>
-      <div class="preply-profile-stat"><span>Protein</span><b>${profile.proteinTarget || 120} <small>g</small></b></div>
+      <div class="preply-profile-stat"><span>Tagesziel</span><b>${Math.round(resolveCalorieTarget(profile))} <small>kcal</small></b></div>
+      <div class="preply-profile-stat"><span>Protein</span><b>${Math.round(resolveProteinTarget(profile))} <small>g</small></b></div>
     </div>
     <div class="preply-settings-card">
       <h2>Ernährungsprofil</h2>
@@ -437,7 +439,7 @@ function onboardingBody(draft) {
   const ALLERGEN_LABELS = { gluten: 'Gluten', dairy: 'Milch', eggs: 'Eier', nuts: 'Nüsse', soy: 'Soja', fish: 'Fisch' };
   if (step === 'restrictions') return `<h2>Was soll ausgeschlossen werden?</h2><div class="option-grid">${Object.entries(ALLERGEN_LABELS).map(([key, label]) => `<button class="option-card ${(profile.allergies || []).includes(key) ? 'selected' : ''}" data-onboard-field="allergies" data-onboard-value="${key}" data-multiple="true"><strong>${label}</strong></button>`).join('')}</div><div class="form-field" style="margin-top:var(--space-4)"><span>Weitere Ausschlüsse</span><input data-onboard-input="excludedIngredients" value="${escapeHtml((profile.excludedIngredients || []).join(', '))}" placeholder="z. B. Koriander, Sellerie"></div>`;
   if (step === 'meals') return `<h2>Welche Mahlzeiten möchtest du planen?</h2><div class="option-grid">${MEAL_OPTIONS.map(([key,label]) => `<button class="option-card ${profile.enabledMeals[key] ? 'selected' : ''}" data-meal-key="${key}"><strong>${label}</strong></button>`).join('')}</div>`;
-  if (step === 'details') return `<h2>Optionale Details</h2><div class="form-grid"><div class="form-field"><label>Personen</label><input type="number" min="1" data-onboard-number="persons" value="${profile.persons}"></div><div class="form-field"><label>Maximale Kochzeit</label><input type="number" min="5" data-onboard-number="maxCookingTime" value="${profile.maxCookingTime || 30}"></div><div class="form-field"><label>Kalorienziel</label><input type="number" min="0" data-onboard-number="calorieTarget" value="${profile.calorieTarget || ''}"></div><div class="form-field"><label>Proteinziel</label><input type="number" min="0" data-onboard-number="proteinTarget" value="${profile.proteinTarget || ''}"></div></div>`;
+  if (step === 'details') return `<h2>Optionale Details</h2><div class="form-grid"><div class="form-field"><label>Personen</label><input type="number" min="1" data-onboard-number="persons" value="${profile.persons}"></div><div class="form-field"><label>Maximale Kochzeit</label><input type="number" min="5" data-onboard-number="maxCookingTime" value="${profile.maxCookingTime || 30}"></div><div class="form-field"><label>Kalorienziel</label><input type="number" min="0" data-onboard-number="calorieTarget" value="${profile.calorieTarget || ''}" placeholder="${Math.round(resolveCalorieTarget(profile))}"></div><div class="form-field"><label>Proteinziel</label><input type="number" min="0" data-onboard-number="proteinTarget" value="${profile.proteinTarget || ''}" placeholder="${Math.round(resolveProteinTarget(profile))}"></div></div><p style="color:var(--muted);font-size:var(--text-sm);margin-top:var(--space-3)">Leer lassen — dann rechnet Preply mit den grau angezeigten Werten aus deinem Ziel.</p>`;
   return `<h2>So wird geplant</h2><div class="v8-status">${escapeHtml(buildProfileSummary(profile))}</div>`;
 }
 
@@ -595,7 +597,7 @@ function renderDialog(root) {
   const step = currentStep(draft);
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
-  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Überspringen</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
+  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Später</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
   root.appendChild(overlay);
   bindDialogEvents(root);
 }
@@ -705,13 +707,7 @@ function createConfiguredPlan(root) {
       profile: state.profile
     }, state.preferences, { seed: Date.now() % 100000 });
 
-    updateState((current) => ({
-      ...current,
-      currentPlan: plan,
-      planHistory: current.currentPlan
-        ? [current.currentPlan, ...(current.planHistory || [])].slice(0, 12)
-        : current.planHistory || []
-    }));
+    updateState((current) => replaceCurrentPlan(current, plan));
     runtime.activeDialog = null;
     runtime.planDraft = null;
     renderApp(root);
@@ -760,16 +756,11 @@ function bindPageEvents(root) {
         mode: 'single_day',
         profile
       }, state.preferences, { seed: Date.now() % 100000 });
-      updateState((current) => ({
-        ...current,
-        currentPlan: plan,
-        planHistory: current.currentPlan
-          ? [current.currentPlan, ...(current.planHistory || [])].slice(0, 12)
-          : current.planHistory || []
-      }));
+      updateState((current) => replaceCurrentPlan(current, plan));
       renderApp(root);
     } catch (error) {
       console.error('[Preply] Tagesplan-Fehler', error);
+      showToast(root, error.message || 'Der Plan konnte nicht erstellt werden.');
     }
   }));
 

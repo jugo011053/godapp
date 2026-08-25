@@ -1,20 +1,26 @@
 import { getRoute } from './core/router.js';
-import { getState, updateState } from './core/store.js';
+import { getState, updateState, silentUpdate } from './core/store.js';
 import { loadCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
+import { scoreRecipe } from './data/recipeScoring.js';
 import { toggleFavorite, excludeRecipe } from './features/favorites/preferenceSignals.js';
 import { buildShoppingList, copyShoppingText, toggleShoppingDate } from './features/shopping/shoppingEngine.js';
 
 const ui = {
   recipes: [],
+  catalogError: null,
   filters: createDefaultFilters(),
   sort: 'recommended',
+  visibleCount: 40,
   selectedDates: [],
   checks: {},
+  shoppingPlanId: null,
   shoppingView: 'category',
   collapsedGroups: new Set(),
   details: new Map()
 };
+
+let searchTimer;
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -71,20 +77,23 @@ function favoriteButton(recipe, preferences, extraClass = '') {
   return `<button class="master-heart ${isFavorite(preferences, recipe.id) ? 'active' : ''} ${extraClass}" type="button" data-v8-favorite="${esc(recipe.id)}" aria-label="${isFavorite(preferences, recipe.id) ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen'}">${SVG.heart}</button>`;
 }
 
+/* Im Katalog gibt es derzeit kein Bildfeld, also lieferte der Platzhalter auf
+   jeder Karte denselben grauen Block. Bild nur zeigen, wenn wirklich eins da
+   ist — sonst trägt die Karte den Text. */
 function recipeVisual(recipe) {
   const image = recipeImage(recipe);
-  return image
-    ? `<div class="master-recipe-visual"><img src="${esc(image)}" alt="" loading="lazy"></div>`
-    : '<div class="master-recipe-visual placeholder" aria-hidden="true"></div>';
+  return image ? `<span class="master-recipe-visual"><img src="${esc(image)}" alt="" loading="lazy"></span>` : '';
 }
 
 function forYouCard(recipe, preferences) {
   return `<article class="master-foryou-card">
-    <button class="master-recipe-main" type="button" data-v8-detail="${esc(recipe.id)}" style="display:block;width:100%;padding:0">
+    <button class="master-recipe-main" type="button" data-v8-detail="${esc(recipe.id)}">
       ${recipeVisual(recipe)}
       <span class="master-foryou-copy">
+        <span class="master-foryou-cat">${esc(CATEGORY_DE[recipe.category] || recipe.category || 'Rezept')}</span>
         <strong>${esc(recipe.name)}</strong>
-        <small>${Math.round(recipe.kcal || 0)} kcal · ${Math.round(recipe.protein || 0)} g Protein · ${Math.round(recipe.time || 0)} Min.</small>
+        <small>${Math.round(recipe.kcal || 0)} kcal · ${Math.round(recipe.protein || 0)} g Protein</small>
+        <small>${Math.round(recipe.time || 0)} Min.</small>
       </span>
     </button>
     ${favoriteButton(recipe, preferences)}
@@ -108,11 +117,97 @@ function hasAdvancedFilters() {
   return Boolean(ui.filters.maxTime || ui.filters.diet || ui.filters.simplicity || ui.filters.difficulty);
 }
 
+const PAGE_SIZE = 40;
+
+const DIET_DE = {
+  vegetarian: 'Vegetarisch',
+  vegan: 'Vegan',
+  pescatarian: 'Pescetarisch'
+};
+
+function activeFilterLabels() {
+  const labels = [];
+  if (ui.filters.favoritesOnly) labels.push('Favoriten');
+  if (ui.filters.query) labels.push(`Suche „${ui.filters.query}“`);
+  if (ui.filters.category) labels.push(CATEGORY_DE[ui.filters.category] || ui.filters.category);
+  if (ui.filters.maxTime) labels.push(`bis ${ui.filters.maxTime} Min.`);
+  if (ui.filters.diet) labels.push(DIET_DE[ui.filters.diet] || ui.filters.diet);
+  if (ui.filters.simplicity) labels.push('Simpel');
+  return labels;
+}
+
+/* Vorher stand hier immer derselbe Satz. Wenn ein Filter außerhalb des
+   sichtbaren Bereichs aktiv war, war nicht erkennbar, was die Liste leert. */
+function emptyResultsHtml(preferences) {
+  const labels = activeFilterLabels();
+  const noFavorites = ui.filters.favoritesOnly && !(preferences.favoriteRecipeIds || []).length;
+  const text = noFavorites
+    ? 'Du hast noch keine Rezepte favorisiert. Tippe bei einem Rezept auf das Herz, dann erscheint es hier.'
+    : labels.length
+      ? `Kein Rezept passt zu: ${labels.join(' · ')}.`
+      : 'Es sind keine Rezepte verfügbar.';
+  return `<p class="master-empty">${esc(text)}</p>
+    ${labels.length ? '<button class="master-load-more" type="button" data-clear-filters>Filter zurücksetzen</button>' : ''}`;
+}
+
+/* "Für dich" nutzt jetzt dieselbe Bewertung wie der Planer — Kalorienziel,
+   Protein, Prioritäten, Kochzeit. Vorher wurde nur alphabetisch sortiert. */
+function recommendFor(profile, preferences) {
+  const pool = filterRecipes(ui.recipes, {
+    ...createDefaultFilters(),
+    category: ui.filters.category,
+    maxTime: ui.filters.maxTime,
+    diet: ui.filters.diet,
+    simplicity: ui.filters.simplicity
+  }, preferences);
+
+  const scored = pool
+    .map((recipe) => ({
+      recipe,
+      score: scoreRecipe(recipe, {
+        category: recipe.category,
+        profile,
+        preferences,
+        usedRecipeIds: new Set(),
+        usedFamilies: new Set()
+      })
+    }))
+    .filter((entry) => Number.isFinite(entry.score))
+    .sort((a, b) => b.score - a.score);
+
+  /* Fällt das Profil komplett durch (z. B. sehr enge Kochzeit), lieber die
+     bestbewerteten Rezepte zeigen als eine leere Zeile. */
+  const ranked = scored.length ? scored.map((entry) => entry.recipe) : sortRecipes(pool, 'recommended', preferences);
+
+  const seen = new Set();
+  const picked = [];
+  for (const recipe of ranked) {
+    const family = recipe.familyKey || recipe.id;
+    if (seen.has(family)) continue;
+    seen.add(family);
+    picked.push(recipe);
+    if (picked.length === 6) break;
+  }
+  return picked;
+}
+
 function renderRecipes(root) {
   const main = root.querySelector('.v8-main');
   if (!main) return;
   if (!ui.recipes.length) {
-    main.innerHTML = '<section class="v8-page preply-page"><h1 class="master-screen-title">Rezepte</h1><p class="master-empty">Rezepte werden geladen …</p></section>';
+    main.innerHTML = `<section class="v8-page preply-page">
+      <h1 class="master-screen-title">Rezepte</h1>
+      ${ui.catalogError
+        ? `<p class="master-empty">${esc(ui.catalogError)}</p>
+           <button class="sheet-action primary" type="button" data-retry-catalog>Erneut versuchen</button>`
+        : '<p class="master-empty">Rezepte werden geladen …</p>'}
+    </section>`;
+    main.querySelector('[data-retry-catalog]')?.addEventListener('click', async (event) => {
+      event.currentTarget.disabled = true;
+      event.currentTarget.textContent = 'Wird geladen …';
+      await initializeFeatureEnhancements();
+      renderRecipes(root);
+    });
     return;
   }
 
@@ -120,13 +215,15 @@ function renderRecipes(root) {
   const preferences = state.preferences || {};
   const filtered = filterRecipes(ui.recipes, ui.filters, preferences);
   const results = sortRecipes(filtered, ui.sort, preferences);
-  const recommendations = sortRecipes(filterRecipes(ui.recipes, {
-    ...createDefaultFilters(),
-    category: ui.filters.category,
-    maxTime: ui.filters.maxTime,
-    diet: ui.filters.diet,
-    simplicity: ui.filters.simplicity
-  }, preferences), 'recommended', preferences).slice(0, 6);
+
+  /* Beim Suchen oder Filtern nach Favoriten sucht man gezielt — eine
+     unveränderte Empfehlungszeile darüber sieht dann aus, als hinge sie fest. */
+  const showRecommendations = !ui.filters.query && !ui.filters.favoritesOnly;
+  const recommendations = showRecommendations
+    ? recommendFor(state.profile || {}, preferences)
+    : [];
+
+  const visible = Math.min(ui.visibleCount, results.length);
 
   main.innerHTML = `<section class="v8-page preply-page">
     <h1 class="master-screen-title">Rezepte</h1>
@@ -152,31 +249,66 @@ function renderRecipes(root) {
       <button class="master-chip ${hasAdvancedFilters() ? 'active' : ''}" type="button" data-open-filters>Alle Filter</button>
     </div>
 
-    <div class="master-section-head"><h2>Für dich</h2><span>${recommendations.length} Vorschläge</span></div>
+    ${recommendations.length ? `
+    <div class="master-section-head"><h2>Für dich</h2><span>Passend zu deinem Profil</span></div>
     <div class="master-foryou">
-      ${recommendations.map((recipe) => forYouCard(recipe, preferences)).join('') || '<p class="master-empty">Noch keine passenden Empfehlungen.</p>'}
-    </div>
+      ${recommendations.map((recipe) => forYouCard(recipe, preferences)).join('')}
+    </div>` : ''}
 
-    <div class="master-section-head"><h2>Alle Rezepte</h2><span>${results.length}</span></div>
+    <div class="master-section-head"><h2>Alle Rezepte</h2><span>${visible < results.length ? `${visible} von ${results.length}` : results.length}</span></div>
     <div class="master-recipe-list">
-      ${results.slice(0, 80).map((recipe) => recipeRow(recipe, preferences)).join('') || '<p class="master-empty">Mit diesen Filtern wurde kein Rezept gefunden.</p>'}
+      ${results.slice(0, visible).map((recipe) => recipeRow(recipe, preferences)).join('')}
     </div>
+    ${results.length ? '' : emptyResultsHtml(preferences)}
+    ${visible < results.length
+      ? `<button class="master-load-more" type="button" data-load-more>Weitere ${Math.min(PAGE_SIZE, results.length - visible)} anzeigen</button>`
+      : ''}
   </section>`;
 
   bindRecipeEvents(root);
 }
 
+/* Ein Herz-Klick darf die Seite nicht neu aufbauen: updateState() löst
+   renderAll() aus, das die ganze Shell ersetzt — die Liste springt dann
+   zurück nach oben. Also Zustand still sichern und nur das Icon umschalten. */
+function applyFavorite(root, id) {
+  if (!id) return;
+  const next = silentUpdate((state) => ({
+    ...state,
+    preferences: toggleFavorite(state.preferences || {}, id)
+  }));
+  const active = (next.preferences?.favoriteRecipeIds || []).includes(id);
+
+  /* Dasselbe Rezept kann in "Für dich" und in der Liste stehen. */
+  root.querySelectorAll(`[data-v8-favorite="${CSS.escape(id)}"]`).forEach((button) => {
+    button.classList.toggle('active', active);
+    button.setAttribute('aria-label', active ? 'Aus Favoriten entfernen' : 'Zu Favoriten hinzufügen');
+  });
+
+  /* Nur wenn nach Favoriten gefiltert wird, ändert sich die sichtbare Menge. */
+  if (ui.filters.favoritesOnly) renderRecipes(root);
+}
+
 function bindRecipeEvents(root) {
   root.querySelector('[data-v8-filter="query"]')?.addEventListener('input', (event) => {
-    ui.filters = { ...ui.filters, query: event.currentTarget.value };
-    renderRecipes(root);
-    const input = root.querySelector('[data-v8-filter="query"]');
-    input?.focus();
-    input?.setSelectionRange(input.value.length, input.value.length);
+    const value = event.currentTarget.value;
+    const caret = event.currentTarget.selectionStart;
+    ui.filters = { ...ui.filters, query: value };
+    ui.visibleCount = PAGE_SIZE;
+    /* Ohne Entprellung wird bei jedem Tastendruck die ganze Liste neu gebaut. */
+    clearTimeout(searchTimer);
+    searchTimer = setTimeout(() => {
+      renderRecipes(root);
+      const input = root.querySelector('[data-v8-filter="query"]');
+      if (!input) return;
+      input.focus();
+      input.setSelectionRange(caret, caret);
+    }, 180);
   });
 
   root.querySelectorAll('[data-chip="category"]').forEach((button) => button.addEventListener('click', () => {
     ui.filters = { ...ui.filters, category: button.dataset.value || '' };
+    ui.visibleCount = PAGE_SIZE;
     renderRecipes(root);
   }));
 
@@ -185,18 +317,27 @@ function bindRecipeEvents(root) {
     if (value === 'favorites') ui.filters = { ...ui.filters, favoritesOnly: !ui.filters.favoritesOnly };
     if (value === 'quick') ui.sort = ui.sort === 'quick' ? 'recommended' : 'quick';
     if (value === 'protein') ui.sort = ui.sort === 'protein' ? 'recommended' : 'protein';
+    ui.visibleCount = PAGE_SIZE;
     renderRecipes(root);
   }));
 
   root.querySelectorAll('[data-open-filters]').forEach((button) => button.addEventListener('click', () => openFilterSheet(root)));
 
+  root.querySelector('[data-load-more]')?.addEventListener('click', () => {
+    ui.visibleCount += PAGE_SIZE;
+    renderRecipes(root);
+  });
+
+  root.querySelector('[data-clear-filters]')?.addEventListener('click', () => {
+    ui.filters = createDefaultFilters();
+    ui.sort = 'recommended';
+    ui.visibleCount = PAGE_SIZE;
+    renderRecipes(root);
+  });
+
   root.querySelectorAll('[data-v8-favorite]').forEach((button) => button.addEventListener('click', (event) => {
     event.stopPropagation();
-    updateState((state) => ({
-      ...state,
-      preferences: toggleFavorite(state.preferences || {}, button.dataset.v8Favorite)
-    }));
-    renderRecipes(root);
+    applyFavorite(root, button.dataset.v8Favorite);
   }));
 
   root.querySelectorAll('[data-v8-detail]').forEach((button) => button.addEventListener('click', () => showDetail(root, button.dataset.v8Detail)));
@@ -221,21 +362,29 @@ function openFilterSheet(root) {
     <div class="sheet-actions"><button class="sheet-action primary" type="button" data-filter-apply>Filter anwenden</button><button class="sheet-action" type="button" data-filter-reset>Zurücksetzen</button></div>
   </section>`);
 
-  const select = (selector, key, value) => {
+  /* Verglichen wird gegen den rohen data-Wert des geklickten Knopfes. Vorher
+     wurde der umgewandelte Wert verglichen — bei "Beliebig" wurde aus 0 dann
+     null und "null" traf auf keinen Knopf, also blieb die Gruppe unmarkiert. */
+  const select = (selector, key, button, value) => {
     draft[key] = value;
-    overlay.querySelectorAll(selector).forEach((button) => button.classList.toggle('selected', button.dataset[selector.includes('diet') ? 'filterDiet' : selector.includes('time') ? 'filterTime' : 'filterSimple'] === String(value)));
+    overlay.querySelectorAll(selector).forEach((other) => other.classList.toggle('selected', other === button));
   };
 
-  overlay.querySelectorAll('[data-filter-diet]').forEach((button) => button.addEventListener('click', () => select('[data-filter-diet]', 'diet', button.dataset.filterDiet)));
-  overlay.querySelectorAll('[data-filter-time]').forEach((button) => button.addEventListener('click', () => select('[data-filter-time]', 'maxTime', Number(button.dataset.filterTime) || null)));
-  overlay.querySelectorAll('[data-filter-simple]').forEach((button) => button.addEventListener('click', () => select('[data-filter-simple]', 'simplicity', button.dataset.filterSimple)));
+  overlay.querySelectorAll('[data-filter-diet]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-diet]', 'diet', button, button.dataset.filterDiet)));
+  overlay.querySelectorAll('[data-filter-time]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-time]', 'maxTime', button, Number(button.dataset.filterTime) || null)));
+  overlay.querySelectorAll('[data-filter-simple]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-simple]', 'simplicity', button, button.dataset.filterSimple)));
   overlay.querySelector('[data-filter-apply]').addEventListener('click', () => {
     ui.filters = { ...ui.filters, diet: draft.diet, maxTime: draft.maxTime, simplicity: draft.simplicity };
+    ui.visibleCount = PAGE_SIZE;
     closeOverlay(overlay);
     renderRecipes(root);
   });
   overlay.querySelector('[data-filter-reset]').addEventListener('click', () => {
     ui.filters = { ...ui.filters, diet: '', maxTime: null, simplicity: '', difficulty: '' };
+    ui.visibleCount = PAGE_SIZE;
     closeOverlay(overlay);
     renderRecipes(root);
   });
@@ -249,7 +398,15 @@ async function recipeById(id) {
 }
 
 async function openRecipeMenu(root, id) {
-  const recipe = await recipeById(id);
+  let recipe;
+  try {
+    recipe = await recipeById(id);
+  } catch (error) {
+    /* Ohne diesen Zweig endete ein fehlgeschlagener Abruf in einer stillen
+       Promise-Rejection — der ···-Knopf tat dann einfach nichts. */
+    console.error('[Preply V8] Rezeptmenü', error);
+    recipe = ui.recipes.find((item) => item.id === id) || { id, name: 'Rezept' };
+  }
   const favorite = isFavorite(getState().preferences || {}, id);
   const overlay = appendSheet(root, 'plan-menu-overlay', `<section class="v8-dialog plan-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="recipe-menu-title">
     <div class="sheet-head"><h2 id="recipe-menu-title">${esc(recipe.name)}</h2><button class="sheet-close" type="button" data-sheet-close aria-label="Schließen">×</button></div>
@@ -265,12 +422,12 @@ async function openRecipeMenu(root, id) {
     showDetail(root, id);
   });
   overlay.querySelector('[data-menu-favorite]').addEventListener('click', () => {
-    updateState((state) => ({ ...state, preferences: toggleFavorite(state.preferences || {}, id) }));
     closeOverlay(overlay);
-    renderRecipes(root);
+    applyFavorite(root, id);
   });
   overlay.querySelector('[data-menu-exclude]').addEventListener('click', () => {
-    updateState((state) => ({ ...state, preferences: excludeRecipe(state.preferences || {}, id, []) }));
+    /* Ausblenden entfernt das Rezept aus der Liste — hier muss neu gerendert werden. */
+    silentUpdate((state) => ({ ...state, preferences: excludeRecipe(state.preferences || {}, id, []) }));
     closeOverlay(overlay);
     renderRecipes(root);
   });
@@ -289,9 +446,8 @@ async function showDetail(root, id) {
       <div class="sheet-actions"><button class="sheet-action ${isFavorite(preferences, id) ? '' : 'lime'}" type="button" data-detail-favorite>${isFavorite(preferences, id) ? 'Aus Favoriten entfernen' : 'Favorisieren'}</button></div>
     </section>`);
     overlay.querySelector('[data-detail-favorite]').addEventListener('click', () => {
-      updateState((state) => ({ ...state, preferences: toggleFavorite(state.preferences || {}, id) }));
       closeOverlay(overlay);
-      renderRecipes(root);
+      applyFavorite(root, id);
     });
   } catch (error) {
     console.error('[Preply V8] Rezeptdetail', error);
@@ -332,9 +488,17 @@ function dateParts(date) {
 
 function displayCategory(category = '') {
   const value = category.toLowerCase();
-  if (value.includes('gemüse') || value.includes('obst')) return 'Gemüse';
-  if (value.includes('hülsen') || value.includes('getreide') || value.includes('trocken')) return 'Hülsenfrüchte & Getreide';
-  if (value.includes('milch') || value.includes('ei') || value.includes('kühl')) return 'Milchprodukte & Eier';
+  if (value.includes('gemüse') || value.includes('obst') || value.includes('salat')) return 'Obst & Gemüse';
+  if (value.includes('fleisch') || value.includes('geflügel') || value.includes('wurst') || value.includes('rind') || value.includes('schwein') || value.includes('hack')) return 'Fleisch & Wurst';
+  if (value.includes('fisch') || value.includes('meeres') || value.includes('garnele') || value.includes('lachs') || value.includes('thunfisch')) return 'Fisch';
+  if (value.includes('milch') || value.includes('käse') || value.includes('joghurt') || value.includes('ei') || value.includes('kühl') || value.includes('quark') || value.includes('sahne') || value.includes('butter') || value.includes('schmand')) return 'Milchprodukte & Eier';
+  if (value.includes('brot') || value.includes('back') || value.includes('mehl') || value.includes('teig')) return 'Brot & Backwaren';
+  if (value.includes('nudel') || value.includes('pasta') || value.includes('reis') || value.includes('getreide') || value.includes('hülsen') || value.includes('trocken') || value.includes('linse') || value.includes('bohne') || value.includes('couscous') || value.includes('haferflocken')) return 'Trockenware & Beilagen';
+  if (value.includes('gewürz') || value.includes('kräuter') || value.includes('soße') || value.includes('sauce') || value.includes('essig') || value.includes('senf') || value.includes('dressing') || value.includes('würz')) return 'Gewürze & Soßen';
+  if (value.includes('öl') || value.includes('fett') || value.includes('margarine')) return 'Öle & Fette';
+  if (value.includes('konserv') || value.includes('dose') || value.includes('passiert') || value.includes('tomatenmark')) return 'Konserven';
+  if (value.includes('tiefkühl') || value.includes('gefroren') || value.includes('tk')) return 'Tiefkühl';
+  if (value.includes('nuss') || value.includes('nüsse') || value.includes('samen') || value.includes('kerne') || value.includes('mandel')) return 'Nüsse & Samen';
   return 'Sonstiges';
 }
 
@@ -352,12 +516,20 @@ function amountText(item) {
   return `${Math.round(Number(amount || 0) * 100) / 100} ${esc(item.buyUnit || item.unit || '')}`;
 }
 
+function packText(item) {
+  const parts = [];
+  if (item.packs) parts.push(`${item.packs} Pack.`);
+  if (item.estimatedPrice) parts.push(`ca. ${item.estimatedPrice.toFixed(2).replace('.', ',')} €`);
+  return parts.join(' · ');
+}
+
 function shoppingItem(item) {
   const checked = Boolean(ui.checks[item.id] ?? item.checked);
+  const pack = packText(item);
   return `<div class="master-shopping-row">
     <button class="master-shopping-check ${checked ? 'checked' : ''}" type="button" data-v8-check="${esc(item.id)}" aria-label="${checked ? 'Als offen markieren' : 'Als erledigt markieren'}">${checked ? '✓' : ''}</button>
     <span class="master-shopping-name ${checked ? 'done' : ''}">${esc(item.name)}</span>
-    <span class="master-shopping-amount">${amountText(item)}</span>
+    <span class="master-shopping-amount">${amountText(item)}${pack ? `<small>${esc(pack)}</small>` : ''}</span>
   </div>`;
 }
 
@@ -385,14 +557,32 @@ async function renderShopping(root) {
     return;
   }
 
-  main.innerHTML = '<section class="v8-page preply-page"><h1 class="master-screen-title">Einkauf</h1><p class="master-empty">Einkaufsliste wird zusammengestellt …</p></section>';
+  /* Der Platzhalter erscheint nur, wenn noch keine Liste steht — sonst würde
+     jeder Tages-Toggle die fertige Liste kurz gegen "wird zusammengestellt" tauschen. */
+  if (!main.querySelector('.master-shopping-groups')) {
+    main.innerHTML = '<section class="v8-page preply-page"><h1 class="master-screen-title">Einkauf</h1><p class="master-empty">Einkaufsliste wird zusammengestellt …</p></section>';
+  }
 
   try {
     const plan = await detailedPlan(state.currentPlan);
+    const planId = plan.id || plan.startDate || null;
+
+    /* Neuer Plan: Tagesauswahl und Haken gehören zum alten Plan und müssen weg,
+       sonst bleibt die Liste leer (alte Daten sind nicht mehr verfügbar). */
+    if (ui.shoppingPlanId !== planId) {
+      ui.shoppingPlanId = planId;
+      ui.selectedDates = [];
+      ui.checks = {};
+      ui.collapsedGroups = new Set();
+      silentUpdate((current) => ({ ...current, shoppingChecks: {} }));
+    } else {
+      ui.checks = { ...(state.shoppingChecks || {}), ...ui.checks };
+    }
+
     if (!ui.selectedDates.length) ui.selectedDates = plan.selectedDates || plan.days.map((day) => day.date);
-    ui.checks = { ...(state.shoppingChecks || {}), ...ui.checks };
     const list = buildShoppingList(plan, ui.selectedDates, ui.checks);
     const groups = groupedShoppingItems(list.items);
+    const openCount = list.items.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
 
     main.innerHTML = `<section class="v8-page preply-page">
       <h1 class="master-screen-title">Einkauf</h1>
@@ -411,6 +601,11 @@ async function renderShopping(root) {
       <div class="master-shopping-groups">
         ${ui.shoppingView === 'category' ? groups.map(categoryGroup).join('') : list.byRecipe.map(recipeShoppingGroup).join('')}
       </div>
+
+      ${ui.shoppingView === 'category' ? `<div class="master-shopping-summary">
+        <span data-open-count>${openCount} von ${list.items.length} offen</span>
+        ${list.estimatedTotal ? `<strong>ca. ${list.estimatedTotal.toFixed(2).replace('.', ',')} €</strong>` : ''}
+      </div>` : ''}
 
       <div class="master-shopping-actions">
         <button class="master-shopping-copy" type="button" data-v8-copy>Einkauf kopieren</button>
@@ -435,10 +630,20 @@ async function renderShopping(root) {
       renderShopping(root);
     }));
 
+    const openLabel = main.querySelector('[data-open-count]');
     main.querySelectorAll('[data-v8-check]').forEach((button) => button.addEventListener('click', () => {
       const id = button.dataset.v8Check;
-      ui.checks[id] = !Boolean(ui.checks[id]);
-      updateState((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: ui.checks[id] } }));
+      const checked = !Boolean(ui.checks[id]);
+      ui.checks[id] = checked;
+      button.classList.toggle('checked', checked);
+      button.textContent = checked ? '✓' : '';
+      button.setAttribute('aria-label', checked ? 'Als offen markieren' : 'Als erledigt markieren');
+      button.nextElementSibling?.classList.toggle('done', checked);
+      if (openLabel) {
+        const open = list.items.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
+        openLabel.textContent = `${open} von ${list.items.length} offen`;
+      }
+      silentUpdate((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: checked } }));
     }));
 
     main.querySelector('[data-v8-copy]')?.addEventListener('click', async (event) => {
@@ -483,8 +688,10 @@ function openShoppingMenu(root, plan) {
 export async function initializeFeatureEnhancements() {
   try {
     ui.recipes = await loadCards();
+    ui.catalogError = null;
   } catch (error) {
     console.error('[Preply V8] Erweiterungskatalog', error);
+    ui.catalogError = error.message || 'Rezepte konnten nicht geladen werden.';
   }
 }
 

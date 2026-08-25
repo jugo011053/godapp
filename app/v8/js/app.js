@@ -5,7 +5,6 @@ import { rerenderIntegratedApp, startIntegratedApp } from './integrationControll
 import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
 import { refreshProfileMaster } from './profileMasterEnhancement.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
-import { refreshPlanReplacementEnhancement } from './planReplacementEnhancement.js';
 import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
 
 const appRoot = document.getElementById('app');
@@ -20,7 +19,6 @@ async function renderAll() {
   await refreshFeatureEnhancements(appRoot);
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
-  await refreshPlanReplacementEnhancement(appRoot);
   refreshPlanManagement(appRoot);
 }
 
@@ -35,7 +33,6 @@ try {
   await refreshFeatureEnhancements(appRoot);
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
-  await refreshPlanReplacementEnhancement(appRoot);
   refreshPlanManagement(appRoot);
 
   window.PreplyV8 = Object.freeze({

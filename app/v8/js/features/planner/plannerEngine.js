@@ -7,6 +7,14 @@ import {
   targetForMeal
 } from '../../data/recipeScoring.js';
 
+const CATEGORY_LABELS = Object.freeze({
+  breakfast: 'Frühstück',
+  lunch: 'Mittagessen',
+  dinner: 'Abendessen',
+  snack: 'Snack',
+  shake: 'Shake'
+});
+
 function dateKey(value) {
   const date = new Date(`${value}T12:00:00`);
   if (Number.isNaN(date.getTime())) throw new TypeError(`Ungültiges Datum: ${value}`);
@@ -114,7 +122,7 @@ export function buildPlan(recipes, request, preferences = {}, options = {}) {
       });
       const chosen = chooseAmongTop(ranked, random, 5);
       if (!chosen) {
-        throw new Error(`Kein geeignetes Rezept für ${category} gefunden.`);
+        throw new Error(`Für ${CATEGORY_LABELS[category] || category} wurde kein passendes Rezept gefunden. Lockere deine Filter — zum Beispiel die maximale Kochzeit oder die Ausschlüsse.`);
       }
 
       const possibleGroup = prepGroupLength(profile, category);
@@ -128,8 +136,8 @@ export function buildPlan(recipes, request, preferences = {}, options = {}) {
         day.meals[category] = createPlannedMeal(chosen, profile, category, {
           prepGroupId,
           prepSourceDate: days[dayIndex].date,
-          repeatedForMealPrep: offset > 0
-        });
+          repeatedForMealPrep: offset > 0,
+          });
       }
 
       usedRecipeIds.add(chosen.id);

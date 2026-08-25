@@ -1,6 +1,7 @@
 import { getRoute } from './core/router.js';
 import { getState, updateState } from './core/store.js';
 import { loadCards } from './data/recipeStore.js';
+import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
 import { restoreRecipe } from './features/favorites/preferenceSignals.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
@@ -57,8 +58,8 @@ function renderProfile(root) {
     </div>
 
     <div class="master-profile-summary">
-      <div class="master-profile-stat dark"><small>Kalorienziel</small><strong>${Math.round(profile.calorieTarget || 0)} kcal</strong></div>
-      <div class="master-profile-stat dark"><small>Proteinziel</small><strong>${Math.round(profile.proteinTarget || 0)} g</strong></div>
+      <div class="master-profile-stat dark"><small>Kalorienziel</small><strong>${Math.round(resolveCalorieTarget(profile))} kcal</strong></div>
+      <div class="master-profile-stat dark"><small>Proteinziel</small><strong>${Math.round(resolveProteinTarget(profile))} g</strong></div>
       <div class="master-profile-stat"><small>Personen</small><strong>${Math.max(1, Number(profile.persons || 1))}</strong></div>
       <div class="master-profile-stat"><small>Kochzeit</small><strong>${Math.round(profile.maxCookingTime || 0)} Min.</strong></div>
     </div>
@@ -97,8 +98,8 @@ function openProfileEditor(root) {
       <div class="master-form-grid">
         <div class="master-form-field"><label for="profile-persons">Personen</label><input id="profile-persons" name="persons" type="number" min="1" max="12" value="${Math.max(1, Number(profile.persons || 1))}"></div>
         <div class="master-form-field"><label for="profile-time">Kochzeit</label><input id="profile-time" name="maxCookingTime" type="number" min="5" max="240" value="${Math.round(profile.maxCookingTime || 45)}"></div>
-        <div class="master-form-field"><label for="profile-kcal">Kalorienziel</label><input id="profile-kcal" name="calorieTarget" type="number" min="800" max="6000" value="${Math.round(profile.calorieTarget || 2200)}"></div>
-        <div class="master-form-field"><label for="profile-protein">Proteinziel</label><input id="profile-protein" name="proteinTarget" type="number" min="20" max="400" value="${Math.round(profile.proteinTarget || 130)}"></div>
+        <div class="master-form-field"><label for="profile-kcal">Kalorienziel</label><input id="profile-kcal" name="calorieTarget" type="number" min="800" max="6000" value="${Math.round(resolveCalorieTarget(profile))}"></div>
+        <div class="master-form-field"><label for="profile-protein">Proteinziel</label><input id="profile-protein" name="proteinTarget" type="number" min="20" max="400" value="${Math.round(resolveProteinTarget(profile))}"></div>
       </div>
 
       <div class="master-form-grid">

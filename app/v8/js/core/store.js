@@ -39,6 +39,17 @@ export function updateState(updater, { persist = true } = {}) {
   return replaceState(result === undefined ? draft : result, { persist });
 }
 
+export function silentUpdate(updater) {
+  if (typeof updater !== 'function') {
+    throw new TypeError('silentUpdate benötigt eine Funktion.');
+  }
+  const draft = getState();
+  const result = updater(draft);
+  state = { ...createEmptyState(), ...clone(result === undefined ? draft : result) };
+  saveState(state);
+  return getState();
+}
+
 export function resetState() {
   return replaceState(createEmptyState());
 }

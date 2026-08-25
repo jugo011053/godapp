@@ -51,7 +51,7 @@ function packEstimate(amount, ingredient) {
   const ingredientUnit = (ingredient.unit || '').toLowerCase();
 
   if (!packSize || amount <= 0 || !unitsCompatible(ingredientUnit, packUnit)) {
-    return { packs: null, buyAmount: round(amount), estimatedPrice: packPrice ? round(Math.ceil(amount) * packPrice) : null };
+    return { packs: null, buyAmount: round(amount), estimatedPrice: null };
   }
   const converted = convertToPackUnit(amount, ingredientUnit, packUnit);
   const packs = Math.ceil(converted / packSize);
@@ -107,6 +107,9 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
             amount: 0,
             packSize: Number(ingredient.packSize || ingredient.pack_size || 0) || null,
             packPrice: Number(ingredient.packPrice || ingredient.pack_price_eur || 0) || null,
+            /* Ohne packUnit hält packEstimate() die Einheiten für unvereinbar und
+               liefert nie Packungen oder Preise. */
+            packUnit: ingredient.packUnit || ingredient.pack_unit || null,
             sources: [],
             checked: Boolean(previousChecks[key])
           });
@@ -164,8 +167,14 @@ export function toggleShoppingDate(currentDates, date, plan) {
   const available = new Set(availableShoppingDates(plan).map((entry) => entry.date));
   if (!available.has(date)) return normalizeSelectedDates(plan, currentDates);
   const next = new Set(normalizeSelectedDates(plan, currentDates));
-  if (next.has(date)) next.delete(date);
-  else next.add(date);
+  if (next.has(date)) {
+    /* Der letzte Tag bleibt stehen — eine leere Auswahl würde von
+       normalizeSelectedDates wieder auf "alle Tage" zurückfallen. */
+    if (next.size === 1) return [...next];
+    next.delete(date);
+  } else {
+    next.add(date);
+  }
   return [...next].sort();
 }
 
@@ -180,8 +189,9 @@ export function copyShoppingText(list) {
     for (const item of group.items) {
       const amount = item.buyAmount || item.amount;
       const packInfo = item.packs ? ` (${item.packs} Packung${item.packs === 1 ? '' : 'en'})` : '';
-      lines.push(`${item.checked ? '✓' : '○'} ${item.name}: ${round(amount)} ${item.unit}${packInfo}`);
+      lines.push(`${item.checked ? '✓' : '○'} ${item.name}: ${round(amount)} ${item.buyUnit || item.unit}${packInfo}`);
     }
   }
+  if (list.estimatedTotal) lines.push('', `Geschätzt: ca. ${list.estimatedTotal.toFixed(2).replace('.', ',')} €`);
   return lines.join('\n');
 }

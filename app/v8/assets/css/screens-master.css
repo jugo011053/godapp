@@ -65,16 +65,15 @@
   stroke-linecap: round;
 }
 
+/* Vorher horizontal scrollend mit versteckter Scrollbar: auf schmalen
+   Displays rutschte "Alle Filter" aus dem Bild, und ein aktiver Filter
+   (etwa Favoriten) blieb unsichtbar, obwohl er die Liste leerte. */
 .master-chip-row {
   display: flex;
+  flex-wrap: wrap;
   gap: 7px;
-  overflow-x: auto;
-  margin: 0 -18px 9px;
-  padding: 0 18px 3px;
-  scrollbar-width: none;
+  margin: 0 0 9px;
 }
-
-.master-chip-row::-webkit-scrollbar { display: none; }
 
 .master-chip {
   flex: 0 0 auto;
@@ -131,7 +130,7 @@
 
 .master-foryou-card {
   position: relative;
-  flex: 0 0 145px;
+  flex: 0 0 162px;
   overflow: hidden;
   border: 0;
   border-radius: 13px;
@@ -139,10 +138,16 @@
   color: var(--ink);
   text-align: left;
 }
+.master-foryou-card > .master-recipe-main {
+  display: block;
+  width: 100%;
+  padding: 0;
+}
 
+/* Wird nur noch gerendert, wenn ein Rezept wirklich ein Bild mitbringt. */
 .master-recipe-visual {
-  position: relative;
-  height: 100px;
+  display: block;
+  height: 92px;
   overflow: hidden;
   background: linear-gradient(145deg, var(--lime-pale), var(--lime));
 }
@@ -153,30 +158,21 @@
   object-fit: cover;
 }
 
-.master-recipe-visual.placeholder::before,
-.master-recipe-visual.placeholder::after {
-  content: "";
-  position: absolute;
-  border-radius: 50%;
-  border: 8px solid rgba(17,17,17,.18);
-}
-.master-recipe-visual.placeholder::before {
-  width: 62px;
-  height: 62px;
-  right: 15px;
-  top: 13px;
-}
-.master-recipe-visual.placeholder::after {
-  width: 24px;
-  height: 24px;
-  left: 17px;
-  bottom: 13px;
-  border-width: 6px;
+.master-foryou-cat {
+  display: block;
+  margin-bottom: 5px;
+  color: var(--ink-secondary);
+  font-size: .5rem;
+  font-weight: 900;
+  letter-spacing: .07em;
+  text-transform: uppercase;
 }
 
 .master-foryou-copy {
-  min-height: 75px;
-  padding: 9px 10px 11px;
+  display: block;
+  min-height: 96px;
+  /* rechts Platz für das absolut positionierte Herz */
+  padding: 11px 40px 12px 12px;
 }
 .master-foryou-copy strong {
   display: -webkit-box;
@@ -189,11 +185,12 @@
 }
 .master-foryou-copy small {
   display: block;
-  margin-top: 6px;
+  margin-top: 5px;
   color: var(--ink-secondary);
   font-size: .53rem;
   line-height: 1.35;
 }
+.master-foryou-copy small + small { margin-top: 2px; }
 
 .master-heart {
   width: 31px;
@@ -464,9 +461,35 @@
   text-decoration: line-through;
 }
 .master-shopping-amount {
+  display: grid;
+  justify-items: end;
+  gap: 1px;
   color: var(--ink-secondary);
   font-size: .61rem;
   white-space: nowrap;
+}
+.master-shopping-amount small {
+  color: var(--muted);
+  font-size: .55rem;
+}
+
+.master-shopping-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-top: 12px;
+  padding: 11px 13px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink-secondary);
+  font-size: .64rem;
+}
+.master-shopping-summary strong {
+  color: var(--ink);
+  font-size: .72rem;
+  font-weight: 900;
 }
 
 .master-shopping-actions {
@@ -494,6 +517,18 @@
   background: var(--surface);
   color: var(--ink);
   font-size: 1.1rem;
+}
+
+.master-load-more {
+  width: 100%;
+  min-height: 46px;
+  margin-top: 10px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  font-size: .68rem;
+  font-weight: 800;
 }
 
 .master-empty {

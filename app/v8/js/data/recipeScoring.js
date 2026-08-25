@@ -36,10 +36,22 @@ export function normalizedAllergens(values = []) {
   return new Set(values.map(normalizeAllergen).filter(Boolean));
 }
 
+/* Einzige Quelle für die Tagesziele. Jede Anzeige und das Scoring müssen
+   dieselbe Zahl verwenden, sonst zeigt die App ein anderes Ziel an, als sie plant. */
+export function resolveCalorieTarget(profile = {}) {
+  const fallback = profile.goal === 'gain' ? 2600 : profile.goal === 'lose' ? 1800 : 2200;
+  return Number(profile.calorieTarget) || fallback;
+}
+
+export function resolveProteinTarget(profile = {}) {
+  const explicit = Number(profile.proteinTarget);
+  if (explicit) return explicit;
+  /* ~1.6 g/kg bei einem 75-kg-Referenzkörper, skaliert am Kalorienziel. */
+  return Math.round(resolveCalorieTarget(profile) * 0.055);
+}
+
 export function targetForMeal(profile, category) {
-  const fallbackDaily = profile.goal === 'gain' ? 2600 : profile.goal === 'lose' ? 1800 : 2200;
-  const daily = Number(profile.calorieTarget) || fallbackDaily;
-  return daily * (MEAL_TARGET_SHARE[category] || 0.25);
+  return resolveCalorieTarget(profile) * (MEAL_TARGET_SHARE[category] || 0.25);
 }
 
 function dietCompatible(recipe, dietStyle) {
@@ -108,9 +120,7 @@ export function scoreRecipe(recipe, context) {
 
   const { category, profile, preferences = {}, usedRecipeIds = new Set(), usedFamilies = new Set() } = context;
   const targetKcal = targetForMeal(profile, category);
-  const targetProtein = profile.proteinTarget
-    ? Number(profile.proteinTarget) * (MEAL_TARGET_SHARE[category] || 0.25)
-    : category === 'snack' ? 8 : 25;
+  const targetProtein = resolveProteinTarget(profile) * (MEAL_TARGET_SHARE[category] || 0.25);
 
   let score = 100;
   score += closeness(recipe.kcal, targetKcal, 18);
