@@ -26,6 +26,7 @@ function appendSheet(root, content) {
   root.querySelector('.v8-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay plan-menu-overlay';
+  overlay.dataset.dismissible = 'true';
   overlay.innerHTML = content;
   root.appendChild(overlay);
   overlay.addEventListener('click', (event) => {

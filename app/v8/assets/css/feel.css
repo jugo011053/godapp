@@ -1,0 +1,223 @@
+/* Interaktionsschicht: Anfassgefühl, Rückmeldung, Gesten.
+   Bewusst separat, damit Layout und Optik davon unberührt bleiben. */
+
+/* --- Grundverhalten am Touchscreen ------------------------------------ */
+
+html {
+  /* Verhindert, dass iOS beim Drehen die Schrift eigenmächtig skaliert. */
+  -webkit-text-size-adjust: 100%;
+}
+
+body {
+  /* Kein Gummiband am Seitenende — das verrät sofort eine Webseite. */
+  overscroll-behavior-y: none;
+}
+
+button,
+a,
+[role="button"],
+input[type="search"],
+.master-shopping-row,
+.preply-discover-card,
+.quick-suggest-card {
+  /* Der graue Kasten beim Antippen ist der deutlichste "das ist Web"-Hinweis. */
+  -webkit-tap-highlight-color: transparent;
+  /* Schaltet die 300-ms-Verzögerung und den Doppeltipp-Zoom ab. */
+  touch-action: manipulation;
+}
+
+button,
+a,
+[role="button"] {
+  /* Langes Drücken soll keinen Text markieren. */
+  -webkit-user-select: none;
+  user-select: none;
+}
+
+/* Tastaturbedienung behält ihren Ring, Fingertipps nicht. */
+:focus { outline: none; }
+:focus-visible {
+  outline: 2px solid var(--lime-strong, var(--lime, #78a800));
+  outline-offset: 2px;
+  border-radius: 8px;
+}
+
+/* --- Rückmeldung beim Drücken ---------------------------------------- */
+
+.v8-button,
+.master-chip,
+.master-icon-button,
+.master-heart,
+.master-row-actions > button,
+.master-recipe-main,
+.master-shopping-check,
+.master-shopping-day,
+.master-shopping-copy,
+.master-shopping-more,
+.master-load-more,
+.master-profile-edit-button,
+.master-profile-row.action,
+.master-meal-option,
+.master-preset,
+.master-editor-meal,
+.master-add-date,
+.master-foryou-card,
+.sheet-action,
+.sheet-close,
+.plan-menu-item,
+.selection-card,
+.option-card,
+.chip,
+.preply-meal-main,
+.preply-swap,
+.preply-day,
+.preply-week-card,
+.preply-outline,
+.preply-discover-card,
+.v8-start-card,
+.quick-suggest-card,
+.v8-header-action {
+  transition:
+    transform var(--duration-fast, 120ms) var(--ease-out, ease),
+    opacity var(--duration-fast, 120ms) var(--ease-out, ease),
+    background-color var(--duration-fast, 120ms) var(--ease-out, ease),
+    border-color var(--duration-fast, 120ms) var(--ease-out, ease);
+}
+
+/* Kleine Ziele dürfen deutlicher nachgeben als große Flächen. */
+.v8-button:active,
+.master-chip:active,
+.master-icon-button:active,
+.master-heart:active,
+.master-row-actions > button:active,
+.master-shopping-check:active,
+.master-shopping-day:active,
+.master-shopping-more:active,
+.sheet-close:active,
+.preply-swap:active,
+.preply-day:active,
+.chip:active,
+.v8-header-action:active {
+  transform: scale(.90);
+}
+
+.master-recipe-main:active,
+.master-foryou-card:active,
+.master-shopping-copy:active,
+.master-load-more:active,
+.master-profile-edit-button:active,
+.master-profile-row.action:active,
+.master-meal-option:active,
+.master-preset:active,
+.master-editor-meal:active,
+.master-add-date:active,
+.sheet-action:active,
+.plan-menu-item:active,
+.selection-card:active,
+.option-card:active,
+.preply-meal-main:active,
+.preply-week-card:active,
+.preply-outline:active,
+.preply-discover-card:active,
+.v8-start-card:active,
+.quick-suggest-card:active {
+  transform: scale(.975);
+}
+
+/* Gedrückte Listenzeilen bekommen zusätzlich einen Hauch Fläche. */
+.plan-menu-item:active,
+.master-profile-row.action:active {
+  background: var(--surface-soft, rgba(17,17,17,.04));
+}
+
+/* Ein frisch abgehaktes Element quittiert kurz. */
+@keyframes feelPop {
+  0%   { transform: scale(1); }
+  38%  { transform: scale(1.22); }
+  100% { transform: scale(1); }
+}
+.master-shopping-check.checked {
+  animation: feelPop 240ms var(--ease-spring, ease-out);
+}
+
+/* Das Herz beim Favorisieren ebenso. */
+.master-heart.active svg {
+  animation: feelPop 260ms var(--ease-spring, ease-out);
+}
+
+/* --- Bottom-Sheets: Griff und Wegwischen ------------------------------ */
+
+.v8-dialog {
+  /* Wird beim Ziehen per JS gesetzt und danach wieder freigegeben. */
+  will-change: transform;
+}
+
+.sheet-grabber {
+  display: block;
+  width: 38px;
+  height: 4px;
+  margin: -6px auto 10px;
+  border-radius: 999px;
+  background: var(--border-strong, rgba(17,17,17,.18));
+  /* Der Griff selbst fängt die Geste ab, ohne mitzuscrollen. */
+  touch-action: none;
+  flex: 0 0 auto;
+}
+
+.v8-overlay[data-dragging="true"] .v8-dialog {
+  transition: none;
+}
+.v8-overlay[data-settling="true"] .v8-dialog {
+  transition: transform 220ms var(--ease-out, ease);
+}
+
+/* --- Wischen in der Einkaufsliste ------------------------------------- */
+
+.master-shopping-row {
+  position: relative;
+  overflow: hidden;
+  /* Senkrecht scrollen bleibt möglich, waagerecht übernimmt die Geste. */
+  touch-action: pan-y;
+}
+.master-shopping-row > * {
+  position: relative;
+  z-index: 1;
+}
+.master-shopping-row[data-swiping="true"] {
+  transition: none;
+}
+.master-shopping-row[data-settling="true"] {
+  transition: transform 200ms var(--ease-out, ease);
+}
+/* Grüne Spur, die beim Wischen hinter der Zeile sichtbar wird. */
+.master-shopping-row::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  background: var(--lime, #78a800);
+  opacity: 0;
+  transition: opacity 120ms linear;
+}
+.master-shopping-row[data-swipe-active="true"]::after {
+  opacity: .28;
+}
+
+/* --- Rücksicht auf Systemeinstellungen -------------------------------- */
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: .001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: .001ms !important;
+    scroll-behavior: auto !important;
+  }
+  .v8-button:active,
+  .master-chip:active,
+  .preply-meal-main:active,
+  .master-recipe-main:active {
+    transform: none;
+  }
+}

@@ -16,6 +16,7 @@ import { buildProfileSummary } from './features/profile/profileSummary.js';
 import { buildPlan, suggestForToday, replacementSuggestions } from './features/planner/plannerEngine.js';
 import { getReturnOptions, isPlanExpired, replaceCurrentPlan } from './features/history/history.js';
 import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
+import { haptic } from './core/feel.js';
 const runtime = {
   recipes: [],
   catalogStatus: 'loading',
@@ -106,6 +107,7 @@ async function showRecipeDetail(root, recipeId) {
     }
     const overlay = document.createElement('div');
     overlay.className = 'v8-overlay';
+    overlay.dataset.dismissible = 'true';
     const stepsHtml = (recipe.steps || []).length
       ? `<div class="meal-steps-list">${recipe.steps.map((step, i) => `<div class="meal-step"><span class="step-num">${i + 1}</span><span>${escapeHtml(step)}</span></div>`).join('')}</div>`
       : '<p style="color:var(--muted);font-size:var(--text-sm)">Keine Zubereitungsschritte hinterlegt.</p>';
@@ -524,6 +526,7 @@ function renderReplacementDialog(root) {
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
   overlay.dataset.replacementOverlay = 'true';
+  overlay.dataset.dismissible = 'true';
   overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true">
     <p class="eyebrow">Gericht austauschen</p>
     <h2>${escapeHtml((meal.recipe || meal).name)}</h2>
@@ -583,6 +586,7 @@ function renderReplacementDialog(root) {
       return { ...current, currentPlan: updated };
     });
     runtime.replaceTarget = null;
+    haptic('strong');
     overlay.remove();
     renderApp(root);
   }));
@@ -710,6 +714,7 @@ function createConfiguredPlan(root) {
     updateState((current) => replaceCurrentPlan(current, plan));
     runtime.activeDialog = null;
     runtime.planDraft = null;
+    haptic('strong');
     renderApp(root);
   } catch (error) {
     draft.error = error.message;
@@ -757,6 +762,7 @@ function bindPageEvents(root) {
         profile
       }, state.preferences, { seed: Date.now() % 100000 });
       updateState((current) => replaceCurrentPlan(current, plan));
+      haptic('strong');
       renderApp(root);
     } catch (error) {
       console.error('[Preply] Tagesplan-Fehler', error);
@@ -772,6 +778,7 @@ function bindPageEvents(root) {
 
   /* Plan day pills */
   root.querySelectorAll('[data-plan-day]').forEach((pill) => pill.addEventListener('click', () => {
+    haptic('tap');
     runtime.activePlanDay = pill.dataset.planDay;
     runtime.viewMode = 'heute';
     renderApp(root);
@@ -785,6 +792,7 @@ function bindPageEvents(root) {
     const recipeId = el.dataset.recipeId;
 
     /* Toggle expansion */
+    haptic('tap');
     if (runtime.expandedMeals.has(key)) {
       runtime.expandedMeals.delete(key);
     } else {
