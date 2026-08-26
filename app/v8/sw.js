@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-34';
+const CACHE_NAME = 'preply-v8-shell-35';
 const SHELL = [
   './',
   './index.html',
@@ -38,6 +38,7 @@ const SHELL = [
   './js/features/auth/auth.js',
   './js/features/auth/account.js',
   './js/features/household/household.js',
+  './js/features/household/planSync.js',
   './js/features/sync/userSync.js',
   './js/features/discover/discoverEngine.js',
   './js/features/favorites/preferenceSignals.js',

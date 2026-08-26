@@ -1,5 +1,6 @@
 import { getRoute } from './core/router.js';
 import { getState, updateState, silentUpdate } from './core/store.js';
+import { emit } from './core/events.js';
 import { loadCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
 import { scoreRecipe } from './data/recipeScoring.js';
@@ -747,6 +748,10 @@ async function renderShopping(root) {
         openLabel.textContent = `${open} von ${list.regular.length} offen`;
       }
       silentUpdate((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: checked } }));
+      /* silentUpdate baut die Liste bewusst nicht neu — und loest deshalb auch
+         keine Synchronisierung aus. Im Haushalt muss der Haken aber zum
+         anderen Geraet, also hier eigens Bescheid geben. */
+      emit('shopping:checked', { id, checked });
     };
 
     /* Waagerecht wischen hakt ab — senkrechtes Scrollen behaelt Vorrang. */
