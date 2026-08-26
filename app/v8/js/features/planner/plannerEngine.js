@@ -100,6 +100,14 @@ export function suggestForToday(recipes, profile, preferences = {}, options = {}
   return selected;
 }
 
+/* Eine Mahlzeit fuer ein gegebenes Profil bemessen — dieselbe Rechnung wie
+   beim Planen, aber einzeln aufrufbar. Wird gebraucht, wenn ein geteilter
+   Haushaltsplan uebernommen wird: die Gerichte kommen vom anderen Geraet, die
+   Portionsgroessen muessen aber aus dem eigenen Profil stammen. */
+export function planMealFor(recipe, profile, category) {
+  return createPlannedMeal(recipe, profile, category);
+}
+
 export function buildPlan(recipes, request, preferences = {}, options = {}) {
   assertPlanRequest(request);
   const selectedDates = [...new Set(request.selectedDates.map(dateKey))].sort();

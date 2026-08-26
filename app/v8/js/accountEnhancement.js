@@ -10,6 +10,11 @@ import { syncNow } from './features/sync/userSync.js';
 import {
   currentHousehold, createHousehold, joinHousehold, leaveHousehold, formatInviteCode
 } from './features/household/household.js';
+import {
+  pushPlan, pullPlan, pullShoppingChecks, pushShoppingChecks, mergeChecks
+} from './features/household/planSync.js';
+import { planMealFor } from './features/planner/plannerEngine.js';
+import { getCards } from './data/recipeStore.js';
 
 /* Konto und Haushalt sitzen im Profil, also im Nebenmenue — die Hauptseiten
    bleiben gross und einfach. Ohne Konto funktioniert die App unveraendert
@@ -227,6 +232,50 @@ function newPasswordSheet(root) {
   overlay.querySelector('input[name="password"]')?.focus();
 }
 
+/* --- Geteilter Haushaltsplan ---------------------------------------------
+
+   Wer im selben Haushalt ist, sieht dieselben Gerichte an denselben Tagen und
+   dieselben Haken auf der Einkaufsliste. Die Portionsgroessen bleiben
+   persoenlich — sie werden beim Uebernehmen aus dem eigenen Profil neu
+   gerechnet. */
+
+async function syncHouseholdPlan() {
+  const household = ui.household;
+  if (!household?.id) return;
+  const state = getState();
+  const cards = getCards();
+  if (!cards.length) return;
+
+  const recipesById = new Map(cards.map((recipe) => [recipe.id, recipe]));
+  const scaleMeal = (recipe, category) => planMealFor(recipe, getState().profile || {}, category);
+
+  const remote = await pullPlan(household.id, { recipesById, scaleMeal });
+  const localAt = state.currentPlan?.sharedAt || state.currentPlan?.createdAt || '';
+  const remoteAt = remote?.sharedAt || '';
+
+  if (remote && remoteAt > localAt) {
+    /* Der andere hat zuletzt geplant — seinen Plan uebernehmen. */
+    updateState((current) => ({ ...current, currentPlan: remote }));
+  } else if (state.currentPlan) {
+    const result = await pushPlan(state.currentPlan, household.id);
+    if (result) {
+      silentUpdate((current) => current.currentPlan
+        ? { ...current, currentPlan: { ...current.currentPlan, sharedAt: result.updatedAt } }
+        : current);
+    }
+  }
+
+  /* Haken zusammenfuehren und in beide Richtungen ausgleichen. */
+  const remoteChecks = await pullShoppingChecks(household.id);
+  const merged = mergeChecks(getState().shoppingChecks || {}, remoteChecks || {});
+  if (JSON.stringify(merged) !== JSON.stringify(getState().shoppingChecks || {})) {
+    updateState((current) => ({ ...current, shoppingChecks: merged }));
+  }
+  if (JSON.stringify(merged) !== JSON.stringify(remoteChecks || {})) {
+    await pushShoppingChecks(household.id, merged);
+  }
+}
+
 /* --- Synchronisieren ---------------------------------------------------- */
 
 async function runSync({ announce = false } = {}) {
@@ -238,6 +287,7 @@ async function runSync({ announce = false } = {}) {
     /* Der zusammengefuehrte Zustand ersetzt den lokalen — replaceState waere
        zu grob, updateState loest den normalen Renderdurchlauf aus. */
     updateState(() => ({ ...merged, lastSyncAt: new Date().toISOString() }));
+    await syncHouseholdPlan();
     if (announce) showToast('Gesichert. Deine Daten liegen jetzt auch im Konto.');
   } catch (error) {
     console.warn('[Preply] Synchronisierung', error);
@@ -266,7 +316,7 @@ function householdSheet(root) {
       <h2 id="hh-title">Haushalt</h2>
       <button class="sheet-close" type="button" data-sheet-close aria-label="Schließen">×</button>
     </div>
-    <p class="account-copy">Ein gemeinsamer Haushalt heißt: ein Plan, eine Einkaufsliste. Was einer abhakt, ist auch beim anderen abgehakt.</p>
+    <p class="account-copy">Ein gemeinsamer Haushalt heißt: dieselben Gerichte an denselben Tagen, und was einer im Laden abhakt, ist auch beim anderen abgehakt. Die Mengen bleiben persönlich — jeder sieht seinen eigenen Bedarf.</p>
     <button class="sheet-action primary" type="button" data-hh-create>Haushalt erstellen</button>
     <form class="account-form" data-hh-join-form novalidate style="margin-top:18px">
       <label class="master-form-field">
@@ -338,6 +388,7 @@ function sectionHtml() {
     ${household
       ? `<div class="master-profile-row"><span>Einladungscode</span><strong>${esc(formatInviteCode(household.invite_code))}</strong></div>
          <div class="master-profile-row"><span>Mitglieder</span><strong>${members}</strong></div>
+         <div class="master-profile-row"><span>Geteilter Plan</span><strong>${state.currentPlan?.sharedAt ? 'ja' : 'noch keiner'}</strong></div>
          <button class="master-profile-row action" type="button" data-hh-copy><span>Code kopieren</span><strong>›</strong></button>
          <button class="master-profile-row action" type="button" data-hh-leave><span>Haushalt verlassen</span><strong>›</strong></button>`
       : `<p class="account-note">Noch kein gemeinsamer Haushalt. Ein Plan, eine Einkaufsliste, zwei Telefone.</p>
@@ -428,6 +479,33 @@ export function initializeAccount() {
     if (!isSignedIn() || ui.syncing) return;
     clearTimeout(timer);
     timer = setTimeout(() => { void runSync(); }, 4000);
+  });
+
+  /* Ein Haken im Laden soll nicht erst beim naechsten Rundlauf beim anderen
+     ankommen. Kurz entprellt, damit eine Reihe schneller Haken eine Anfrage
+     ergibt und nicht acht. */
+  let checkTimer = null;
+  on('shopping:checked', () => {
+    if (!isSignedIn() || !ui.household?.id) return;
+    clearTimeout(checkTimer);
+    checkTimer = setTimeout(() => { void syncHouseholdPlan().catch(() => {}); }, 1200);
+  });
+
+  /* Im Haushalt regelmaessig nachsehen, ob der andere etwas geaendert hat.
+     Realtime waere schoener, aber Abfragen alle halbe Minute reichen fuer
+     zwei Menschen und einen Wochenplan — und kosten nichts an Komplexitaet. */
+  const HOUSEHOLD_POLL_MS = 30000;
+  setInterval(() => {
+    if (!isSignedIn() || !ui.household?.id || ui.syncing) return;
+    if (document.visibilityState !== 'visible') return;
+    void syncHouseholdPlan().catch(() => {});
+  }, HOUSEHOLD_POLL_MS);
+
+  /* Und einmal sofort, wenn die App wieder nach vorn kommt. */
+  document.addEventListener('visibilitychange', () => {
+    if (document.visibilityState !== 'visible') return;
+    if (!isSignedIn() || !ui.household?.id || ui.syncing) return;
+    void syncHouseholdPlan().catch(() => {});
   });
 }
 
