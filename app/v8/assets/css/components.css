@@ -321,6 +321,44 @@
   display: block;
 }
 
+/* Hinweis aufs Vorkochen. Sitzt im getoenten Kartenkopf, muss also gegen
+   fuenf verschiedene Hintergruende bestehen — deshalb Schwarz mit Deckung
+   statt einer eigenen Farbe. */
+.preply-prep {
+  margin-top: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, .82);
+  color: #fff;
+  font-size: 8.5px;
+  font-weight: 800;
+  letter-spacing: .04em;
+  width: fit-content;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.preply-prep.is-repeat {
+  background: rgba(17, 17, 17, .12);
+  color: rgba(17, 17, 17, .72);
+}
+
+/* Kurzmarke in der zugeklappten Wochenliste, direkt hinter dem Gerichtsnamen. */
+.preply-prep-mark {
+  margin-left: 6px;
+  padding: 1px 6px;
+  border-radius: 999px;
+  background: rgba(17, 17, 17, .08);
+  color: rgba(17, 17, 17, .66);
+  font-size: 8.5px;
+  font-style: normal;
+  font-weight: 800;
+  letter-spacing: .03em;
+  white-space: nowrap;
+  vertical-align: 1px;
+}
+
 /* Swap button (separate white card) */
 .preply-swap {
   flex: 0 0 38px;

@@ -34,19 +34,22 @@ export const ALLERGEN_OPTIONS = Object.freeze([
 /* Der Stil ist die dauerhafte Grundhaltung — im Gegensatz zu den Richtungen,
    die eine einzelne Neuplanung korrigieren. Beide greifen auf dieselben
    Achsen zu, nur mit unterschiedlicher Haltbarkeit. */
+/* prepDays gehoert zu jedem Stil dazu, nicht nur zu "Meal Prep". Vorher
+   stand ueberall der Standardwert 2 — "Abwechslungsreich" wiederholte damit
+   jedes Gericht zwei Tage lang und widersprach seinem eigenen Namen. */
 export const STYLE_OPTIONS = Object.freeze([
   ['easy',     'Einfach & schnell', 'Wenig Zutaten, meist unter 30 Minuten',
-   { simplicity: 'simple', priorities: ['quick'], maxCookingTime: 30 }],
+   { simplicity: 'simple', priorities: ['quick'], maxCookingTime: 30, cookingStyle: 'mixed', prepDays: 2 }],
   ['balanced', 'Ausgewogen', 'Gute Mischung aus schnell und besonders',
-   { simplicity: 'balanced', priorities: [], maxCookingTime: 45 }],
+   { simplicity: 'balanced', priorities: [], maxCookingTime: 45, cookingStyle: 'mixed', prepDays: 2 }],
   ['protein',  'Proteinreich', 'Mehr Eiweiß in jeder Mahlzeit',
-   { simplicity: 'balanced', priorities: ['high_protein'], maxCookingTime: 45 }],
+   { simplicity: 'balanced', priorities: ['high_protein'], maxCookingTime: 45, cookingStyle: 'mixed', prepDays: 2 }],
   ['budget',   'Günstig', 'Preiswerte Zutaten, große Portionen',
-   { simplicity: 'simple', priorities: ['budget'], maxCookingTime: 40 }],
-  ['prep',     'Meal Prep', 'Einmal kochen, mehrfach essen',
-   { simplicity: 'balanced', priorities: ['meal_prep'], cookingStyle: 'meal_prep', maxCookingTime: 60 }],
-  ['varied',   'Abwechslungsreich', 'Öfter mal etwas Neues',
-   { simplicity: 'experimental', priorities: ['varied'], maxCookingTime: 60 }]
+   { simplicity: 'simple', priorities: ['budget'], maxCookingTime: 40, cookingStyle: 'mixed', prepDays: 2 }],
+  ['prep',     'Meal Prep', 'Einmal kochen, drei Tage essen',
+   { simplicity: 'balanced', priorities: ['meal_prep'], cookingStyle: 'meal_prep', maxCookingTime: 60, prepDays: 3 }],
+  ['varied',   'Abwechslungsreich', 'Jeden Tag etwas anderes',
+   { simplicity: 'experimental', priorities: ['varied'], maxCookingTime: 60, cookingStyle: 'fresh', prepDays: 1 }]
 ]);
 
 export function styleSettings(key) {

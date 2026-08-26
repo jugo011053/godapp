@@ -144,7 +144,52 @@ function computeDaySummary(dayData) {
   return { totalKcal, totalProtein, mealCount: meals.length };
 }
 
-function renderMealCard(date, category, meal, dayIndex, cardIndex) {
+/* --- Vorkochen sichtbar machen ------------------------------------------
+   Der Planer legt Gerichte ueber mehrere Tage zusammen (prepGroupId), zeigte
+   das aber nirgends an. Dasselbe Gericht an zwei Tagen sah dadurch wie ein
+   Fehler aus, obwohl es Absicht ist. */
+
+const WEEKDAY_FMT = new Intl.DateTimeFormat('de-DE', { weekday: 'short' });
+
+function shortDay(date) {
+  if (!date) return '';
+  return WEEKDAY_FMT.format(new Date(`${date}T12:00:00`)).replace('.', '');
+}
+
+export function prepGroupDates(days) {
+  const groups = new Map();
+  for (const day of days) {
+    for (const meal of Object.values(day.meals || {})) {
+      const id = meal?.prepGroupId;
+      if (!id) continue;
+      if (!groups.has(id)) groups.set(id, []);
+      groups.get(id).push(day.date);
+    }
+  }
+  /* Ein "Gruppe" aus einem einzigen Tag ist keine — die wird nicht beschriftet. */
+  for (const [id, dates] of groups) if (dates.length < 2) groups.delete(id);
+  return groups;
+}
+
+/* In der zugeklappten Wochenliste faellt die Wiederholung zuerst auf — dort
+   muss der Hinweis also auch stehen, nicht nur in der geoeffneten Karte. */
+function prepMark(meal, groupDates) {
+  if (!groupDates || groupDates.length < 2) return '';
+  return meal.repeatedForMealPrep
+    ? '<i class="preply-prep-mark is-repeat">schon gekocht</i>'
+    : `<i class="preply-prep-mark">für ${groupDates.length} Tage</i>`;
+}
+
+function prepNote(meal, groupDates) {
+  if (!groupDates || groupDates.length < 2) return '';
+  if (meal.repeatedForMealPrep) {
+    const from = shortDay(meal.prepSourceDate);
+    return `<span class="preply-prep is-repeat">Schon gekocht${from ? ` am ${from}` : ''}</span>`;
+  }
+  return `<span class="preply-prep">Für ${groupDates.map(shortDay).join(' + ')} vorkochen</span>`;
+}
+
+function renderMealCard(date, category, meal, dayIndex, cardIndex, groupDates) {
   const recipe = meal.recipe || meal;
   const name = recipe.name || 'Unbekannt';
   const kcal = meal.estimatedKcalPerPerson || Math.round(recipe.kcal || 0);
@@ -178,6 +223,7 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex) {
       <span class="preply-meal-slot">${escapeHtml(MEAL_LABELS[category] || category)}</span>
       <strong>${escapeHtml(name)}</strong>
       <em>${kcal} kcal · ${protein} g Protein · ${time} Min</em>
+      ${prepNote(meal, groupDates)}
     </button>
     ${pinButton}
     ${isExpanded ? '' : `<button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>`}
@@ -193,6 +239,7 @@ function renderPlanPage() {
   if (!plan || isPlanExpired(plan)) return renderEmptyPlan();
 
   const days = normalizeDays(plan);
+  const groups = prepGroupDates(days);
   if (!days.length) return renderEmptyPlan();
 
   const today = localDate(0);
@@ -236,10 +283,10 @@ function renderPlanPage() {
           </button>
           ${isOpen
             ? `<div class="preply-week-body">${cats.map((cat, idx) =>
-                 renderMealCard(day.date, cat, day.meals[cat], dayIndex, idx)
+                 renderMealCard(day.date, cat, day.meals[cat], dayIndex, idx, groups.get(day.meals[cat]?.prepGroupId))
                ).join('')}</div>`
             : `<div class="preply-week-meals">${cats.map((cat) =>
-                 `<div class="preply-week-meal"><span>${escapeHtml(MEAL_LABELS[cat] || cat)}</span><strong>${escapeHtml((day.meals[cat].recipe || day.meals[cat]).name)}</strong><b>›</b></div>`
+                 `<div class="preply-week-meal"><span>${escapeHtml(MEAL_LABELS[cat] || cat)}</span><strong>${escapeHtml((day.meals[cat].recipe || day.meals[cat]).name)}${prepMark(day.meals[cat], groups.get(day.meals[cat]?.prepGroupId))}</strong><b>›</b></div>`
                ).join('')}</div>`}
         </div>`;
       }).join('')}
@@ -271,6 +318,7 @@ function renderTodayPage() {
   }
 
   const days = normalizeDays(plan);
+  const groups = prepGroupDates(days);
   const dayData = days.find((d) => d.date === today);
 
   if (!dayData) {
@@ -306,7 +354,7 @@ function renderTodayPage() {
     <div class="preply-section"><h2>Deine Mahlzeiten</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
 
     <div class="preply-plan-card" data-active-day-index="${dayIndex}" data-active-day-date="${today}">
-      ${cats.map((cat, idx) => renderMealCard(today, cat, dayData.meals[cat], dayIndex, idx)).join('')}
+      ${cats.map((cat, idx) => renderMealCard(today, cat, dayData.meals[cat], dayIndex, idx, groups.get(dayData.meals[cat]?.prepGroupId))).join('')}
     </div>
 
     <button class="preply-outline" onclick="location.hash='shopping'">Zur Einkaufsliste <span>→</span></button>
