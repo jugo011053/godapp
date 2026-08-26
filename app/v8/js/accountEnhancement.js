@@ -3,7 +3,8 @@ import { on, emit } from './core/events.js';
 import { haptic } from './core/feel.js';
 import { showToast as rawToast } from './core/toast.js';
 import {
-  isSignedIn, currentUser, signIn, signUp, signOut, validatePassword
+  isSignedIn, currentUser, signIn, signUp, signOut, validatePassword,
+  signInWithGoogle, handleAuthRedirect, requestPasswordReset, setNewPassword
 } from './features/auth/account.js';
 import { syncNow } from './features/sync/userSync.js';
 import {
@@ -76,12 +77,60 @@ function authSheet(root, mode = 'signin') {
       </label>
       ${isRegister ? '<p class="master-form-hint">Mindestens acht Zeichen.</p>' : ''}
       <p class="account-error" data-account-error hidden></p>
+      <p class="account-hinweis" data-account-hinweis hidden></p>
       <button class="sheet-action primary" type="submit">${isRegister ? 'Konto anlegen' : 'Anmelden'}</button>
+      ${isRegister ? '' : '<button class="account-link" type="button" data-forgot>Passwort vergessen?</button>'}
     </form>
+
+    <div class="account-trenner"><span>oder</span></div>
+    <button class="sheet-action account-google" type="button" data-google>
+      <svg viewBox="0 0 18 18" aria-hidden="true" width="18" height="18">
+        <path fill="#4285F4" d="M17.64 9.2c0-.64-.06-1.25-.16-1.84H9v3.48h4.84a4.14 4.14 0 0 1-1.8 2.72v2.26h2.92c1.7-1.57 2.68-3.88 2.68-6.62Z"/>
+        <path fill="#34A853" d="M9 18c2.43 0 4.47-.8 5.96-2.18l-2.92-2.26c-.8.54-1.84.86-3.04.86-2.34 0-4.32-1.58-5.03-3.7H.96v2.33A9 9 0 0 0 9 18Z"/>
+        <path fill="#FBBC05" d="M3.97 10.72a5.4 5.4 0 0 1 0-3.44V4.95H.96a9 9 0 0 0 0 8.1l3.01-2.33Z"/>
+        <path fill="#EA4335" d="M9 3.58c1.32 0 2.5.45 3.44 1.35l2.58-2.58C13.46.89 11.43 0 9 0A9 9 0 0 0 .96 4.95l3.01 2.33C4.68 5.16 6.66 3.58 9 3.58Z"/>
+      </svg>
+      <span>Weiter mit Google</span>
+    </button>
     <button class="account-switch" type="button" data-account-switch="${isRegister ? 'signin' : 'signup'}">
       ${isRegister ? 'Ich habe schon ein Konto' : 'Noch kein Konto? Eins anlegen'}
     </button>
   </section>`);
+
+  overlay.querySelector('[data-google]').addEventListener('click', async (event) => {
+    event.currentTarget.disabled = true;
+    haptic('tap');
+    try { await signInWithGoogle(); }
+    catch (error) {
+      event.currentTarget.disabled = false;
+      overlay.querySelector('[data-account-error]').textContent = error.message || 'Google-Anmeldung nicht möglich.';
+      overlay.querySelector('[data-account-error]').hidden = false;
+    }
+  });
+
+  overlay.querySelector('[data-forgot]')?.addEventListener('click', async () => {
+    const field = overlay.querySelector('input[name="email"]');
+    const hinweis = overlay.querySelector('[data-account-hinweis]');
+    const fehler = overlay.querySelector('[data-account-error]');
+    const email = String(field.value || '').trim();
+    fehler.hidden = true;
+    if (!email.includes('@')) {
+      fehler.textContent = 'Trag oben deine E-Mail ein, dann schicken wir dir einen Link.';
+      fehler.hidden = false;
+      field.focus();
+      return;
+    }
+    try {
+      await requestPasswordReset(email);
+      /* Bewusst dieselbe Antwort, egal ob es das Konto gibt — sonst verraet
+         die App, welche Adressen registriert sind. */
+      hinweis.textContent = `Wenn es zu ${email} ein Konto gibt, liegt gleich ein Link im Postfach.`;
+      hinweis.hidden = false;
+    } catch (error) {
+      fehler.textContent = error.message || 'Das hat nicht geklappt.';
+      fehler.hidden = false;
+    }
+  });
 
   overlay.querySelector('[data-account-switch]').addEventListener('click', (event) => {
     closeOverlay(overlay);
@@ -133,6 +182,49 @@ function authSheet(root, mode = 'signin') {
   });
 
   overlay.querySelector('input[name="email"]')?.focus();
+}
+
+/* Nach dem Klick im Zuruecksetzen-Link: die Sitzung steht bereits, es fehlt
+   nur noch das neue Passwort. */
+function newPasswordSheet(root) {
+  const overlay = appendSheet(root, `<section class="v8-dialog plan-menu-sheet account-sheet" role="dialog" aria-modal="true" aria-labelledby="pw-title">
+    <div class="sheet-head">
+      <h2 id="pw-title">Neues Passwort</h2>
+      <button class="sheet-close" type="button" data-sheet-close aria-label="Schließen">×</button>
+    </div>
+    <p class="account-copy">Du bist über den Link angemeldet. Setz jetzt ein neues Passwort, damit du dich beim nächsten Mal wieder normal anmelden kannst.</p>
+    <form class="account-form" data-password-form novalidate>
+      <label class="master-form-field">
+        <span>Neues Passwort</span>
+        <input type="password" name="password" autocomplete="new-password" required>
+      </label>
+      <p class="master-form-hint">Mindestens acht Zeichen.</p>
+      <p class="account-error" data-account-error hidden></p>
+      <button class="sheet-action primary" type="submit">Passwort speichern</button>
+    </form>
+  </section>`);
+
+  const fehler = overlay.querySelector('[data-account-error]');
+  overlay.querySelector('[data-password-form]').addEventListener('submit', async (event) => {
+    event.preventDefault();
+    const password = String(new FormData(event.currentTarget).get('password') || '');
+    const problem = validatePassword(password);
+    if (problem) { fehler.textContent = problem; fehler.hidden = false; return; }
+    const button = event.currentTarget.querySelector('button[type="submit"]');
+    button.disabled = true;
+    try {
+      await setNewPassword(password);
+      closeOverlay(overlay);
+      haptic('confirm');
+      showToast('Passwort geändert.');
+      await runSync({ announce: false });
+    } catch (error) {
+      fehler.textContent = error.message;
+      fehler.hidden = false;
+      button.disabled = false;
+    }
+  });
+  overlay.querySelector('input[name="password"]')?.focus();
 }
 
 /* --- Synchronisieren ---------------------------------------------------- */
@@ -306,11 +398,23 @@ export function initializeAccount() {
   if (initialized) return;
   initialized = true;
 
-  /* Beim Start einmal stillschweigend abgleichen, wenn eine Sitzung liegt. */
-  if (isSignedIn()) {
-    void loadHousehold();
-    void runSync();
-  }
+  /* Kommt der Nutzer von Google oder aus einer Zuruecksetzen-Mail zurueck,
+     steht der Code in der Adresszeile und muss zuerst eingeloest werden. */
+  void handleAuthRedirect().then(async (result) => {
+    if (result.status === 'error') {
+      showToast(result.message);
+    } else if (result.status === 'recovery') {
+      haptic('confirm');
+      newPasswordSheet(document.getElementById('app') || document.body);
+    } else if (result.status === 'signed_in') {
+      haptic('confirm');
+      showToast('Angemeldet.');
+    }
+    if (isSignedIn()) {
+      void loadHousehold();
+      void runSync({ announce: result.status === 'signed_in' });
+    }
+  });
 
   on('auth:changed', () => {
     ui.household = null;

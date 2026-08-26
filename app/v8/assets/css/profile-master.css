@@ -314,3 +314,54 @@
 .master-profile-row.action[disabled] {
   opacity: .55;
 }
+
+/* Trennlinie zwischen E-Mail-Anmeldung und Google. */
+.account-trenner {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 20px 0 14px;
+  color: var(--ink-secondary);
+  font-size: .72rem;
+  font-weight: 800;
+  letter-spacing: .06em;
+  text-transform: uppercase;
+}
+.account-trenner::before,
+.account-trenner::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--border);
+}
+.account-google {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  background: var(--card);
+  border: 1px solid var(--border-strong);
+  color: var(--ink);
+}
+.account-google svg { flex: 0 0 auto; }
+.account-link {
+  justify-self: start;
+  padding: 8px 0 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.account-hinweis {
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: var(--accent-bg);
+  color: #3f5606;
+  font-size: .82rem;
+  line-height: 1.45;
+}
