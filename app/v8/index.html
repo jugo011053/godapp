@@ -50,7 +50,17 @@
          sieht der Nutzer die alte Versionsnummer und die alten Fehler — und
          der Hinweisbalken war leicht zu uebersehen. Also selbst neu laden,
          ausser der Nutzer ist gerade mitten in etwas. */
+      /* Wer die App gerade in der Hand hat, darf sie nicht unter den Fingern
+         verlieren. Ein Neuladen mitten im Tippen frisst den Tipp und fuehlt
+         sich an, als reagiere die App nicht. */
+      var letzteBeruehrung = 0;
+      ['pointerdown', 'touchstart', 'keydown', 'wheel'].forEach(function (art) {
+        addEventListener(art, function () { letzteBeruehrung = Date.now(); },
+                         { passive: true, capture: true });
+      });
+
       function userIsBusy() {
+        if (Date.now() - letzteBeruehrung < 10000) return true;
         var active = document.activeElement;
         if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return true;
         return Boolean(document.querySelector('.v8-overlay'));
