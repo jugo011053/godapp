@@ -423,6 +423,18 @@
   stroke-width: 1.8;
   transition: transform 150ms ease;
 }
+/* Zaehler im Kopf der Gerichtsgruppe: ruhig, nicht laut. */
+.master-shopping-open {
+  flex: 0 0 auto;
+  margin-left: auto;
+  margin-right: 8px;
+  font-style: normal;
+  font-size: .7rem;
+  font-weight: 700;
+  color: var(--muted);
+  letter-spacing: .02em;
+}
+
 .master-shopping-group.collapsed > button svg { transform: rotate(180deg); }
 .master-shopping-group.collapsed .master-shopping-items { display: none; }
 

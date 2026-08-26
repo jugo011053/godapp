@@ -4,7 +4,7 @@ import { loadCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
 import { scoreRecipe } from './data/recipeScoring.js';
 import { toggleFavorite, excludeRecipe } from './features/favorites/preferenceSignals.js';
-import { buildShoppingList, copyShoppingText, toggleShoppingDate } from './features/shopping/shoppingEngine.js';
+import { buildShoppingList, copyShoppingText, formatAmount, toggleShoppingDate } from './features/shopping/shoppingEngine.js';
 import { haptic, enableSwipeToggle } from './core/feel.js';
 
 const ui = {
@@ -15,6 +15,11 @@ const ui = {
   visibleCount: 40,
   selectedDates: [],
   checks: {},
+  /* Haken der Gerichtsansicht liegen getrennt: wer nur fuer ein Gericht
+     einkauft, soll dessen Liste abhaken koennen, ohne dass dieselbe Zutat
+     in einem anderen Gericht mit verschwindet. */
+  recipeChecks: {},
+  collapsedRecipes: new Set(),
   shoppingPlanId: null,
   shoppingView: 'category',
   expandedStaples: false,
@@ -564,7 +569,8 @@ function amountText(item) {
   /* "1,2 nach Geschmack" ist keine Einkaufsmenge. */
   if (item.showAmount === false) return esc(item.unit || '');
   const amount = item.packs ? item.buyAmount : item.amount;
-  return `${Math.round(Number(amount || 0) * 100) / 100} ${esc(item.buyUnit || item.unit || '')}`;
+  /* Packungsmengen sind echte Zahlen (3 x 250 g) und werden nicht gerundet. */
+  return esc(formatAmount(amount, item.buyUnit || item.unit, { exact: Boolean(item.packs) }));
 }
 
 function packText(item) {
@@ -603,10 +609,34 @@ function categoryGroup(group) {
   </section>`;
 }
 
+/* Ein Haken gehoert zu genau einem Gericht, nicht zur Zutat. */
+function recipeCheckKey(group, item) {
+  return `${group.recipeId || group.recipeName}|${group.date}|${item.id}`;
+}
+
+function recipeShoppingRow(group, item) {
+  const key = recipeCheckKey(group, item);
+  const checked = Boolean(ui.recipeChecks[key]);
+  return `<div class="master-shopping-row">
+    <button class="master-shopping-check ${checked ? 'checked' : ''}" type="button" data-recipe-check="${esc(key)}" aria-label="${checked ? 'Als offen markieren' : 'Als erledigt markieren'}">${checked ? '✓' : ''}</button>
+    <span class="master-shopping-name ${checked ? 'done' : ''}">${esc(item.name)}</span>
+    <span class="master-shopping-amount">${esc(formatAmount(item.amount, item.unit))}</span>
+  </div>`;
+}
+
+function recipeGroupKey(group) {
+  return `${group.date}|${group.category}|${group.recipeId || group.recipeName}`;
+}
+
 function recipeShoppingGroup(group) {
-  return `<section class="master-shopping-group">
-    <button type="button"><span>${esc(group.dayLabel)} · ${esc(group.recipeName)}</span></button>
-    <div class="master-shopping-items">${group.ingredients.map((item) => `<div class="master-shopping-row"><span></span><span class="master-shopping-name">${esc(item.name)}</span><span class="master-shopping-amount">${Math.round(Number(item.amount || 0) * 100) / 100} ${esc(item.unit)}</span></div>`).join('')}</div>
+  const open = group.ingredients.filter((item) => !ui.recipeChecks[recipeCheckKey(group, item)]).length;
+  const key = recipeGroupKey(group);
+  /* Zuklappbar, damit man im Laden nur das Gericht offen hat, fuer das man
+     gerade einkauft. */
+  const collapsed = ui.collapsedRecipes.has(key);
+  return `<section class="master-shopping-group ${collapsed ? 'collapsed' : ''}">
+    <button type="button" data-recipe-group="${esc(key)}"><span>${esc(group.dayLabel)} · ${esc(group.recipeName)}</span><em class="master-shopping-open">${open} offen</em>${SVG.chevron}</button>
+    <div class="master-shopping-items">${group.ingredients.map((item) => recipeShoppingRow(group, item)).join('')}</div>
   </section>`;
 }
 
@@ -635,10 +665,13 @@ async function renderShopping(root) {
       ui.shoppingPlanId = planId;
       ui.selectedDates = [];
       ui.checks = {};
+      ui.recipeChecks = {};
       ui.collapsedGroups = new Set();
-      silentUpdate((current) => ({ ...current, shoppingChecks: {} }));
+      ui.collapsedRecipes = new Set();
+      silentUpdate((current) => ({ ...current, shoppingChecks: {}, shoppingRecipeChecks: {} }));
     } else {
       ui.checks = { ...(state.shoppingChecks || {}), ...ui.checks };
+      ui.recipeChecks = { ...(state.shoppingRecipeChecks || {}), ...ui.recipeChecks };
     }
 
     if (!ui.selectedDates.length) ui.selectedDates = plan.selectedDates || plan.days.map((day) => day.date);
@@ -727,6 +760,42 @@ async function renderShopping(root) {
       const checked = !Boolean(ui.checks[id]);
       haptic(checked ? 'confirm' : 'tap');
       applyCheck(button, checked);
+    }));
+
+    /* Gerichtsansicht: eigener Haken, eigener Zaehler, gleiche Bedienung. */
+    const applyRecipeCheck = (button, checked) => {
+      const key = button.dataset.recipeCheck;
+      ui.recipeChecks[key] = checked;
+      button.classList.toggle('checked', checked);
+      button.textContent = checked ? '\u2713' : '';
+      button.setAttribute('aria-label', checked ? 'Als offen markieren' : 'Als erledigt markieren');
+      button.nextElementSibling?.classList.toggle('done', checked);
+      const section = button.closest('.master-shopping-group');
+      const counter = section?.querySelector('.master-shopping-open');
+      if (counter) {
+        const open = section.querySelectorAll('[data-recipe-check]:not(.checked)').length;
+        counter.textContent = `${open} offen`;
+      }
+      silentUpdate((current) => ({ ...current, shoppingRecipeChecks: { ...(current.shoppingRecipeChecks || {}), [key]: checked } }));
+    };
+
+    main.querySelectorAll('.master-shopping-row').forEach((row) => {
+      const button = row.querySelector('[data-recipe-check]');
+      if (button) enableSwipeToggle(row, () => applyRecipeCheck(button, !Boolean(ui.recipeChecks[button.dataset.recipeCheck])));
+    });
+
+    main.querySelectorAll('[data-recipe-group]').forEach((button) => button.addEventListener('click', () => {
+      const key = button.dataset.recipeGroup;
+      if (ui.collapsedRecipes.has(key)) ui.collapsedRecipes.delete(key);
+      else ui.collapsedRecipes.add(key);
+      button.closest('.master-shopping-group')?.classList.toggle('collapsed', ui.collapsedRecipes.has(key));
+      haptic('tap');
+    }));
+
+    main.querySelectorAll('[data-recipe-check]').forEach((button) => button.addEventListener('click', () => {
+      const checked = !Boolean(ui.recipeChecks[button.dataset.recipeCheck]);
+      haptic(checked ? 'confirm' : 'tap');
+      applyRecipeCheck(button, checked);
     }));
 
     main.querySelector('[data-v8-copy]')?.addEventListener('click', async (event) => {
