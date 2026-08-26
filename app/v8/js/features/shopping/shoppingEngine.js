@@ -3,8 +3,59 @@ function round(value, digits = 2) {
   return Math.round((Number(value) + Number.EPSILON) * factor) / factor;
 }
 
+/* Der Schluessel darf die Einheit NICHT enthalten. Sonst wird aus Rapsoel
+   in Millilitern und Rapsoel in Essloeffeln zweimal derselbe Einkauf. */
 function ingredientKey(ingredient) {
-  return `${ingredient.ingredientId || ingredient.foodId || ingredient.name}::${ingredient.unit || 'g'}`;
+  const id = ingredient.ingredientId || ingredient.foodId;
+  if (id) return String(id);
+  return normalizeName(ingredient.name);
+}
+
+/* Singular und Plural sind derselbe Einkauf: "Knoblauchzehe" und
+   "Knoblauchzehen" standen bisher als zwei Posten in der Liste. */
+function normalizeName(name = '') {
+  return String(name).trim().toLowerCase()
+    .replace(/[()]/g, '')
+    .replace(/(en|er|n|e)$/, '')
+    .replace(/\s+/g, ' ');
+}
+
+/* Zaehlbare Einheiten. Bruchteile davon kann man nicht kaufen. */
+const COUNTABLE = new Set(['stück', 'stueck', 'stk', 'zehe', 'zehen', 'scheibe', 'scheiben',
+  'bund', 'kopf', 'dose', 'dosen', 'packung', 'packungen', 'glas', 'blatt', 'zweig']);
+
+/* Masse, die nur beschreiben, wie viel man beim Kochen nimmt — daraus wird
+   kein Einkauf. Steht das als einzige Angabe da, zeigen wir keine Zahl. */
+const VAGUE_UNITS = new Set(['nach geschmack', 'etwas', 'prise', 'prisen', 'handvoll', 'nach bedarf']);
+
+export function isCountable(unit) {
+  return COUNTABLE.has(String(unit || '').trim().toLowerCase());
+}
+export function isVague(unit) {
+  return VAGUE_UNITS.has(String(unit || '').trim().toLowerCase());
+}
+
+/* Grundzutaten, die praktisch jeder vorraetig hat. Sie verschwinden nicht,
+   sondern wandern in eine eigene, eingeklappte Gruppe — wer nachsehen will,
+   kann es, aber sie blaehen die Liste nicht mehr auf. */
+export const STAPLE_NAMES = new Set([
+  'salz', 'pfeffer', 'olivenöl', 'rapsöl', 'sonnenblumenöl', 'kokosöl', 'öl',
+  'essig', 'balsamico', 'sojasauce', 'sojasoße', 'senf', 'tomatenmark',
+  'zucker', 'honig', 'ahornsirup', 'mehl', 'backpulver', 'hefe', 'zimt',
+  'vanille', 'paprikapulver', 'kreuzkümmel', 'kurkuma', 'currypulver',
+  'chiliflocken', 'oregano', 'thymian', 'rosmarin', 'lorbeerblatt',
+  'gemüsebrühe', 'hühnerbrühe', 'gemüsebrühpulver', 'brühe',
+  'sesamöl', 'wasser'
+]);
+
+const STAPLE_NORMALIZED = new Set([...STAPLE_NAMES].map(normalizeName));
+
+/* Nur ganze Woerter vergleichen. Ein Praefixvergleich machte aus
+   "Zuckermais" faelschlich Vorrat, weil "Zucker" darin steckt. */
+export function isStaple(name = '') {
+  const n = normalizeName(name);
+  if (STAPLE_NORMALIZED.has(n)) return true;
+  return n.split(/[\s-]+/).some((word) => STAPLE_NORMALIZED.has(word));
 }
 
 function recipeIngredients(meal) {
@@ -105,6 +156,10 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
             unit: ingredient.unit || 'g',
             category: ingredient.category || 'Sonstiges',
             amount: 0,
+            /* Mengen je Einheit getrennt sammeln — 500 g und 1,2 EL sind
+               derselbe Einkauf, aber nicht dieselbe Zahl. */
+            byUnit: {},
+            staple: isStaple(ingredient.name),
             packSize: Number(ingredient.packSize || ingredient.pack_size || 0) || null,
             packPrice: Number(ingredient.packPrice || ingredient.pack_price_eur || 0) || null,
             /* Ohne packUnit hält packEstimate() die Einheiten für unvereinbar und
@@ -115,6 +170,8 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
           });
         }
         const item = aggregated.get(key);
+        const unit = ingredient.unit || 'g';
+        item.byUnit[unit] = (item.byUnit[unit] || 0) + amount;
         item.amount += amount;
         item.sources.push({
           date: day.date,
@@ -138,16 +195,42 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
   }
 
   const items = [...aggregated.values()].map((item) => {
-    const total = round(item.amount);
-    const estimate = packEstimate(total, item);
+    /* Die Einkaufseinheit ist die, fuer die es Packungsdaten gibt — sonst die
+       mit der groessten Menge. Nebenmasse wie "1,2 EL Oel" aendern nichts
+       daran, dass man eine Flasche kauft. */
+    const units = Object.entries(item.byUnit);
+    const packUnit = String(item.packUnit || '').toLowerCase();
+    const buyable = units.find(([u]) => unitsCompatible(u, packUnit) && item.packSize);
+    const [chosenUnit, chosenAmount] = buyable
+      || units.slice().sort((a, b) => b[1] - a[1])[0]
+      || [item.unit, item.amount];
+
+    const usable = units.filter(([u]) => !isVague(u));
+    const displayUnit = isVague(chosenUnit) && usable.length ? usable[0][0] : chosenUnit;
+    const displayAmountRaw = isVague(chosenUnit) && usable.length ? usable[0][1] : chosenAmount;
+
+    /* Zaehlbares aufrunden: 2,4 Eier gibt es nicht. */
+    const total = isCountable(displayUnit)
+      ? Math.ceil(round(displayAmountRaw))
+      : round(displayAmountRaw);
+
+    const estimate = packEstimate(total, { ...item, unit: displayUnit });
     return {
       ...item,
+      unit: displayUnit,
       amount: total,
+      /* Nur anzeigen, wenn die Zahl etwas bedeutet. */
+      showAmount: !isVague(displayUnit),
+      otherUnits: units.filter(([u]) => u !== displayUnit && !isVague(u))
+        .map(([u, v]) => ({ unit: u, amount: round(v) })),
       ...estimate
     };
   }).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
 
-  const groups = Object.values(items.reduce((acc, item) => {
+  const staples = items.filter((item) => item.staple);
+  const regular = items.filter((item) => !item.staple);
+
+  const groups = Object.values(regular.reduce((acc, item) => {
     if (!acc[item.category]) acc[item.category] = { category: item.category, items: [] };
     acc[item.category].items.push(item);
     return acc;
@@ -157,9 +240,13 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
     selectedDates: activeDates,
     availableDates: availableShoppingDates(plan),
     items,
+    regular,
+    staples,
     groups,
     byRecipe,
-    estimatedTotal: round(items.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0))
+    /* Grundzutaten zaehlen nicht in die Schaetzung — sonst steht da ein Preis
+       fuer eine Flasche Oel, die laengst im Schrank steht. */
+    estimatedTotal: round(regular.reduce((sum, item) => sum + (item.estimatedPrice || 0), 0))
   };
 }
 

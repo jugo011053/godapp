@@ -433,3 +433,36 @@ a,
 @media (prefers-reduced-motion: reduce) {
   .v8-main.route-enter { animation: none; }
 }
+
+/* --- Einkauf: Balken darf die Liste nicht ueberdecken ------------------ */
+
+/* Der Balken schwebte halbtransparent ueber den Zeilen — darunter lasen sich
+   Posten durch. Jetzt deckt er, und die Liste bekommt Platz, um darunter
+   hinwegzuscrollen. */
+.master-shopping-groups {
+  padding-bottom: 6px;
+}
+.master-shopping-actions {
+  /* Muss ueber den Zeilen liegen: fuer die Wisch-Spur bekamen deren Kinder
+     z-index: 1, wodurch sie ueber den Balken ohne eigene Ebene malten. */
+  position: sticky;
+  z-index: 12;
+  background: var(--app-bg);
+  box-shadow: 0 -10px 16px -6px var(--app-bg), 0 -1px 0 var(--border-soft);
+  padding-top: 10px;
+}
+.master-shopping-summary { position: relative; z-index: 2; }
+
+/* --- Vorratsgruppe ----------------------------------------------------- */
+
+.master-shopping-group.staples { opacity: .82; }
+.master-shopping-group.staples > button span em {
+  margin-left: 6px;
+  padding: 2px 7px;
+  border-radius: 999px;
+  background: var(--surface-soft, rgba(17,17,17,.07));
+  color: var(--muted);
+  font-size: .55rem;
+  font-style: normal;
+  font-weight: 800;
+}
