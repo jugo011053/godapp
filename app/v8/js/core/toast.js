@@ -13,7 +13,15 @@ function dismiss() {
 }
 
 export function showToast(root, message, options = {}) {
-  const host = root || document.body;
+  /* Der erste Parameter ist der Behaelter, nicht der Text — eine Stolperstelle,
+     in die man beim Aufrufen leicht tritt. Wer nur eine Nachricht uebergibt,
+     bekommt sie trotzdem zu sehen. */
+  if (typeof root === 'string') {
+    options = message && typeof message === 'object' ? message : {};
+    message = root;
+    root = null;
+  }
+  const host = root instanceof Element || root instanceof Document ? root : document.body;
   host.querySelectorAll('.preply-toast').forEach((node) => node.remove());
 
   const toast = document.createElement('div');

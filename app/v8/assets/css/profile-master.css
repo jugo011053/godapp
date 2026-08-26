@@ -248,3 +248,69 @@
   border-radius: 9px;
   font-size: .56rem;
 }
+
+/* --- Konto und Haushalt ---------------------------------------------------
+   Sitzen im Profil, also im Nebenmenue. Ruhig gehalten: das ist Verwaltung,
+   keine Hauptsache. */
+.account-note {
+  margin: 4px 0 12px;
+  color: var(--ink-secondary);
+  font-size: .8rem;
+  line-height: 1.5;
+}
+.account-copy {
+  margin: 0 0 18px;
+  color: var(--ink-secondary);
+  font-size: .88rem;
+  line-height: 1.5;
+}
+.account-sheet .account-form {
+  display: grid;
+  gap: 14px;
+}
+.account-sheet .master-form-field span {
+  display: block;
+  margin-bottom: 6px;
+  color: var(--ink-secondary);
+  font-size: .57rem;
+  font-weight: 850;
+  letter-spacing: .05em;
+  text-transform: uppercase;
+}
+.account-sheet input {
+  width: 100%;
+  min-height: 46px;
+  padding: 0 14px;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  background: var(--paper);
+  color: var(--ink);
+  font: inherit;
+  font-size: 1rem; /* unter 16px zoomt iOS beim Antippen herein */
+}
+.account-sheet input:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+.account-error {
+  margin: 0;
+  color: #a3312a;
+  font-size: .82rem;
+  line-height: 1.45;
+}
+.account-switch {
+  width: 100%;
+  margin-top: 14px;
+  padding: 10px;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: inherit;
+  font-size: .84rem;
+  font-weight: 700;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.master-profile-row.action[disabled] {
+  opacity: .55;
+}
