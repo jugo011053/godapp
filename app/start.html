@@ -25,7 +25,10 @@
 html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
 body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;
   font-feature-settings:"ss01";overflow-x:hidden}
-img{max-width:100%;display:block}
+/* height:auto ist Pflicht, sobald width/height als Attribut dranstehen —
+   sonst bleibt die Hoehe auf dem Attributwert stehen und das Bild wird
+   in die Laenge gezogen. */
+img{max-width:100%;height:auto;display:block}
 a{color:inherit}
 .wrap{width:100%;max-width:var(--wrap);margin:0 auto;padding:0 24px}
 
@@ -62,7 +65,7 @@ h1{font-size:clamp(2.4rem,7vw,4.2rem);font-weight:800;letter-spacing:-.045em;lin
 .shots{display:flex;gap:20px;justify-content:center;align-items:flex-end;
   padding:56px 0 8px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x mandatory}
 .shots::-webkit-scrollbar{display:none}
-.phone{flex:0 0 auto;width:236px;scroll-snap-align:center}
+.phone{flex:0 0 auto;width:min(268px,72vw);scroll-snap-align:center}
 .phone .screen{border-radius:30px;overflow:hidden;background:var(--dark);
   padding:8px;box-shadow:0 24px 60px rgba(17,17,17,.14),0 2px 8px rgba(17,17,17,.06)}
 .phone .screen img{border-radius:23px}
@@ -137,7 +140,7 @@ footer a:hover{color:var(--ink)}
   .hero{padding:48px 0 8px}
   section{padding:48px 0}
   .shots{padding:36px 0 8px;gap:14px;justify-content:flex-start}
-  .phone{width:206px}
+  .phone{width:min(212px,64vw)}
   .phone.lift{transform:none}
   .wrap{padding:0 20px}
 }
@@ -165,15 +168,15 @@ footer a:hover{color:var(--ink)}
 
 <div class="shots">
   <figure class="phone">
-    <div class="screen"><img src="marketing/shot-woche.png" alt="Wochenübersicht mit Tagesziel und den Gerichten je Tag" loading="lazy" width="390" height="844"></div>
+    <div class="screen"><img src="marketing/shot-woche.png" alt="Wochenübersicht mit Tagesziel und den Gerichten je Tag" loading="lazy" width="780" height="1688"></div>
     <figcaption>Deine Woche</figcaption>
   </figure>
   <figure class="phone lift">
-    <div class="screen"><img src="marketing/shot-heute.png" alt="Heute-Ansicht mit den drei Mahlzeiten des Tages" loading="lazy" width="390" height="844"></div>
+    <div class="screen"><img src="marketing/shot-heute.png" alt="Heute-Ansicht mit den drei Mahlzeiten des Tages" loading="lazy" width="780" height="1688"></div>
     <figcaption>Was heute ansteht</figcaption>
   </figure>
   <figure class="phone">
-    <div class="screen"><img src="marketing/shot-gericht.png" alt="Einkaufsliste nach Gericht sortiert, jede Zeile abhakbar" loading="lazy" width="390" height="844"></div>
+    <div class="screen"><img src="marketing/shot-gericht.png" alt="Einkaufsliste nach Gericht sortiert, jede Zeile abhakbar" loading="lazy" width="780" height="1688"></div>
     <figcaption>Der Einkauf</figcaption>
   </figure>
 </div>
