@@ -522,13 +522,34 @@ const SHOPPING_CATEGORY_ORDER = [
   'Sonstiges'
 ];
 
-function displayCategory(category = '') {
+/* 18 Zutaten tragen im Katalog eine falsche Kategorie — Sardine, Wolfsbarsch
+   und Fleischbällchen stehen unter "Gemüse", Spaghetti und Basmatireis auch.
+   Wo der Name eindeutig ist, schlägt er die eingetragene Kategorie: sonst
+   sucht man den Fisch in der Gemüseabteilung. */
+const NAME_CATEGORY_HINTS = [
+  [/lachs|thunfisch|sardin|sardell|kabeljau|seelachs|forelle|hering|makrele|wolfsbarsch|dorade|scholle|garnel|krabbe|muschel|fisch/i, 'Fleisch & Fisch'],
+  [/h(ä|ae)hnchen|h(ü|ue)hner|pute|truthahn|rind|schwein|lamm|bacon|speck|schinken|salami|chorizo|wurst|hack|fleischb|gyros/i, 'Fleisch & Fisch'],
+  [/nudel|pasta|spaghetti|linguine|penne|fusilli|makkaroni|reis$|basmati|jasminreis|couscous|bulgur|quinoa|haferflocken|graupen|linsen|bohnen|kichererbsen/i, 'Trockenware & Beilagen'],
+  [/tofu|tempeh|seitan|sojaschnetzel/i, 'Tofu & Hülsenfrüchte'],
+  [/mandel|cashew|waln|haseln|pistazie|pekan|chiasamen|sesamsamen|sonnenblumenkerne|k(ü|ue)rbiskerne/i, 'Nüsse & Samen'],
+  [/k(ä|ae)se|parmesan|mozzarella|feta|joghurt|quark|skyr|sahne|milch|butter|ricotta|schmand/i, 'Milchprodukte & Eier']
+];
+
+function displayCategory(category = '', name = '') {
+  const label = String(name);
+  for (const [pattern, target] of NAME_CATEGORY_HINTS) {
+    if (pattern.test(label)) {
+      /* Pflanzliche Erzeugnisse nicht zu Milchprodukten machen. */
+      if (target === 'Milchprodukte & Eier' && /soja|hafer|mandel|kokos|pflanzlich|vegan/i.test(label)) continue;
+      return target;
+    }
+  }
   return SHOPPING_CATEGORY_MAP[String(category).trim().toLowerCase()] || 'Sonstiges';
 }
 
 function groupedShoppingItems(items) {
   const groups = items.reduce((acc, item) => {
-    const category = displayCategory(item.category);
+    const category = displayCategory(item.category, item.name);
     if (!acc[category]) acc[category] = { category, items: [] };
     acc[category].items.push(item);
     return acc;
