@@ -17,6 +17,7 @@ const ui = {
   checks: {},
   shoppingPlanId: null,
   shoppingView: 'category',
+  expandedStaples: false,
   collapsedGroups: new Set(),
   details: new Map()
 };
@@ -539,6 +540,8 @@ function groupedShoppingItems(items) {
 }
 
 function amountText(item) {
+  /* "1,2 nach Geschmack" ist keine Einkaufsmenge. */
+  if (item.showAmount === false) return esc(item.unit || '');
   const amount = item.packs ? item.buyAmount : item.amount;
   return `${Math.round(Number(amount || 0) * 100) / 100} ${esc(item.buyUnit || item.unit || '')}`;
 }
@@ -558,6 +561,17 @@ function shoppingItem(item) {
     <span class="master-shopping-name ${checked ? 'done' : ''}">${esc(item.name)}</span>
     <span class="master-shopping-amount">${amountText(item)}${pack ? `<small>${esc(pack)}</small>` : ''}</span>
   </div>`;
+}
+
+/* Grundzutaten stehen eingeklappt am Ende: nicht im Weg, aber nachschlagbar. */
+function stapleGroup(items) {
+  const collapsed = !ui.expandedStaples;
+  return `<section class="master-shopping-group staples ${collapsed ? 'collapsed' : ''}">
+    <button type="button" data-toggle-staples>
+      <span>Hast du wahrscheinlich <em>${items.length}</em></span>${SVG.chevron}
+    </button>
+    <div class="master-shopping-items">${items.map(shoppingItem).join('')}</div>
+  </section>`;
 }
 
 function categoryGroup(group) {
@@ -608,8 +622,10 @@ async function renderShopping(root) {
 
     if (!ui.selectedDates.length) ui.selectedDates = plan.selectedDates || plan.days.map((day) => day.date);
     const list = buildShoppingList(plan, ui.selectedDates, ui.checks);
-    const groups = groupedShoppingItems(list.items);
-    const openCount = list.items.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
+    /* Nur die regulaeren Posten gruppieren — der Vorrat bekommt unten eine
+       eigene Gruppe und stand sonst doppelt in der Liste. */
+    const groups = groupedShoppingItems(list.regular);
+    const openCount = list.regular.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
 
     main.innerHTML = `<section class="v8-page preply-page">
       <h1 class="master-screen-title">Einkauf</h1>
@@ -627,10 +643,11 @@ async function renderShopping(root) {
 
       <div class="master-shopping-groups">
         ${ui.shoppingView === 'category' ? groups.map(categoryGroup).join('') : list.byRecipe.map(recipeShoppingGroup).join('')}
+        ${ui.shoppingView === 'category' && list.staples.length ? stapleGroup(list.staples) : ''}
       </div>
 
       ${ui.shoppingView === 'category' ? `<div class="master-shopping-summary">
-        <span data-open-count>${openCount} von ${list.items.length} offen</span>
+        <span data-open-count>${openCount} von ${list.regular.length} offen</span>
         ${list.estimatedTotal ? `<strong>ca. ${list.estimatedTotal.toFixed(2).replace('.', ',')} €</strong>` : ''}
       </div>` : ''}
 
@@ -650,6 +667,12 @@ async function renderShopping(root) {
       renderShopping(root);
     }));
 
+    main.querySelector('[data-toggle-staples]')?.addEventListener('click', () => {
+      ui.expandedStaples = !ui.expandedStaples;
+      haptic('tap');
+      renderShopping(root);
+    });
+
     main.querySelectorAll('[data-shopping-group]').forEach((button) => button.addEventListener('click', () => {
       const category = button.dataset.shoppingGroup;
       if (ui.collapsedGroups.has(category)) ui.collapsedGroups.delete(category);
@@ -666,8 +689,8 @@ async function renderShopping(root) {
       button.setAttribute('aria-label', checked ? 'Als offen markieren' : 'Als erledigt markieren');
       button.nextElementSibling?.classList.toggle('done', checked);
       if (openLabel) {
-        const open = list.items.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
-        openLabel.textContent = `${open} von ${list.items.length} offen`;
+        const open = list.regular.filter((item) => !(ui.checks[item.id] ?? item.checked)).length;
+        openLabel.textContent = `${open} von ${list.regular.length} offen`;
       }
       silentUpdate((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: checked } }));
     };
