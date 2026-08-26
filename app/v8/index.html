@@ -28,17 +28,43 @@
   <script type="module" src="js/app.js"></script>
   <script>
     if ('serviceWorker' in navigator) {
-      /* Vor der Registrierung merken: gab es schon einen Controller? Beim
-         allerersten Besuch gibt es keinen — dann ist das keine Aktualisierung. */
+      /* Beim allerersten Besuch uebernimmt der Service Worker die Seite zum
+         ersten Mal — das ist keine Aktualisierung, sondern der Normalfall.
+         Erst jeder weitere Wechsel bedeutet eine neue Version.
+         Vorher stand hier eine einmalige Momentaufnahme; die blieb beim ersten
+         Besuch fuer immer false, sodass eine spaetere echte Aktualisierung in
+         derselben Sitzung unbemerkt blieb. */
       var hadController = Boolean(navigator.serviceWorker.controller);
 
       function showUpdateBanner() {
         if (document.querySelector('.preply-update-bar')) return;
         var bar = document.createElement('div');
         bar.className = 'preply-update-bar';
-        bar.innerHTML = '<span>Neue Version geladen.</span><button type="button">Jetzt anzeigen</button>';
+        bar.innerHTML = '<span>Neue Version bereit.</span><button type="button">Jetzt laden</button>';
         bar.querySelector('button').addEventListener('click', function () { location.reload(); });
         document.body.appendChild(bar);
+      }
+
+      /* Uebernimmt ein neuer Service Worker, laeuft die offene Seite trotzdem
+         mit dem Code weiter, den sie beim Start geladen hat. Ohne Neuladen
+         sieht der Nutzer die alte Versionsnummer und die alten Fehler — und
+         der Hinweisbalken war leicht zu uebersehen. Also selbst neu laden,
+         ausser der Nutzer ist gerade mitten in etwas. */
+      function userIsBusy() {
+        var active = document.activeElement;
+        if (active && /^(INPUT|TEXTAREA|SELECT)$/.test(active.tagName)) return true;
+        return Boolean(document.querySelector('.v8-overlay'));
+      }
+
+      function applyUpdate() {
+        /* Nur einmal pro Sitzung von selbst neu laden, sonst droht eine
+           Schleife. Kommt danach noch eine Version, bleibt der Balken. */
+        if (sessionStorage.getItem('preply_reloading') === '1' || userIsBusy()) {
+          showUpdateBanner();
+          return;
+        }
+        sessionStorage.setItem('preply_reloading', '1');
+        location.reload();
       }
 
       window.addEventListener('load', function () {
@@ -46,7 +72,8 @@
           /* Der Service Worker ruft skipWaiting(), übernimmt also sofort. Die
              bereits geladenen Dateien im Tab sind danach veraltet. */
           navigator.serviceWorker.addEventListener('controllerchange', function () {
-            if (hadController) showUpdateBanner();
+            if (hadController) applyUpdate();
+            else hadController = true;
           });
 
           var check = function () { registration.update().catch(function () {}); };
