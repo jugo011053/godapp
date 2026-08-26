@@ -8,11 +8,15 @@ import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './fea
 import { appendBuildStamp, refreshProfileMaster } from './profileMasterEnhancement.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
 import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
+import { initializeAccount, refreshAccount } from './accountEnhancement.js';
 
 const appRoot = document.getElementById('app');
 
 function renderProfileLayer() {
   refreshProfileMaster(appRoot);
+  /* Muss nach refreshProfileMaster laufen: der Abschnitt haengt sich an den
+     Bearbeiten-Knopf, den erst der Profil-Renderer erzeugt. */
+  refreshAccount(appRoot);
   appRoot.querySelector('.master-profile-intro h1')?.setAttribute('aria-label', 'Deine Einstellungen');
 }
 
@@ -68,9 +72,11 @@ function scheduleRender() {
 try {
   initializeStore();
   initializePlanManagement();
+  initializeAccount();
   initFeel(document.body);
   on('route:changed', scheduleRender);
   on('state:changed', scheduleRender);
+  on('account:changed', scheduleRender);
   initializeRouter();
   await startIntegratedApp(appRoot);
   await initializeFeatureEnhancements();

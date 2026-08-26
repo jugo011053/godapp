@@ -16,11 +16,14 @@ export class AuthSessionError extends Error {
 }
 
 export class SupabaseSessionClient {
-  constructor({ supabaseUrl, anonKey, fetchImpl = fetch, storage = localStorage, onStatus = () => {} }) {
+  constructor({ supabaseUrl, anonKey, fetchImpl, storage = localStorage, onStatus = () => {} }) {
     if (!supabaseUrl || !anonKey) throw new TypeError('Supabase URL und Anon-Key sind erforderlich.');
     this.supabaseUrl = supabaseUrl.replace(/\/$/, '');
     this.anonKey = anonKey;
-    this.fetchImpl = fetchImpl;
+    /* fetch braucht window als this. Stand hier als `fetchImpl = fetch` und
+       wurde als `this.fetchImpl(...)` aufgerufen — im Browser ist das ein
+       "Illegal invocation", das als Netzwerkfehler durchgereicht wurde. */
+    this.fetchImpl = fetchImpl || ((...args) => globalThis.fetch(...args));
     this.storage = storage;
     this.onStatus = onStatus;
     this.refreshPromise = null;
