@@ -1,18 +1,23 @@
 import { getRoute, navigate } from './core/router.js';
 import { getState, updateState } from './core/store.js';
-import { loadCards, getCards, getRecipe } from './data/recipeStore.js';
+import { loadCards, getRecipe } from './data/recipeStore.js';
 import { renderShell } from './features/shell/renderShell.js';
 import {
   completeOnboarding,
   createOnboardingDraft,
   currentStep,
+  isLastStep,
   nextStep,
   previousStep,
   updateDraft,
-  validateOnboardingStep
+  validateOnboardingStep,
+  ONBOARDING_STEPS
 } from './features/onboarding/onboardingModel.js';
-import { MEAL_OPTIONS, STEP_DEFINITIONS } from './features/onboarding/onboardingSteps.js';
-import { buildProfileSummary } from './features/profile/profileSummary.js';
+import {
+  MEAL_OPTIONS, STEP_TITLES, DIET_OPTIONS, ALLERGEN_OPTIONS, STYLE_OPTIONS,
+  SEXES, ACTIVITY_LEVELS, GOALS, BODY_LIMITS
+} from './features/onboarding/onboardingSteps.js';
+import { calorieTargetFor, proteinTargetFor, explainTarget } from './features/onboarding/nutrition.js';
 import { buildPlan, suggestForToday, replacementSuggestions } from './features/planner/plannerEngine.js';
 import { getReturnOptions, isPlanExpired, replaceCurrentPlan, setMealPinned } from './features/history/history.js';
 import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
@@ -52,21 +57,11 @@ function localDate(offset = 0) {
   return date.toISOString().slice(0, 10);
 }
 
-function dateLabel(value) {
-  return formatDay.format(new Date(`${value}T12:00:00`));
-}
 
 function tone(index) {
   return ['tone-lime', 'tone-lavender', 'tone-peach', 'tone-blue', 'tone-pink'][index % 5];
 }
 
-function recipeCard(recipe, extra = '') {
-  return `<article class="recipe-card" data-recipe-id="${escapeHtml(recipe.id)}">
-    <div><p class="eyebrow">${escapeHtml(MEAL_LABELS[recipe.category] || recipe.category)}</p><h3>${escapeHtml(recipe.name)}</h3></div>
-    <div class="recipe-meta"><span>${Math.round(recipe.kcal)} kcal</span><span>${Math.round(recipe.protein)} g Protein</span><span>${Math.round(recipe.time)} Min.</span><span>${escapeHtml(recipe.simplicity || 'ausgewogen')}</span></div>
-    ${extra}
-  </article>`;
-}
 
 function catalogStatusHtml() {
   if (runtime.catalogStatus === 'loading') return '<div class="v8-status">Rezepte werden geladen …</div>';
@@ -407,37 +402,91 @@ function renderApp(root) {
   renderDialog(root);
 }
 
-function setDraftValue(field, value, multiple = false) {
-  const draft = runtime.onboardingDraft;
-  if (!draft) return;
-  if (multiple) {
-    const current = new Set(draft.profile[field] || []);
-    current.has(value) ? current.delete(value) : current.add(value);
-    runtime.onboardingDraft = updateDraft(draft, { [field]: [...current] });
-  } else {
-    runtime.onboardingDraft = updateDraft(draft, { [field]: value });
-  }
+/* Ein Regler mit grosser Zahl statt eines Textfeldes: keine Tastatur, die
+   aufspringt, einhaendig bedienbar, und der Wert ist immer sichtbar. */
+function sliderField(field, label, value, limits) {
+  return `<div class="ob-slider" data-slider-field="${field}">
+    <div class="ob-slider-head">
+      <span>${escapeHtml(label)}</span>
+      <span class="ob-slider-value"><b data-slider-out>${value}</b> ${escapeHtml(limits.unit)}</span>
+    </div>
+    <div class="ob-slider-row">
+      <button type="button" class="ob-step" data-slider-nudge="-1" aria-label="${escapeHtml(label)} verringern">−</button>
+      <input type="range" min="${limits.min}" max="${limits.max}" step="${limits.step}"
+             value="${value}" data-slider-input aria-label="${escapeHtml(label)}">
+      <button type="button" class="ob-step" data-slider-nudge="1" aria-label="${escapeHtml(label)} erhöhen">+</button>
+    </div>
+  </div>`;
 }
 
-function optionButtons(step, definition, profile) {
-  const field = { planningMode: 'planningMode', goal: 'goal', diet: 'dietStyle', cooking: 'cookingStyle', simplicity: 'simplicity', priorities: 'priorities' }[step];
-  const selected = definition.multiple ? new Set(profile[field] || []) : null;
-  return `<div class="option-grid">${definition.options.map((option) => {
-    const active = definition.multiple ? selected.has(option.value) : profile[field] === option.value;
-    return `<button class="option-card ${active ? 'selected' : ''}" data-onboard-field="${field}" data-onboard-value="${option.value ?? ''}" data-multiple="${definition.multiple ? 'true' : 'false'}"><strong>${escapeHtml(option.label)}</strong>${option.description ? `<span>${escapeHtml(option.description)}</span>` : ''}</button>`;
-  }).join('')}</div>`;
+function choiceCards(field, options, selected, columns = 2) {
+  return `<div class="ob-choice" style="grid-template-columns:repeat(${columns},minmax(0,1fr))">
+    ${options.map(([value, label, hint]) => `
+      <button type="button" class="ob-card ${selected === value ? 'selected' : ''}"
+              data-choice-field="${field}" data-choice-value="${escapeHtml(value)}" aria-pressed="${selected === value}">
+        <strong>${escapeHtml(label)}</strong>${hint ? `<small>${escapeHtml(hint)}</small>` : ''}
+      </button>`).join('')}
+  </div>`;
+}
+
+function targetPreview(profile) {
+  const kcal = calorieTargetFor(profile, profile.goal || 'maintain');
+  const protein = proteinTargetFor(profile, profile.goal || 'maintain');
+  return `<div class="ob-preview">
+    <div><span>Tagesziel</span><b>${kcal}<small> kcal</small></b></div>
+    <div><span>Protein</span><b>${protein}<small> g</small></b></div>
+    <p>${escapeHtml(explainTarget(profile, profile.goal || 'maintain'))}</p>
+  </div>`;
 }
 
 function onboardingBody(draft) {
   const step = currentStep(draft);
-  const profile = draft.profile;
-  const definition = STEP_DEFINITIONS[step];
-  if (definition) return `<h2>${escapeHtml(definition.title)}</h2>${optionButtons(step, definition, profile)}`;
-  const ALLERGEN_LABELS = { gluten: 'Gluten', dairy: 'Milch', eggs: 'Eier', nuts: 'Nüsse', soy: 'Soja', fish: 'Fisch' };
-  if (step === 'restrictions') return `<h2>Was soll ausgeschlossen werden?</h2><div class="option-grid">${Object.entries(ALLERGEN_LABELS).map(([key, label]) => `<button class="option-card ${(profile.allergies || []).includes(key) ? 'selected' : ''}" data-onboard-field="allergies" data-onboard-value="${key}" data-multiple="true"><strong>${label}</strong></button>`).join('')}</div><div class="form-field" style="margin-top:var(--space-4)"><span>Weitere Ausschlüsse</span><input data-onboard-input="excludedIngredients" value="${escapeHtml((profile.excludedIngredients || []).join(', '))}" placeholder="z. B. Koriander, Sellerie"></div>`;
-  if (step === 'meals') return `<h2>Welche Mahlzeiten möchtest du planen?</h2><div class="option-grid">${MEAL_OPTIONS.map(([key,label]) => `<button class="option-card ${profile.enabledMeals[key] ? 'selected' : ''}" data-meal-key="${key}"><strong>${label}</strong></button>`).join('')}</div>`;
-  if (step === 'details') return `<h2>Optionale Details</h2><div class="form-grid"><div class="form-field"><label>Personen</label><input type="number" min="1" data-onboard-number="persons" value="${profile.persons}"></div><div class="form-field"><label>Maximale Kochzeit</label><input type="number" min="5" data-onboard-number="maxCookingTime" value="${profile.maxCookingTime || 30}"></div><div class="form-field"><label>Kalorienziel</label><input type="number" min="0" data-onboard-number="calorieTarget" value="${profile.calorieTarget || ''}" placeholder="${Math.round(resolveCalorieTarget(profile))}"></div><div class="form-field"><label>Proteinziel</label><input type="number" min="0" data-onboard-number="proteinTarget" value="${profile.proteinTarget || ''}" placeholder="${Math.round(resolveProteinTarget(profile))}"></div></div><p style="color:var(--muted);font-size:var(--text-sm);margin-top:var(--space-3)">Leer lassen — dann rechnet Preply mit den grau angezeigten Werten aus deinem Ziel.</p>`;
-  return `<h2>So wird geplant</h2><div class="v8-status">${escapeHtml(buildProfileSummary(profile))}</div>`;
+  const p = draft.profile;
+  const head = STEP_TITLES[step] || { title: '', copy: '' };
+  const heading = `<h2>${escapeHtml(head.title)}</h2><p class="ob-copy">${escapeHtml(head.copy)}</p>`;
+
+  if (step === 'body') {
+    return `${heading}
+      ${choiceCards('sex', SEXES, p.sex, 3)}
+      ${sliderField('age', 'Alter', p.age, BODY_LIMITS.age)}
+      ${sliderField('height', 'Größe', p.height, BODY_LIMITS.height)}
+      ${sliderField('weight', 'Gewicht', p.weight, BODY_LIMITS.weight)}
+      <p class="ob-label">Wie viel bewegst du dich?</p>
+      ${choiceCards('activity', ACTIVITY_LEVELS.map(([v, l, h]) => [v, l, h]), p.activity, 2)}`;
+  }
+
+  if (step === 'goal') {
+    return `${heading}
+      ${choiceCards('goal', GOALS.map(([v, l, h]) => [v, l, h]), p.goal, 1)}
+      ${p.sex ? targetPreview(p) : ''}`;
+  }
+
+  if (step === 'diet') {
+    const allergies = new Set(p.allergies || []);
+    return `${heading}
+      ${choiceCards('dietStyle', DIET_OPTIONS, p.dietStyle, 2)}
+      <p class="ob-label">Was soll nie im Plan auftauchen?</p>
+      <div class="ob-chips">
+        ${ALLERGEN_OPTIONS.map(([value, label]) => `
+          <button type="button" class="ob-chip ${allergies.has(value) ? 'selected' : ''}"
+                  data-allergen="${value}" aria-pressed="${allergies.has(value)}">${escapeHtml(label)}</button>`).join('')}
+      </div>
+      <div class="form-field" style="margin-top:14px">
+        <span class="ob-label">Sonst noch etwas?</span>
+        <input data-onboard-input="excludedIngredients" value="${escapeHtml((p.excludedIngredients || []).join(', '))}" placeholder="z. B. Koriander, Sellerie">
+      </div>`;
+  }
+
+  const meals = p.enabledMeals || {};
+  return `${heading}
+    ${choiceCards('style', STYLE_OPTIONS.map(([v, l, h]) => [v, l, h]), p.style, 2)}
+    <p class="ob-label">Welche Mahlzeiten sollen wir planen?</p>
+    <div class="ob-chips">
+      ${MEAL_OPTIONS.map(([key, label]) => `
+        <button type="button" class="ob-chip ${meals[key] ? 'selected' : ''}" data-meal-key="${key}" aria-pressed="${Boolean(meals[key])}">${escapeHtml(label)}</button>`).join('')}
+    </div>
+    <p class="ob-label">Für wie viele Personen?</p>
+    ${sliderField('persons', 'Personen', Math.max(1, Number(p.persons) || 1), { min: 1, max: 8, step: 1, unit: '' })}`;
 }
 
 function createPlanDraft(profile) {
@@ -596,10 +645,20 @@ function renderDialog(root) {
   if (runtime.activeDialog === 'plan' && runtime.planDraft) { renderPlanDialog(root); return; }
   if (runtime.activeDialog !== 'onboarding' || !runtime.onboardingDraft) return;
   const draft = runtime.onboardingDraft;
-  const step = currentStep(draft);
+  const total = ONBOARDING_STEPS.length;
+  const last = isLastStep(draft);
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
-  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true"><p class="eyebrow">Einrichtung ${draft.stepIndex + 1} / 10</p><div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / 10) * 100}%"></div></div>${onboardingBody(draft)}<p id="onboarding-error" class="v8-status error" hidden></p><div class="v8-actions" style="margin-top:22px"><button class="v8-button ghost" data-onboard-action="close">Später</button>${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : ''}<button class="v8-button primary" data-onboard-action="next">${step === 'summary' ? 'Profil speichern' : 'Weiter'}</button></div></section>`;
+  overlay.innerHTML = `<section class="v8-dialog ob-dialog" role="dialog" aria-modal="true">
+    <p class="eyebrow">Schritt ${draft.stepIndex + 1} von ${total}</p>
+    <div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / total) * 100}%"></div></div>
+    ${onboardingBody(draft)}
+    <p id="onboarding-error" class="v8-status error" hidden></p>
+    <div class="v8-actions ob-actions">
+      ${draft.stepIndex ? '<button class="v8-button" data-onboard-action="back">Zurück</button>' : '<button class="v8-button ghost" data-onboard-action="close">Später</button>'}
+      <button class="v8-button primary" data-onboard-action="next">${last ? 'Los geht\u2019s' : 'Weiter'}</button>
+    </div>
+  </section>`;
   root.appendChild(overlay);
   bindDialogEvents(root);
 }
@@ -644,35 +703,88 @@ function bindPlanDialogEvents(root) {
 }
 
 function bindDialogEvents(root) {
-  root.querySelectorAll('[data-onboard-field]').forEach((button) => button.addEventListener('click', () => {
-    const raw = button.dataset.onboardValue;
-    const value = raw === '' && button.dataset.onboardField === 'goal' ? null : raw;
-    setDraftValue(button.dataset.onboardField, value, button.dataset.multiple === 'true');
+  /* Auswahlkarten */
+  root.querySelectorAll('[data-choice-field]').forEach((button) => button.addEventListener('click', () => {
+    haptic('tap');
+    runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, {
+      [button.dataset.choiceField]: button.dataset.choiceValue
+    });
     renderDialog(root);
   }));
+
+  /* Regler: waehrend des Ziehens nur die Zahl aktualisieren, damit der
+     Dialog nicht bei jedem Pixel neu gebaut wird. */
+  root.querySelectorAll('[data-slider-field]').forEach((group) => {
+    const field = group.dataset.sliderField;
+    const input = group.querySelector('[data-slider-input]');
+    const out = group.querySelector('[data-slider-out]');
+    if (!input || !out) return;
+
+    const commit = (value) => {
+      runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, { [field]: Number(value) });
+    };
+
+    input.addEventListener('input', () => { out.textContent = input.value; });
+    input.addEventListener('change', () => {
+      commit(input.value);
+      haptic('tap');
+      /* Erst am Ende neu zeichnen — dann stimmt auch die Bedarfsvorschau. */
+      renderDialog(root);
+    });
+
+    group.querySelectorAll('[data-slider-nudge]').forEach((button) => button.addEventListener('click', () => {
+      const delta = Number(button.dataset.sliderNudge) * Number(input.step || 1);
+      const next = Math.min(Number(input.max), Math.max(Number(input.min), Number(input.value) + delta));
+      input.value = String(next);
+      out.textContent = String(next);
+      commit(next);
+      haptic('tap');
+      renderDialog(root);
+    }));
+  });
+
+  /* Ausschluesse */
+  root.querySelectorAll('[data-allergen]').forEach((button) => button.addEventListener('click', () => {
+    const value = button.dataset.allergen;
+    const current = new Set(runtime.onboardingDraft.profile.allergies || []);
+    current.has(value) ? current.delete(value) : current.add(value);
+    haptic('tap');
+    runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, { allergies: [...current] });
+    renderDialog(root);
+  }));
+
   root.querySelectorAll('[data-meal-key]').forEach((button) => button.addEventListener('click', () => {
     const key = button.dataset.mealKey;
-    const current = runtime.onboardingDraft.profile.enabledMeals;
+    const current = runtime.onboardingDraft.profile.enabledMeals || {};
+    haptic('tap');
     runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, { enabledMeals: { [key]: !current[key] } });
     renderDialog(root);
   }));
-  root.querySelectorAll('[data-onboard-number]').forEach((input) => input.addEventListener('change', () => {
-    const value = input.value === '' ? null : Number(input.value);
-    runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, { [input.dataset.onboardNumber]: value });
-  }));
+
   root.querySelectorAll('[data-onboard-input]').forEach((input) => input.addEventListener('change', () => {
-    runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, { [input.dataset.onboardInput]: input.value.split(',').map((item) => item.trim()).filter(Boolean) });
+    runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, {
+      [input.dataset.onboardInput]: input.value.split(',').map((item) => item.trim()).filter(Boolean)
+    });
   }));
+
   root.querySelectorAll('[data-onboard-action]').forEach((button) => button.addEventListener('click', () => {
     const action = button.dataset.onboardAction;
     if (action === 'close') { runtime.activeDialog = null; renderApp(root); return; }
     if (action === 'back') { runtime.onboardingDraft = previousStep(runtime.onboardingDraft); renderDialog(root); return; }
+
     const error = validateOnboardingStep(runtime.onboardingDraft);
-    if (error) { const errorNode = root.querySelector('#onboarding-error'); errorNode.hidden = false; errorNode.textContent = error; return; }
-    if (currentStep(runtime.onboardingDraft) === 'summary') {
+    if (error) {
+      const node = root.querySelector('#onboarding-error');
+      if (node) { node.hidden = false; node.textContent = error; }
+      haptic('warn');
+      return;
+    }
+
+    if (isLastStep(runtime.onboardingDraft)) {
       runtime.onboardingDraft = completeOnboarding(runtime.onboardingDraft);
       updateState((state) => ({ ...state, profile: runtime.onboardingDraft.profile, onboardingCompleted: true }));
       runtime.activeDialog = null;
+      haptic('strong');
       renderApp(root);
       return;
     }
