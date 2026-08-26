@@ -1,3 +1,3 @@
-Preply v8.28 · 2026-08-25
+Preply v8.29 · 2026-08-25
 Dies ist der Stand, der auf GitHub Pages veroeffentlicht ist.
 Steht im Profil der App eine kleinere Nummer, laeuft dort eine alte Version.

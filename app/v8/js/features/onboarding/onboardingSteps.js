@@ -21,10 +21,14 @@ export const DIET_OPTIONS = Object.freeze([
   ['pescatarian', 'Pescetarisch', 'Fisch ja, Fleisch nein']
 ]);
 
+/* Senf, Sellerie und Sulfite kommen im Katalog vor (40 / 21 / 7 Rezepte),
+   waren aber nicht auswaehlbar — betroffene Personen konnten sie nicht
+   ausschliessen. Sellerie und Senf gehoeren zu den 14 EU-Hauptallergenen. */
 export const ALLERGEN_OPTIONS = Object.freeze([
   ['gluten', 'Gluten'], ['dairy', 'Milch'], ['eggs', 'Eier'],
   ['nuts', 'Nüsse'], ['soy', 'Soja'], ['fish', 'Fisch'],
-  ['shellfish', 'Schalentiere'], ['sesame', 'Sesam']
+  ['shellfish', 'Schalentiere'], ['sesame', 'Sesam'],
+  ['mustard', 'Senf'], ['celery', 'Sellerie'], ['sulphites', 'Sulfite']
 ]);
 
 /* Der Stil ist die dauerhafte Grundhaltung — im Gegensatz zu den Richtungen,

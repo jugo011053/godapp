@@ -74,16 +74,139 @@ export function noveltyLevel(classification = {}) {
   return NOVELTY_MAP[token(raw)] ?? 0;
 }
 
-export function normalizeAllergens(values = []) {
-  return [...new Set(values.map((value) => ALLERGEN_MAP[token(value)] || token(value)).filter(Boolean))].sort();
+/* --- Ernaehrungsweise aus den Zutaten ableiten ---------------------------
+   Beide Label-Felder des Katalogs sind nachweislich unzuverlaessig: Es gibt
+   Gerichte mit Bacon und Ei, die als "vegan" gefuehrt werden, und eine
+   Sardinen-Pasta mit diet_tags ["vegan"]. Bei einer Ausschlussregel, auf die
+   sich jemand verlaesst, darf ein Label nicht das letzte Wort haben — die
+   Zutatenliste schon. */
+
+const MEAT = /(^|[\s-])(rind|kalb|schwein|lamm|hammel|wild|hirsch|ente|gans|kanin)|h(ä|ae)hnchen|h(ü|ue)hner|hühnchen|pute|truthahn|bacon|speck|schinken|salami|chorizo|prosciutto|pancetta|bratwurst|wurst|hackfleisch|hack$|fleisch|gyros|d(ö|oe)ner|leber|gelatine|lardo|gu?anciale/i;
+
+const FISH = /fisch|lachs|thunfisch|kabeljau|dorsch|seelachs|forelle|hering|makrele|sardin|sardell|anchovis|wolfsbarsch|dorade|scholle|garnel|shrimp|krabbe|hummer|muschel|tintenfisch|calamari|oktopus|surimi|meeresfr(ü|ue)cht|r(ä|ae)ucherlachs/i;
+
+const DAIRY_EGG = /(^|[\s-])(ei|eier|eigelb|eiwei(ß|ss))([\s-]|$)|milch|sahne|rahm|k(ä|ae)se|parmesan|mozzarella|feta|gouda|cheddar|ricotta|mascarpone|frischk(ä|ae)se|quark|joghurt|skyr|schmand|cr(è|e)me.?fra(î|i)che|buttermilch|molke|whey|honig|ghee|butter/i;
+
+/* Falsche Freunde: pflanzliche Erzeugnisse, die ein tierisches Wort tragen. */
+const PLANT_OVERRIDE = /soja|hafer|mandel|kokos|cashew|erdnuss|reis(milch|drink)|pflanzlich|vegan|lupine|hanf|erbsenprotein|butterbohne|buttern(u|ü)ss|kichererbse|butternut/i;
+
+function ingredientNamesOf(recipe) {
+  return (recipe.ingredients || []).map((item) => String(item?.name || ''));
 }
 
-export function normalizeDietTags(values = [], classification = {}) {
-  const tags = new Set(values.map(token).filter(Boolean));
+/* Rangfolge von streng nach offen. Ein Rezept darf nie strenger eingestuft
+   werden, als seine Zutaten hergeben. */
+const DIET_RANK = { vegan: 0, vegetarian: 1, pescatarian: 2, omnivore: 3 };
+
+export function dietFromIngredients(recipe) {
+  let level = 'vegan';
+  for (const raw of ingredientNamesOf(recipe)) {
+    const name = raw.toLowerCase();
+    if (PLANT_OVERRIDE.test(name)) continue;
+    if (MEAT.test(name)) return 'omnivore';
+    if (FISH.test(name)) { level = 'pescatarian'; continue; }
+    if (DAIRY_EGG.test(name) && DIET_RANK[level] < DIET_RANK.vegetarian) level = 'vegetarian';
+  }
+  /* Kategorien als zweites Signal — Namen sind teils falsch einsortiert. */
+  for (const item of recipe.ingredients || []) {
+    const cat = String(item?.category || '').toLowerCase();
+    const name = String(item?.name || '').toLowerCase();
+    if (PLANT_OVERRIDE.test(name)) continue;
+    if (cat === 'fleisch') return 'omnivore';
+    if (cat === 'fisch' && DIET_RANK[level] < DIET_RANK.pescatarian) level = 'pescatarian';
+  }
+  return level;
+}
+
+/* Was die Zutaten hergeben, begrenzt das Etikett. */
+export function allowedDietTags(claimLevel, evidenceLevel) {
+  const level = DIET_RANK[claimLevel] >= DIET_RANK[evidenceLevel] ? claimLevel : evidenceLevel;
+  if (level === 'vegan') return ['vegan', 'vegetarian', 'pescatarian', 'omnivore'];
+  if (level === 'vegetarian') return ['vegetarian', 'pescatarian', 'omnivore'];
+  if (level === 'pescatarian') return ['pescatarian', 'omnivore'];
+  return ['omnivore'];
+}
+
+/* --- Allergene aus den Zutaten ergaenzen ---------------------------------
+   Die Angaben im Katalog sind unvollstaendig: 60 Gerichte enthalten Ei ohne
+   Ei-Warnung, 31 Fisch ohne Fisch-Warnung, 28 Nuesse ohne Nuss-Warnung.
+   Anders als bei der Ernaehrungsweise ist Ergaenzen hier immer die sichere
+   Richtung — eine Warnung zu viel schadet niemandem, eine zu wenig schon. */
+
+const ALLERGEN_PATTERNS = [
+  ['gluten', /weizen|dinkel|roggen|gerste|graupen|bulgur|couscous|seitan|semmelbr(ö|oe)sel|panko|nudel|pasta|spaghetti|linguine|penne|fusilli|makkaroni|tortellini|gnocchi|brot(?!aufstrich)|br(ö|oe)tchen|baguette|pita|wrap|tortilla|croutons|paniermehl|mehl/],
+  ['dairy',  /k(ä|ae)se|milch|sahne|rahm|joghurt|quark|skyr|parmesan|mozzarella|feta|gouda|cheddar|ricotta|mascarpone|frischk(ä|ae)se|schmand|cr(è|e)me.?fra(î|i)che|butter|molke|whey|ghee/],
+  ['eggs',   /(^|[\s-])(ei|eier|eigelb|eiwei(ß|ss))([\s-]|$)|mittelgro(ß|ss)es ei|gro(ß|ss)es ei|mayonnaise|aioli/],
+  ['nuts',   /nuss|n(ü|ue)sse|mandel|cashew|walnuss|haseln|pistazie|pekan|macadamia|paran(u|ü)ss|nussmus|marzipan/],
+  ['soy',    /soja|tofu|edamame|miso|tempeh|sojasauce|sojaso(ß|ss)e/],
+  ['fish',   /fisch|lachs|thunfisch|sardin|sardell|anchovis|kabeljau|dorsch|seelachs|forelle|hering|makrele|wolfsbarsch|dorade|scholle|surimi|fischsauce/],
+  ['shellfish', /garnel|shrimp|krabbe|hummer|muschel|tintenfisch|calamari|oktopus|jakobsmuschel|krebs/],
+  ['sesame', /sesam|tahin/],
+  ['mustard', /senf|dijon/],
+  ['celery', /sellerie/]
+];
+
+/* Pflanzliche Erzeugnisse und Woerter, die ein Allergen nur im Namen tragen. */
+const ALLERGEN_EXCEPTIONS = {
+  dairy: /soja|hafer|mandel|kokos|cashew|reis(milch|drink)|pflanzlich|vegan|erdnuss|butterbohne|buttern(u|ü)ss|butternut/,
+  nuts:  /muskatnuss|kokosnuss|kokos|buttern(u|ü)ss|butternut/,
+  gluten: /mandelmehl|kokosmehl|kichererbsenmehl|reismehl|buchweizen|glutenfrei|maismehl/
+};
+
+export function allergensFromIngredients(recipe) {
+  const found = new Set();
+  for (const item of recipe?.ingredients || []) {
+    const name = String(item?.name || '').toLowerCase();
+    if (!name) continue;
+    for (const [allergen, pattern] of ALLERGEN_PATTERNS) {
+      if (!pattern.test(name)) continue;
+      const exception = ALLERGEN_EXCEPTIONS[allergen];
+      if (exception && exception.test(name)) continue;
+      found.add(allergen);
+    }
+  }
+  return [...found];
+}
+
+export function normalizeAllergens(values = [], recipe = null) {
+  const labelled = values.map((value) => ALLERGEN_MAP[token(value)] || token(value)).filter(Boolean);
+  /* Vereinigung statt Ersetzung: das Etikett bleibt, die Zutaten ergaenzen. */
+  return [...new Set([...labelled, ...allergensFromIngredients(recipe)])].sort();
+}
+
+/* classification.dietary_style steht auf Deutsch. Bisher wurde das Wort roh
+   in die Tags gelegt: "vegetarisch" traf nie den Vergleich auf "vegetarian"
+   (also wirkungslos), waehrend "vegan" in beiden Sprachen gleich heisst und
+   dadurch voll durchschlug — auch bei Gerichten mit Bacon. */
+const GERMAN_DIET = {
+  vegan: 'vegan', vegetarisch: 'vegetarian',
+  pescetarisch: 'pescatarian', pescatarisch: 'pescatarian', omnivor: 'omnivore'
+};
+
+export function normalizeDietTags(values = [], classification = {}, recipe = null) {
+  const claimed = new Set(values.map(token).map((t) => GERMAN_DIET[t] || t).filter(Boolean));
   const style = token(classification.dietary_style);
-  if (style) tags.add(style);
-  if (tags.has('vegan')) tags.add('vegetarian');
-  return [...tags].sort();
+  if (style) claimed.add(GERMAN_DIET[style] || style);
+
+  const known = [...claimed].filter((t) => t in DIET_RANK);
+  const strictestClaim = known.length
+    ? known.reduce((a, c) => (DIET_RANK[c] < DIET_RANK[a] ? c : a), 'omnivore')
+    : null;
+
+  /* Ohne Zutaten (etwa in Tests) bleibt es beim Etikett. */
+  if (!recipe || !Array.isArray(recipe.ingredients) || !recipe.ingredients.length) {
+    return strictestClaim ? [strictestClaim] : [...claimed].sort();
+  }
+
+  /* Die Zutaten setzen die Obergrenze. Ein Etikett darf nie strenger sein,
+     als die Zutatenliste hergibt — daran haengt ein Ausschluss, auf den sich
+     jemand verlaesst. Fehlt ein Etikett (alle Legacy-Rezepte), entscheiden
+     allein die Zutaten; dadurch werden sie ueberhaupt erst auffindbar. */
+  const evidence = dietFromIngredients(recipe);
+  const effective = strictestClaim && DIET_RANK[strictestClaim] >= DIET_RANK[evidence]
+    ? strictestClaim
+    : evidence;
+  return [effective];
 }
 
 export function inferMealRole(recipe) {
@@ -170,8 +293,8 @@ export function normalizeCatalogRecipe(recipe) {
   return {
     ...recipe,
     category: recipe.cat || recipe.category || 'dinner',
-    allergens: normalizeAllergens(recipe.allergens || []),
-    dietTags: normalizeDietTags(recipe.diet_tags || recipe.dietTags || [], classification),
+    allergens: normalizeAllergens(recipe.allergens || [], recipe),
+    dietTags: normalizeDietTags(recipe.diet_tags || recipe.dietTags || [], classification, recipe),
     mealRole: inferMealRole(recipe),
     simplicity: inferSimplicity(recipe),
     mealPrepScore: Number(classification.meal_prep_score_v2 || recipe.mealPrepScore || 0),
