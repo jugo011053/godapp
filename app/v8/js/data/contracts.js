@@ -32,6 +32,12 @@ export function createDefaultProfile() {
   return {
     version: PROFILE_VERSION,
     planningMode: 'simple',
+    /* Koerperdaten fuer die Bedarfsrechnung nach Mifflin-St Jeor. */
+    sex: null,
+    age: null,
+    height: null,
+    weight: null,
+    activity: 'light',
     goal: null,
     calorieTarget: null,
     proteinTarget: null,

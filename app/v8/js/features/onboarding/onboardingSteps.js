@@ -1,57 +1,53 @@
-export const STEP_DEFINITIONS = Object.freeze({
-  planningMode: {
-    title: 'Wie möchtest du planen?',
-    options: [
-      { value: 'simple', label: 'Einfach planen', description: 'Die App rechnet grob im Hintergrund.' },
-      { value: 'macros', label: 'Mit Kalorien und Makros', description: 'Ziele und Nährwerte bleiben sichtbar.' }
-    ]
-  },
-  goal: {
-    title: 'Was ist dein Ziel?',
-    options: [
-      { value: null, label: 'Kein konkretes Ziel' },
-      { value: 'lose', label: 'Abnehmen' },
-      { value: 'maintain', label: 'Gewicht halten' },
-      { value: 'gain', label: 'Zunehmen' }
-    ]
-  },
-  diet: {
-    title: 'Wie ernährst du dich?',
-    options: [
-      { value: 'omnivore', label: 'Omnivor' },
-      { value: 'vegetarian', label: 'Vegetarisch' },
-      { value: 'vegan', label: 'Vegan' },
-      { value: 'pescatarian', label: 'Pescetarisch' }
-    ]
-  },
-  cooking: {
-    title: 'Wie möchtest du kochen?',
-    options: [
-      { value: 'fresh', label: 'Frisch kochen' },
-      { value: 'meal_prep', label: 'Meal Prep' },
-      { value: 'mixed', label: 'Gemischt' }
-    ]
-  },
-  simplicity: {
-    title: 'Wie ausgefallen darf es sein?',
-    options: [
-      { value: 'simple', label: 'Simpel', description: 'Bekannte Zutaten, wenig Schritte, meist unter 30 Minuten.' },
-      { value: 'balanced', label: 'Ausgewogen', description: 'Mischung aus einfachen und abwechslungsreichen Rezepten.' },
-      { value: 'experimental', label: 'Experimentell', description: 'Mehr internationale und ungewöhnliche Gerichte.' }
-    ]
-  },
-  priorities: {
-    title: 'Was ist dir besonders wichtig?',
-    multiple: true,
-    options: [
-      { value: 'high_protein', label: 'Proteinreich' },
-      { value: 'quick', label: 'Schnell' },
-      { value: 'budget', label: 'Günstig' },
-      { value: 'meal_prep', label: 'Meal Prep' },
-      { value: 'varied', label: 'Abwechslungsreich' }
-    ]
-  }
+import { SEXES, ACTIVITY_LEVELS, GOALS, BODY_LIMITS } from './nutrition.js';
+
+export { SEXES, ACTIVITY_LEVELS, GOALS, BODY_LIMITS };
+
+/* Vier Bildschirme statt zehn. Nicht weil weniger gefragt wird, sondern weil
+   Zusammengehoeriges auf einer Flaeche steht — was sich lang anfuehlt, sind
+   Bildschirmwechsel, nicht die Menge der Angaben. */
+export const ONBOARDING_STEPS = Object.freeze(['body', 'goal', 'diet', 'style']);
+
+export const STEP_TITLES = Object.freeze({
+  body:  { title: 'Erst mal zu dir', copy: 'Daraus rechnen wir deinen Tagesbedarf aus.' },
+  goal:  { title: 'Was ist dein Ziel?', copy: 'Wir passen die Portionen daran an.' },
+  diet:  { title: 'Wie isst du?', copy: 'Was hier nicht reinsoll, taucht nie im Plan auf.' },
+  style: { title: 'Wie soll es laufen?', copy: 'Das lässt sich später jederzeit ändern.' }
 });
+
+export const DIET_OPTIONS = Object.freeze([
+  ['omnivore', 'Mischkost', 'Alles dabei'],
+  ['vegetarian', 'Vegetarisch', 'Ohne Fleisch und Fisch'],
+  ['vegan', 'Vegan', 'Rein pflanzlich'],
+  ['pescatarian', 'Pescetarisch', 'Fisch ja, Fleisch nein']
+]);
+
+export const ALLERGEN_OPTIONS = Object.freeze([
+  ['gluten', 'Gluten'], ['dairy', 'Milch'], ['eggs', 'Eier'],
+  ['nuts', 'Nüsse'], ['soy', 'Soja'], ['fish', 'Fisch'],
+  ['shellfish', 'Schalentiere'], ['sesame', 'Sesam']
+]);
+
+/* Der Stil ist die dauerhafte Grundhaltung — im Gegensatz zu den Richtungen,
+   die eine einzelne Neuplanung korrigieren. Beide greifen auf dieselben
+   Achsen zu, nur mit unterschiedlicher Haltbarkeit. */
+export const STYLE_OPTIONS = Object.freeze([
+  ['easy',     'Einfach & schnell', 'Wenig Zutaten, meist unter 30 Minuten',
+   { simplicity: 'simple', priorities: ['quick'], maxCookingTime: 30 }],
+  ['balanced', 'Ausgewogen', 'Gute Mischung aus schnell und besonders',
+   { simplicity: 'balanced', priorities: [], maxCookingTime: 45 }],
+  ['protein',  'Proteinreich', 'Mehr Eiweiß in jeder Mahlzeit',
+   { simplicity: 'balanced', priorities: ['high_protein'], maxCookingTime: 45 }],
+  ['budget',   'Günstig', 'Preiswerte Zutaten, große Portionen',
+   { simplicity: 'simple', priorities: ['budget'], maxCookingTime: 40 }],
+  ['prep',     'Meal Prep', 'Einmal kochen, mehrfach essen',
+   { simplicity: 'balanced', priorities: ['meal_prep'], cookingStyle: 'meal_prep', maxCookingTime: 60 }],
+  ['varied',   'Abwechslungsreich', 'Öfter mal etwas Neues',
+   { simplicity: 'experimental', priorities: ['varied'], maxCookingTime: 60 }]
+]);
+
+export function styleSettings(key) {
+  return STYLE_OPTIONS.find(([id]) => id === key)?.[3] || STYLE_OPTIONS[1][3];
+}
 
 export const MEAL_OPTIONS = Object.freeze([
   ['breakfast', 'Frühstück'],
@@ -59,3 +55,6 @@ export const MEAL_OPTIONS = Object.freeze([
   ['dinner', 'Abendessen'],
   ['snack', 'Snack']
 ]);
+
+/* Bleibt fuer den Profil-Editor erhalten. */
+export const STEP_DEFINITIONS = Object.freeze({});

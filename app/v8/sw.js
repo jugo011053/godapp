@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-24';
+const CACHE_NAME = 'preply-v8-shell-25';
 const SHELL = [
   './',
   './index.html',
@@ -12,6 +12,7 @@ const SHELL = [
   './assets/css/screens-master.css',
   './assets/css/profile-master.css',
   './assets/css/plan-editor-master.css',
+  './assets/css/onboarding.css',
   './assets/css/feel.css',
   './js/app.js',
   './js/integrationController.js',
@@ -38,6 +39,7 @@ const SHELL = [
   './js/features/history/history.js',
   './js/features/onboarding/onboardingModel.js',
   './js/features/onboarding/onboardingSteps.js',
+  './js/features/onboarding/nutrition.js',
   './js/features/planner/plannerEngine.js',
   './js/features/profile/profileSummary.js',
   './js/features/shell/renderShell.js',
