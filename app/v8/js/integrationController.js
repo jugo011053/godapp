@@ -1,5 +1,5 @@
 import { getRoute, navigate } from './core/router.js';
-import { getState, updateState } from './core/store.js';
+import { getState, updateState, silentUpdate } from './core/store.js';
 import { loadCards, getRecipe } from './data/recipeStore.js';
 import { renderShell } from './features/shell/renderShell.js';
 import {
@@ -525,6 +525,7 @@ function renderPlanDialog(root) {
   const draft = runtime.planDraft;
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
+  overlay.dataset.owner = 'integration';
   const stepLabels = ['Zeitraum', 'Mahlzeiten', 'Fertig'];
   const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
 
@@ -592,6 +593,7 @@ function renderReplacementDialog(root) {
 
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
+  overlay.dataset.owner = 'integration';
   overlay.dataset.replacementOverlay = 'true';
   overlay.dataset.dismissible = 'true';
   overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true">
@@ -663,7 +665,10 @@ function renderReplacementDialog(root) {
 }
 
 function renderDialog(root) {
-  root.querySelector('.v8-overlay')?.remove();
+  /* Nur die eigenen Dialoge abraeumen. Vorher loeschte jeder Renderdurchlauf
+     jedes Overlay — auch die Sheets anderer Module, die dann mitten in der
+     Bedienung verschwanden. */
+  root.querySelector('.v8-overlay[data-owner="integration"]')?.remove();
   if (runtime.activeDialog === 'replace' && runtime.replaceTarget) { renderReplacementDialog(root); return; }
   if (runtime.activeDialog === 'plan' && runtime.planDraft) { renderPlanDialog(root); return; }
   if (runtime.activeDialog !== 'onboarding' || !runtime.onboardingDraft) return;
@@ -672,6 +677,7 @@ function renderDialog(root) {
   const last = isLastStep(draft);
   const overlay = document.createElement('div');
   overlay.className = 'v8-overlay';
+  overlay.dataset.owner = 'integration';
   overlay.innerHTML = `<section class="v8-dialog ob-dialog" role="dialog" aria-modal="true">
     <p class="eyebrow">Schritt ${draft.stepIndex + 1} von ${total}</p>
     <div class="v8-progress"><div style="width:${((draft.stepIndex + 1) / total) * 100}%"></div></div>
@@ -948,11 +954,17 @@ function bindPageEvents(root) {
     event.stopPropagation();
     const date = button.dataset.pinDate;
     const category = button.dataset.pinCat;
-    const state = getState();
-    const days = normalizeDays(state.currentPlan);
-    const current = Boolean(days.find((d) => d.date === date)?.meals?.[category]?.pinned);
-    haptic(current ? 'tap' : 'confirm');
-    updateState((s2) => ({ ...s2, currentPlan: setMealPinned(s2.currentPlan, date, category, !current) }));
+    const days = normalizeDays(getState().currentPlan);
+    const next = !Boolean(days.find((d) => d.date === date)?.meals?.[category]?.pinned);
+    haptic(next ? 'confirm' : 'tap');
+
+    /* Ein Icon umzuschalten braucht keinen Neuaufbau der Seite — updateState
+       wuerde einen vollen Durchlauf ausloesen und dabei spuerbar haengen. */
+    silentUpdate((state) => ({ ...state, currentPlan: setMealPinned(state.currentPlan, date, category, next) }));
+    button.classList.toggle('pinned', next);
+    button.setAttribute('aria-pressed', String(next));
+    button.setAttribute('aria-label', next ? 'Gericht nicht mehr festhalten' : 'Dieses Gericht behalten');
+    button.closest('.preply-meal')?.classList.toggle('is-pinned', next);
   }));
 
   /* Swap meal button */

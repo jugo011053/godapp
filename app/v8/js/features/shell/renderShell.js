@@ -16,24 +16,41 @@ const ROUTES = [
 
 import { APP_BUILD } from '../../core/version.js';
 
+/* Die Huelle wird einmal gebaut und danach nur noch nachgezogen.
+   Vorher ersetzte jeder Zustandswechsel per innerHTML Kopf, Navigation und
+   Inhalt gemeinsam. Da das Fenster scrollt, fiel die Seitenhoehe dabei kurz
+   auf null — die Scrollposition war jedes Mal verloren. Genau das erzeugte
+   die Haenger. */
 export function renderShell(root, { route = 'plan' } = {}) {
-  /* Map 'profile' route to show profile but keep nav on 'plan' */
   const activeNav = route === 'profile' ? 'profile' : route;
+  let shell = root.querySelector('.v8-shell');
 
-  root.innerHTML = `
-    <div class="v8-shell">
-      <header class="v8-header">
-        <div class="v8-brand">
-          <strong>preply</strong>
-          <span>Einfach gesund planen. · ${APP_BUILD}</span>
-        </div>
-        <button type="button" class="v8-header-action" aria-label="Profil öffnen" onclick="location.hash='profile'">
-          ${ICONS.profile}
-        </button>
-      </header>
-      <main class="v8-main"></main>
-      <nav class="v8-nav" aria-label="Hauptnavigation">
-        ${ROUTES.map(([key, label, icon]) => `<a href="#${key}" ${key === activeNav ? 'aria-current="page"' : ''}>${icon}${label}</a>`).join('')}
-      </nav>
-    </div>`;
+  if (!shell) {
+    root.innerHTML = `
+      <div class="v8-shell">
+        <header class="v8-header">
+          <div class="v8-brand">
+            <strong>preply</strong>
+            <span>Einfach gesund planen. · ${APP_BUILD}</span>
+          </div>
+          <button type="button" class="v8-header-action" aria-label="Profil öffnen" onclick="location.hash='profile'">
+            ${ICONS.profile}
+          </button>
+        </header>
+        <main class="v8-main"></main>
+        <nav class="v8-nav" aria-label="Hauptnavigation">
+          ${ROUTES.map(([key, label, icon]) => `<a href="#${key}">${icon}${label}</a>`).join('')}
+        </nav>
+      </div>`;
+    shell = root.querySelector('.v8-shell');
+  }
+
+  /* Nur der aktive Zustand aendert sich zwischen den Renderdurchlaeufen. */
+  shell.querySelectorAll('.v8-nav a').forEach((link) => {
+    const key = (link.getAttribute('href') || '').replace(/^#/, '');
+    if (key === activeNav) link.setAttribute('aria-current', 'page');
+    else link.removeAttribute('aria-current');
+  });
+
+  return shell.querySelector('.v8-main');
 }

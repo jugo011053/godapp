@@ -16,21 +16,61 @@ function renderProfileLayer() {
   appRoot.querySelector('.master-profile-intro h1')?.setAttribute('aria-label', 'Deine Einstellungen');
 }
 
+/* --- Renderpfad ---------------------------------------------------------
+   Drei Ursachen fuer die Haenger, alle hier behandelt:
+   1. Die Huelle wurde bei jedem Durchlauf neu gebaut (jetzt in renderShell
+      behoben) — dadurch ging die Scrollposition verloren.
+   2. Jede Zustandsaenderung loeste sofort einen eigenen Durchlauf aus.
+      Mehrere Aenderungen im selben Tick ergaben mehrere volle Neuaufbauten.
+   3. Beim Seitenwechsel sprang der Inhalt hart um. */
+
+const scrollByRoute = new Map();
+let renderedRoute = null;
+let renderPending = false;
+
 async function renderAll() {
+  const route = getRoute();
+  const routeChanged = route !== renderedRoute;
+
+  /* Position der bisherigen Seite merken, bevor der Inhalt ersetzt wird. */
+  if (renderedRoute && routeChanged) scrollByRoute.set(renderedRoute, window.scrollY);
+
   rerenderIntegratedApp(appRoot);
   await refreshFeatureEnhancements(appRoot);
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   refreshPlanManagement(appRoot);
   appendBuildStamp(appRoot);
+
+  if (routeChanged) {
+    const main = appRoot.querySelector('.v8-main');
+    if (main) {
+      main.classList.remove('route-enter');
+      /* Neustart der Animation erzwingen, sonst laeuft sie nur beim ersten Mal. */
+      void main.offsetWidth;
+      main.classList.add('route-enter');
+    }
+    window.scrollTo(0, scrollByRoute.get(route) ?? 0);
+    renderedRoute = route;
+  }
+}
+
+/* Mehrere Zustandsaenderungen im selben Frame ergeben einen Durchlauf. */
+function scheduleRender() {
+  if (renderPending) return;
+  renderPending = true;
+  requestAnimationFrame(() => {
+    renderPending = false;
+    void renderAll();
+  });
 }
 
 try {
   initializeStore();
   initializePlanManagement();
   initFeel(document.body);
-  on('route:changed', () => void renderAll());
-  on('state:changed', () => void renderAll());
+  on('route:changed', scheduleRender);
+  on('state:changed', scheduleRender);
   initializeRouter();
   await startIntegratedApp(appRoot);
   await initializeFeatureEnhancements();
@@ -39,6 +79,7 @@ try {
   refreshHistoryEnhancement(appRoot);
   refreshPlanManagement(appRoot);
   appendBuildStamp(appRoot);
+  renderedRoute = getRoute();
 
   window.PreplyV8 = Object.freeze({
     getState,
