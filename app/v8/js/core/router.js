@@ -1,6 +1,10 @@
 import { emit } from './events.js';
 
-const VALID_ROUTES = new Set(['plan', 'recipes', 'shopping', 'profile']);
+/* 'plan' ist die Woche (planen und anpassen), 'today' der Kochmoment.
+   Das sind zwei Zeitpunkte im selben Kreislauf, keine zwei Zoomstufen —
+   deshalb eigene Flaechen statt eines Umschalters.
+   'recipes' bleibt erreichbar, steht aber nicht mehr in der Navigation. */
+const VALID_ROUTES = new Set(['plan', 'today', 'recipes', 'shopping', 'profile']);
 let currentRoute = 'plan';
 
 export function getRoute() {

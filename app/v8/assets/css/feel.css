@@ -377,3 +377,46 @@ a,
   font-weight: 900;
   text-decoration: underline;
 }
+
+/* --- Woche: Tage zum Aufklappen --------------------------------------- */
+
+.preply-week-card { display: block; width: 100%; padding: 0; overflow: hidden; }
+.preply-week-head {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 14px;
+  border: 0;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.preply-week-head > div { min-width: 0; }
+.preply-week-head span {
+  display: block;
+  color: var(--muted);
+  font-size: .58rem;
+  font-weight: 800;
+}
+.preply-week-head strong {
+  display: block;
+  margin-top: 2px;
+  font-size: .72rem;
+  font-weight: 900;
+}
+.preply-week-head > b {
+  flex: 0 0 auto;
+  color: var(--ink);
+  font-size: .66rem;
+  font-weight: 900;
+  font-variant-numeric: tabular-nums;
+}
+.preply-week-head:active { transform: scale(.99); }
+
+.preply-week-card.expanded { box-shadow: inset 0 0 0 2px var(--ink); }
+.preply-week-body { padding: 0 6px 6px; }
+.preply-week-body .preply-meal:last-child { border-bottom: 0; }

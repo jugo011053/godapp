@@ -173,8 +173,13 @@ function openConfirmation(root, { title, text, confirmLabel, destructive = false
   overlay.querySelector('[data-manage-confirm]')?.focus();
 }
 
+/* Bezugstag fuer "nur dieser Tag": der aufgeklappte Tag in der Woche, sonst
+   der Tag der Heute-Ansicht, sonst der erste Tag des Plans. */
 function activePlanDate(root, plan) {
-  return root.querySelector('.preply-day.active')?.dataset.planDay || plan.days?.[0]?.date || null;
+  return root.querySelector('[data-active-day-date]')?.dataset.activeDayDate
+    || root.querySelector('.preply-day.active')?.dataset.planDay
+    || normalizePlanDays(plan)[0]?.date
+    || null;
 }
 
 function menuItem({ icon, title, copy, attribute, danger = false }) {
