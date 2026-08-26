@@ -1,0 +1,304 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#78A800">
+<title>Preply — Essen planen, einkaufen, kochen</title>
+<meta name="description" content="Preply stellt dir eine Woche Essen zusammen, die zu deinem Bedarf passt, und macht daraus eine Einkaufsliste. Wie eine Kochbox, nur kaufst du selbst ein.">
+<link rel="icon" type="image/png" href="icon.png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta property="og:title" content="Preply — Essen planen, einkaufen, kochen">
+<meta property="og:description" content="Eine Woche Essen, die zu deinem Bedarf passt. Und die Liste für den Supermarkt gleich dazu.">
+<meta property="og:type" content="website">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<style>
+:root{
+  --paper:#f7f7f4; --card:#ffffff; --ink:#111111; --muted:#72726d;
+  --accent:#78a800; --accent-soft:#eaf5cf; --border:#e1e1db; --dark:#15150f;
+  --sans:'Manrope',-apple-system,BlinkMacSystemFont,'Segoe UI',Roboto,sans-serif;
+  --wrap:1080px;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth;-webkit-text-size-adjust:100%}
+body{background:var(--paper);color:var(--ink);font-family:var(--sans);line-height:1.55;
+  font-feature-settings:"ss01";overflow-x:hidden}
+img{max-width:100%;display:block}
+a{color:inherit}
+.wrap{width:100%;max-width:var(--wrap);margin:0 auto;padding:0 24px}
+
+/* ---------- Kopf ---------- */
+.top{position:sticky;top:0;z-index:20;background:rgba(247,247,244,.88);
+  backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
+.top .wrap{display:flex;align-items:center;justify-content:space-between;height:64px;gap:16px}
+.mark{font-size:1.35rem;font-weight:800;letter-spacing:-.04em}
+.mark span{color:var(--accent)}
+.top a.ghost{font-size:.85rem;font-weight:700;color:var(--muted);text-decoration:none}
+.top a.ghost:hover{color:var(--ink)}
+
+/* ---------- Knöpfe ---------- */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;
+  padding:14px 24px;border-radius:999px;font-weight:800;font-size:.95rem;
+  text-decoration:none;border:1.5px solid transparent;transition:transform .15s ease,background .15s ease}
+.btn:active{transform:scale(.97)}
+.btn.primary{background:var(--accent);color:#fff}
+.btn.primary:hover{background:#6b9700}
+.btn.secondary{background:transparent;color:var(--ink);border-color:var(--border)}
+.btn.secondary:hover{border-color:var(--ink)}
+
+/* ---------- Held ---------- */
+.hero{padding:72px 0 24px;text-align:center}
+.eyebrow{font-size:.72rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:18px}
+h1{font-size:clamp(2.4rem,7vw,4.2rem);font-weight:800;letter-spacing:-.045em;line-height:1.04}
+.lede{font-size:clamp(1.05rem,2.4vw,1.3rem);color:var(--muted);max-width:34ch;
+  margin:20px auto 0;line-height:1.5}
+.cta-row{display:flex;flex-wrap:wrap;gap:12px;justify-content:center;margin-top:32px}
+.hint{font-size:.8rem;color:var(--muted);margin-top:14px}
+
+/* ---------- Bildstreifen ---------- */
+.shots{display:flex;gap:20px;justify-content:center;align-items:flex-end;
+  padding:56px 0 8px;overflow-x:auto;scrollbar-width:none;scroll-snap-type:x mandatory}
+.shots::-webkit-scrollbar{display:none}
+.phone{flex:0 0 auto;width:236px;scroll-snap-align:center}
+.phone .screen{border-radius:30px;overflow:hidden;background:var(--dark);
+  padding:8px;box-shadow:0 24px 60px rgba(17,17,17,.14),0 2px 8px rgba(17,17,17,.06)}
+.phone .screen img{border-radius:23px}
+.phone figcaption{text-align:center;font-size:.8rem;font-weight:700;color:var(--muted);
+  margin-top:14px}
+.phone.lift{transform:translateY(-22px)}
+
+/* ---------- Abschnitte ---------- */
+section{padding:64px 0}
+.band{background:var(--card);border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+h2{font-size:clamp(1.6rem,4vw,2.4rem);font-weight:800;letter-spacing:-.035em;line-height:1.12}
+.sub{color:var(--muted);margin-top:12px;max-width:56ch;font-size:1.02rem}
+
+.steps{display:grid;gap:20px;margin-top:40px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr))}
+.step{background:var(--paper);border:1px solid var(--border);border-radius:18px;padding:26px}
+.band .step{background:var(--paper)}
+.step .num{width:34px;height:34px;border-radius:50%;background:var(--accent-soft);
+  color:#4d6d00;font-weight:800;font-size:.9rem;display:flex;align-items:center;
+  justify-content:center;margin-bottom:16px}
+.step h3{font-size:1.08rem;font-weight:800;letter-spacing:-.02em;margin-bottom:8px}
+.step p{color:var(--muted);font-size:.94rem}
+
+.features{display:grid;gap:1px;margin-top:40px;background:var(--border);
+  border:1px solid var(--border);border-radius:18px;overflow:hidden;
+  grid-template-columns:repeat(auto-fit,minmax(260px,1fr))}
+.feature{background:var(--card);padding:26px}
+.feature h3{font-size:1rem;font-weight:800;margin-bottom:8px;letter-spacing:-.015em}
+.feature p{color:var(--muted);font-size:.92rem}
+.feature .tag{display:inline-block;font-size:.68rem;font-weight:800;letter-spacing:.1em;
+  text-transform:uppercase;color:var(--accent);margin-bottom:12px}
+
+/* ---------- Abgrenzung ---------- */
+.contrast{display:grid;gap:20px;margin-top:36px;grid-template-columns:repeat(auto-fit,minmax(280px,1fr))}
+.col{border-radius:18px;padding:26px;border:1px solid var(--border);background:var(--card)}
+.col.no{background:var(--paper)}
+.col h3{font-size:.75rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  margin-bottom:18px;color:var(--muted)}
+.col ul{list-style:none;display:grid;gap:12px}
+.col li{display:flex;gap:12px;align-items:flex-start;font-size:.96rem}
+.col li b{flex:0 0 auto;width:20px;height:20px;border-radius:50%;font-size:.7rem;
+  display:flex;align-items:center;justify-content:center;margin-top:3px}
+.col.yes li b{background:var(--accent-soft);color:#4d6d00}
+.col.no li b{background:#eceae4;color:var(--muted)}
+.col.no li{color:var(--muted)}
+
+/* ---------- Zahlenreihe ---------- */
+.stats{display:grid;gap:20px;margin-top:40px;grid-template-columns:repeat(auto-fit,minmax(110px,1fr));
+  text-align:center}
+.stat strong{display:block;font-size:clamp(2rem,5vw,2.8rem);font-weight:800;
+  letter-spacing:-.04em;line-height:1}
+.stat span{color:var(--muted);font-size:.88rem;font-weight:600}
+
+/* ---------- Schluss ---------- */
+.close{background:var(--dark);color:#fff;text-align:center;padding:80px 0}
+.close h2{color:#fff}
+.close .sub{color:rgba(255,255,255,.62);margin-left:auto;margin-right:auto}
+.close .btn.secondary{color:#fff;border-color:rgba(255,255,255,.28)}
+.close .btn.secondary:hover{border-color:#fff}
+.install{margin-top:44px;display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));
+  text-align:left;max-width:640px;margin-left:auto;margin-right:auto}
+.install div{background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);
+  border-radius:14px;padding:18px}
+.install h4{font-size:.72rem;font-weight:800;letter-spacing:.12em;text-transform:uppercase;
+  color:var(--accent);margin-bottom:8px}
+.install p{font-size:.9rem;color:rgba(255,255,255,.72)}
+
+footer{padding:36px 0;text-align:center;font-size:.84rem;color:var(--muted)}
+footer a{color:var(--muted);text-decoration:underline;text-underline-offset:3px}
+footer a:hover{color:var(--ink)}
+
+@media (max-width:640px){
+  .hero{padding:48px 0 8px}
+  section{padding:48px 0}
+  .shots{padding:36px 0 8px;gap:14px;justify-content:flex-start}
+  .phone{width:206px}
+  .phone.lift{transform:none}
+  .wrap{padding:0 20px}
+}
+</style>
+</head>
+<body>
+
+<header class="top">
+  <div class="wrap">
+    <div class="mark">pre<span>ply</span></div>
+    <a class="ghost" href="https://github.com/jugo011053/godapp">Quellcode</a>
+  </div>
+</header>
+
+<div class="hero wrap">
+  <p class="eyebrow">Essensplaner</p>
+  <h1>Die Woche ist geplant.<br>Der Einkauf auch.</h1>
+  <p class="lede">Preply stellt dir eine Woche Essen zusammen, die zu deinem Bedarf passt — und macht daraus die Liste für den Supermarkt.</p>
+  <div class="cta-row">
+    <a class="btn primary" href="v8/">App öffnen</a>
+    <a class="btn secondary" href="#so">So funktioniert's</a>
+  </div>
+  <p class="hint">Läuft im Browser. Nichts zu installieren, kein Konto nötig.</p>
+</div>
+
+<div class="shots">
+  <figure class="phone">
+    <div class="screen"><img src="marketing/shot-woche.png" alt="Wochenübersicht mit Tagesziel und den Gerichten je Tag" loading="lazy" width="390" height="844"></div>
+    <figcaption>Deine Woche</figcaption>
+  </figure>
+  <figure class="phone lift">
+    <div class="screen"><img src="marketing/shot-heute.png" alt="Heute-Ansicht mit den drei Mahlzeiten des Tages" loading="lazy" width="390" height="844"></div>
+    <figcaption>Was heute ansteht</figcaption>
+  </figure>
+  <figure class="phone">
+    <div class="screen"><img src="marketing/shot-gericht.png" alt="Einkaufsliste nach Gericht sortiert, jede Zeile abhakbar" loading="lazy" width="390" height="844"></div>
+    <figcaption>Der Einkauf</figcaption>
+  </figure>
+</div>
+
+<section id="so" class="band">
+  <div class="wrap">
+    <h2>Drei Fragen, dann steht die Woche.</h2>
+    <p class="sub">Keine Ernährungstagebücher, keine Punkte, kein Wiegen. Du beantwortest einmal, wer du bist und was du magst — den Rest übernimmt die App.</p>
+    <div class="steps">
+      <div class="step">
+        <div class="num">1</div>
+        <h3>Einrichten</h3>
+        <p>Größe, Gewicht, Alter, Bewegung, Ziel. Daraus wird dein tatsächlicher Kalorien- und Proteinbedarf berechnet — keine Schätzung, die du selbst eintippst.</p>
+      </div>
+      <div class="step">
+        <div class="num">2</div>
+        <h3>Woche bekommen</h3>
+        <p>Frühstück, Mittag und Abend für jeden Tag, passend zu deiner Ernährungsweise, deinen Allergien und der Zeit, die du zum Kochen hast.</p>
+      </div>
+      <div class="step">
+        <div class="num">3</div>
+        <h3>Einkaufen und kochen</h3>
+        <p>Die Einkaufsliste entsteht von selbst — sortiert nach Regal oder nach Gericht, zum Abhaken im Laden. Die meisten Rezepte führen dich Schritt für Schritt durchs Kochen.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section>
+  <div class="wrap">
+    <h2>Wie eine Kochbox.<br>Nur kaufst du selbst ein.</h2>
+    <p class="sub">Die Idee ist dieselbe: du musst dir nicht überlegen, was es gibt. Der Unterschied ist, dass dir niemand Zutaten in Einzelportionen nach Hause fährt — du gehst mit einer fertigen Liste in den Laden, in dem du sowieso einkaufst.</p>
+    <div class="contrast">
+      <div class="col yes">
+        <h3>Das macht Preply</h3>
+        <ul>
+          <li><b>✓</b><span>Plant die Woche vorab — du weißt am Sonntag, was Mittwoch auf den Tisch kommt.</span></li>
+          <li><b>✓</b><span>Rechnet deinen Bedarf aus Körperdaten und Bewegung aus und skaliert die Portionen danach.</span></li>
+          <li><b>✓</b><span>Filtert nach Ernährungsweise und Allergien — anhand der Zutaten, nicht nur nach Etikett.</span></li>
+          <li><b>✓</b><span>Fasst die Zutaten aller Gerichte zu einer Liste zusammen.</span></li>
+          <li><b>✓</b><span>Lässt dich jedes Gericht tauschen, wenn dir eins nicht passt.</span></li>
+        </ul>
+      </div>
+      <div class="col no">
+        <h3>Das macht Preply nicht</h3>
+        <ul>
+          <li><b>—</b><span>Kein Tagebuch darüber, was du gegessen hast. Die App schaut nach vorne, nicht zurück.</span></li>
+          <li><b>—</b><span>Keine Punkte, keine Serien, keine Level.</span></li>
+          <li><b>—</b><span>Keine Lieferung, kein Abo, keine Bezahlschranke.</span></li>
+          <li><b>—</b><span>Kein Trainingsplan und keine Supplement-Empfehlungen.</span></li>
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="band">
+  <div class="wrap">
+    <h2>Was drinsteckt</h2>
+    <div class="stats">
+      <div class="stat"><strong>600</strong><span>Rezepte im Katalog</span></div>
+      <div class="stat"><strong>4</strong><span>Ernährungsweisen, von vegan bis alles</span></div>
+      <div class="stat"><strong>0 €</strong><span>und kein Konto nötig</span></div>
+    </div>
+    <div class="features">
+      <div class="feature">
+        <span class="tag">Bedarf</span>
+        <h3>Gerechnet, nicht geraten</h3>
+        <p>Der Grundumsatz kommt aus der Mifflin-St-Jeor-Formel, dazu dein Bewegungsniveau und dein Ziel. Die App zeigt dir den Rechenweg, statt dir eine Zahl vorzusetzen.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Sicherheit</span>
+        <h3>Allergene aus den Zutaten</h3>
+        <p>Ob ein Gericht Nüsse, Ei oder Fisch enthält, wird an der Zutatenliste geprüft — nicht nur an dem, was im Etikett steht. Was du ausschließt, kommt nicht in den Plan.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Einkauf</span>
+        <h3>Zwei Ansichten, ein Einkauf</h3>
+        <p>Nach Regal sortiert, wenn du den ganzen Wocheneinkauf machst. Nach Gericht, wenn du heute nur für ein Essen einkaufst. Beide zum Abhaken.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Alltag</span>
+        <h3>Tauschen statt tüfteln</h3>
+        <p>Kein Bock auf das Curry? Ein Tipp, ein anderes Gericht — Plan und Einkaufsliste ziehen sofort nach. Gerichte, die bleiben sollen, kannst du anpinnen.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Nachjustieren</span>
+        <h3>Sag, was nicht gepasst hat</h3>
+        <p>Zu aufwendig, zu teuer, zu wenig Protein, immer dasselbe? Du sagst der App beim Neuzusammenstellen den Grund — und die nächste Woche fällt entsprechend anders aus.</p>
+      </div>
+      <div class="feature">
+        <span class="tag">Zu zweit</span>
+        <h3>Kochst du für mehrere?</h3>
+        <p>Stell ein, für wie viele Personen gekocht wird. Portionen und Einkaufsmengen rechnen sich mit — du kaufst nicht dreimal dieselbe Packung zu wenig.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<section class="close">
+  <div class="wrap">
+    <h2>Probier's aus.</h2>
+    <p class="sub">Vier Fragen zur Einrichtung, dann steht deine erste Woche.</p>
+    <div class="cta-row">
+      <a class="btn primary" href="v8/">App öffnen</a>
+      <a class="btn secondary" href="https://github.com/jugo011053/godapp">Auf GitHub ansehen</a>
+    </div>
+    <div class="install">
+      <div>
+        <h4>Auf dem iPhone</h4>
+        <p>App öffnen, unten auf „Teilen“ tippen, dann „Zum Home-Bildschirm“. Danach startet sie wie eine normale App.</p>
+      </div>
+      <div>
+        <h4>Auf Android</h4>
+        <p>App öffnen, im Browsermenü „App installieren“ wählen. Das Symbol landet direkt auf dem Startbildschirm.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<footer>
+  <div class="wrap">
+    Preply · quelloffen auf <a href="https://github.com/jugo011053/godapp">GitHub</a>
+  </div>
+</footer>
+
+</body>
+</html>

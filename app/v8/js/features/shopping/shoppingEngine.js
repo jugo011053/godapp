@@ -35,6 +35,64 @@ export function isVague(unit) {
   return VAGUE_UNITS.has(String(unit || '').trim().toLowerCase());
 }
 
+/* --- Mengen lesbar machen ------------------------------------------------
+   "82,2 g Beeren" ist keine Einkaufsmenge, sondern ein Messwert. Im Laden
+   liest das niemand. Der Rundungsschritt waechst mit der Menge, damit jede
+   Zahl gleich grob wirkt: 7 g, 80 g, 350 g, 1,2 kg.
+   Ausnahme ist `exact` — steht die Menge fuer gekaufte Packungen, ist sie
+   schon eine echte Zahl (3 x 250 g) und darf nicht verschoben werden. */
+
+/* Fuenfer-Schritte, keine Zehner: sonst wird aus der Standardpackung
+   "125 g" ploetzlich "130 g", und die Zahl stimmt mit nichts mehr ueberein. */
+const AMOUNT_STEPS = [
+  { below: 10, step: 1 },
+  { below: Infinity, step: 5 }
+];
+
+function stepFor(value) {
+  return AMOUNT_STEPS.find((entry) => value < entry.below).step;
+}
+
+/* Deutsches Komma, und keine Nachkommastelle, die nur Null ist. */
+function decimal(value, digits) {
+  return String(Number(value.toFixed(digits))).replace('.', ',');
+}
+
+function withUnit(text, unit) {
+  return [text, unit].filter(Boolean).join(' ');
+}
+
+export function formatAmount(amount, unit, { exact = false } = {}) {
+  const label = String(unit || '').trim();
+  const u = label.toLowerCase();
+  const value = Number(amount);
+  if (!Number.isFinite(value)) return '';
+  /* "1,2 nach Geschmack" waere Unsinn — dann bleibt nur das Wort stehen. */
+  if (isVague(u)) return label;
+  if (value <= 0) return '';
+
+  /* Zaehlbares immer aufrunden: ein halbes Ei kauft man nicht. */
+  if (isCountable(u)) return withUnit(String(Math.ceil(value - 0.05)), label);
+
+  if (u === 'g' || u === 'ml') {
+    const step = stepFor(value);
+    /* Erst runden, dann die Einheit waehlen — sonst steht bei 999 g "1000 g"
+       statt "1 kg". */
+    const rounded = exact ? value : Math.max(step, Math.round(value / step) * step);
+    if (rounded >= 1000) return withUnit(decimal(rounded / 1000, 1), u === 'g' ? 'kg' : 'l');
+    return withUnit(decimal(rounded, 1), u);
+  }
+
+  if (u === 'kg' || u === 'l') {
+    /* Unter einer Einheit liest sich die kleine Schwester besser. */
+    if (value < 1) return formatAmount(value * 1000, u === 'kg' ? 'g' : 'ml', { exact });
+    return withUnit(decimal(value, 2), u);
+  }
+
+  /* Loeffelmasse: ein halber Loeffel ist die feinste Angabe, die noch zaehlt. */
+  return withUnit(decimal(Math.max(0.5, Math.round(value * 2) / 2), 1), label);
+}
+
 /* Grundzutaten, die praktisch jeder vorraetig hat. Sie verschwinden nicht,
    sondern wandern in eine eigene, eingeklappte Gruppe — wer nachsehen will,
    kann es, aber sie blaehen die Liste nicht mehr auf. */
@@ -274,9 +332,10 @@ export function copyShoppingText(list) {
   for (const group of list.groups || []) {
     lines.push('', group.category);
     for (const item of group.items) {
-      const amount = item.buyAmount || item.amount;
+      const amount = item.packs ? item.buyAmount : item.amount;
       const packInfo = item.packs ? ` (${item.packs} Packung${item.packs === 1 ? '' : 'en'})` : '';
-      lines.push(`${item.checked ? '✓' : '○'} ${item.name}: ${round(amount)} ${item.buyUnit || item.unit}${packInfo}`);
+      const menge = formatAmount(amount, item.buyUnit || item.unit, { exact: Boolean(item.packs) });
+      lines.push(`${item.checked ? '✓' : '○'} ${item.name}${menge ? `: ${menge}` : ''}${packInfo}`);
     }
   }
   if (list.estimatedTotal) lines.push('', `Geschätzt: ca. ${list.estimatedTotal.toFixed(2).replace('.', ',')} €`);
