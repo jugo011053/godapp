@@ -2,8 +2,14 @@ import { getState, updateState } from './core/store.js';
 import { on } from './core/events.js';
 import { loadCards } from './data/recipeStore.js';
 import { buildPlan } from './features/planner/plannerEngine.js';
-import { replaceCurrentPlan } from './features/history/history.js';
+import {
+  replaceCurrentPlan, protectedMeals, applyProtectedMeals, countPinnedMeals,
+  clearAllPins, recentRecipeIds, undoLastPlanChange, canUndoPlan,
+  normalizePlanDays, localToday
+} from './features/history/history.js';
+import { DIRECTIONS } from './data/recipeScoring.js';
 import { haptic } from './core/feel.js';
+import { showToast } from './core/toast.js';
 
 let profileSignature;
 let pendingProfileDecision = false;
@@ -39,14 +45,76 @@ function signature(profile) {
   return JSON.stringify(profile || {});
 }
 
-function rebuildPlan(catalog, plan, profile, preferences, selectedDates = plan.selectedDates, enabledMeals = plan.enabledMeals) {
+function rebuildPlan(catalog, plan, profile, preferences, selectedDates = plan.selectedDates, enabledMeals = plan.enabledMeals, options = {}) {
   return buildPlan(catalog, {
     startDate: selectedDates[0],
     selectedDates,
     enabledMeals,
     mode: selectedDates.length === 1 ? 'single_day' : 'multi_day',
     profile
-  }, preferences, { seed: Date.now() % 100000 });
+  }, preferences, {
+    seed: Date.now() % 100000,
+    direction: options.direction || null,
+    recentRecipeIds: options.recentRecipeIds,
+    recentFamilies: options.recentFamilies
+  });
+}
+
+/* Eine Neuplanung mit erklaerter Absicht: Der Nutzer sagt, woran es lag,
+   angepinnte und vergangene Gerichte bleiben stehen, und das Ergebnis
+   laesst sich zuruecknehmen. */
+async function replanWithDirection(root, { direction, scope, activeDate }) {
+  const state = getState();
+  const plan = state.currentPlan;
+  if (!plan) return;
+
+  const catalog = await recipes();
+  const today = localToday();
+  const allDates = normalizePlanDays(plan).map((day) => day.date);
+  const targetDates = scope === 'day' && activeDate ? [activeDate] : allDates;
+
+  /* Vergangenes und Angepinntes ueberlebt — unabhaengig vom Umfang. */
+  const keep = protectedMeals(plan, today).filter((entry) => targetDates.includes(entry.date));
+  const keptIds = keep.map((entry) => entry.meal?.recipeId || entry.meal?.recipe?.id).filter(Boolean);
+
+  const recent = recentRecipeIds(state);
+  const preferences = {
+    ...state.preferences,
+    /* Was stehen bleibt, darf nicht ein zweites Mal gezogen werden. */
+    excludedRecipeIds: [...new Set([...(state.preferences?.excludedRecipeIds || []), ...keptIds])]
+  };
+
+  const generated = rebuildPlan(
+    catalog, plan, state.profile, preferences, targetDates,
+    plan.enabledMeals || [...new Set(normalizePlanDays(plan).flatMap((d) => Object.keys(d.meals || {})))],
+    { direction, recentRecipeIds: recent.ids, recentFamilies: recent.families }
+  );
+
+  const rebuilt = applyProtectedMeals(generated, keep);
+
+  /* Beim Tagesumfang bleibt der Rest der Woche unangetastet. */
+  const nextPlan = scope === 'day'
+    ? {
+        ...plan,
+        days: normalizePlanDays(plan).map((day) => {
+          const replacement = normalizePlanDays(rebuilt).find((d) => d.date === day.date);
+          return replacement || day;
+        }),
+        updatedAt: new Date().toISOString()
+      }
+    : rebuilt;
+
+  updateState((current) => replaceCurrentPlan(current, nextPlan));
+  haptic('strong');
+
+  const label = direction ? DIRECTIONS[direction]?.hint?.toLowerCase() : 'neu gemischt';
+  showToast(root, `Plan angepasst: ${label}.`, {
+    actionLabel: 'Rueckgaengig',
+    onAction: () => {
+      updateState((current) => undoLastPlanChange(current));
+      showToast(root, 'Aenderung zurueckgenommen.');
+    }
+  });
 }
 
 function closeOverlay(overlay) {
@@ -72,35 +140,6 @@ async function regenerateWholePlan() {
   const catalog = await recipes();
   const nextPlan = rebuildPlan(catalog, state.currentPlan, state.profile, state.preferences);
   updateState((current) => replaceCurrentPlan(current, nextPlan));
-}
-
-async function regenerateDay(date) {
-  const state = getState();
-  const plan = state.currentPlan;
-  if (!plan || !Array.isArray(plan.days)) return;
-  const currentDay = plan.days.find((day) => day.date === date);
-  if (!currentDay) return;
-
-  const catalog = await recipes();
-  const currentRecipeIds = Object.values(currentDay.meals || {})
-    .map((meal) => meal?.recipe?.id || meal?.recipeId)
-    .filter(Boolean);
-  const preferences = {
-    ...state.preferences,
-    excludedRecipeIds: [...new Set([...(state.preferences.excludedRecipeIds || []), ...currentRecipeIds])]
-  };
-  const generated = rebuildPlan(catalog, plan, state.profile, preferences, [date]);
-  const replacementDay = generated.days[0];
-  const nextDays = plan.days.map((day) => day.date === date ? replacementDay : day);
-
-  updateState((current) => ({
-    ...current,
-    currentPlan: {
-      ...current.currentPlan,
-      days: nextDays,
-      updatedAt: new Date().toISOString()
-    }
-  }));
 }
 
 function deleteCurrentPlan() {
@@ -291,69 +330,103 @@ function renderPlanEditor(root, draft) {
   });
 }
 
+function shoppedDatesFor(state, plan) {
+  /* Ein Haken sagt "hab ich im Wagen" — daraus leiten wir keine Entscheidung
+     mehr ab, wir weisen nur darauf hin. */
+  const checks = state.shoppingChecks || {};
+  if (!Object.values(checks).some(Boolean)) return [];
+  const today = localToday();
+  return normalizePlanDays(plan).map((day) => day.date).filter((date) => date >= today).slice(0, 2);
+}
+
+function dayLabelShort(date) {
+  return new Intl.DateTimeFormat('de-DE', { weekday: 'short' }).format(new Date(`${date}T12:00:00`)).replace('.', '');
+}
+
 function openPlanMenu(root) {
   const state = getState();
   const plan = state.currentPlan;
   if (!plan || !Array.isArray(plan.days)) return;
-  const date = activePlanDate(root, plan);
 
-  root.querySelector('.v8-overlay')?.remove();
-  const overlay = document.createElement('div');
-  overlay.className = 'v8-overlay plan-menu-overlay';
-  overlay.innerHTML = `<section class="v8-dialog plan-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="plan-menu-title">
-    <div class="sheet-head">
-      <h2 id="plan-menu-title">Neu zusammenstellen</h2>
-      <button class="sheet-close" type="button" data-plan-menu-close aria-label="Schließen">×</button>
-    </div>
-    <div class="plan-menu-list">
-      ${menuItem({ icon: ICONS.day, title: 'Diesen Tag neu planen', copy: 'Neue Gerichte nur für den ausgewählten Tag', attribute: `data-regenerate-day="${date || ''}"` })}
-      ${menuItem({ icon: ICONS.plan, title: 'Gesamten Plan neu erstellen', copy: 'Alle Tage und Gerichte neu zusammenstellen', attribute: 'data-regenerate-plan' })}
-      ${menuItem({ icon: ICONS.edit, title: 'Plan bearbeiten', copy: 'Zeitraum, Mahlzeiten oder Personen ändern', attribute: 'data-edit-plan' })}
-    </div>
-    ${menuItem({ icon: ICONS.trash, title: 'Plan löschen', copy: 'Den Plan entfernen und in der Historie sichern', attribute: 'data-delete-plan', danger: true })}
-  </section>`;
+  const activeDate = activePlanDate(root, plan);
+  const multiDay = normalizePlanDays(plan).length > 1;
+  const draft = { scope: multiDay ? 'plan' : 'day' };
 
-  root.appendChild(overlay);
-  bindOverlayDismiss(overlay);
-  overlay.querySelector('[data-plan-menu-close]').addEventListener('click', () => closeOverlay(overlay));
+  const render = () => {
+    root.querySelector('.v8-overlay')?.remove();
+    const pinned = countPinnedMeals(plan);
+    const shopped = shoppedDatesFor(state, plan);
 
-  overlay.querySelector('[data-regenerate-day]').addEventListener('click', () => {
-    closeOverlay(overlay);
-    openConfirmation(root, {
-      title: 'Diesen Tag neu planen?',
-      text: 'Nur der ausgewählte Tag wird ersetzt. Alle anderen Tage bleiben unverändert.',
-      confirmLabel: 'Diesen Tag erneuern',
-      onConfirm: () => regenerateDay(date)
+    const overlay = document.createElement('div');
+    overlay.className = 'v8-overlay plan-menu-overlay';
+    overlay.innerHTML = `<section class="v8-dialog plan-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="plan-menu-title">
+      <div class="sheet-head">
+        <h2 id="plan-menu-title">Passt nicht? Woran liegt&#39;s?</h2>
+        <button class="sheet-close" type="button" data-plan-menu-close aria-label="Schlie&szlig;en">&times;</button>
+      </div>
+
+      ${multiDay ? `<div class="plan-scope-row" role="group" aria-label="Umfang">
+        <button type="button" class="${draft.scope === 'day' ? 'active' : ''}" data-scope="day">Nur ${esc(activeDate ? dayLabelShort(activeDate) : 'heute')}</button>
+        <button type="button" class="${draft.scope === 'plan' ? 'active' : ''}" data-scope="plan">Ganze Woche</button>
+      </div>` : ''}
+
+      <div class="plan-direction-grid">
+        ${Object.entries(DIRECTIONS).map(([key, item]) =>
+          `<button class="plan-direction" type="button" data-direction="${key}"><strong>${esc(item.label)}</strong><small>${esc(item.hint)}</small></button>`
+        ).join('')}
+      </div>
+
+      <button class="sheet-action" type="button" data-direction="">Einfach neu mischen</button>
+
+      ${pinned ? `<div class="plan-notice"><span>${pinned} ${pinned === 1 ? 'Gericht ist angepinnt und bleibt' : 'Gerichte sind angepinnt und bleiben'} stehen.</span><button type="button" data-clear-pins>Alle l&ouml;sen</button></div>` : ''}
+      ${shopped.length ? `<div class="plan-notice"><span>F&uuml;r ${shopped.map(dayLabelShort).map(esc).join(' und ')} hast du schon eingekauft. Die Einkaufsliste &auml;ndert sich mit.</span></div>` : ''}
+
+      <div class="plan-menu-list" style="margin-top:14px">
+        ${menuItem({ icon: ICONS.edit, title: 'Plan bearbeiten', copy: 'Zeitraum, Mahlzeiten oder Personen &auml;ndern', attribute: 'data-edit-plan' })}
+      </div>
+      ${menuItem({ icon: ICONS.trash, title: 'Plan l&ouml;schen', copy: 'Entfernt den Plan und sichert ihn in der Historie', attribute: 'data-delete-plan', danger: true })}
+    </section>`;
+
+    root.appendChild(overlay);
+    bindOverlayDismiss(overlay);
+    overlay.querySelector('[data-plan-menu-close]').addEventListener('click', () => closeOverlay(overlay));
+
+    overlay.querySelectorAll('[data-scope]').forEach((button) => button.addEventListener('click', () => {
+      draft.scope = button.dataset.scope;
+      haptic('tap');
+      render();
+    }));
+
+    overlay.querySelector('[data-clear-pins]')?.addEventListener('click', () => {
+      updateState((current) => ({ ...current, currentPlan: clearAllPins(current.currentPlan) }));
+      haptic('tap');
+      closeOverlay(overlay);
     });
-  });
 
-  overlay.querySelector('[data-regenerate-plan]').addEventListener('click', () => {
-    closeOverlay(overlay);
-    openConfirmation(root, {
-      title: 'Gesamten Plan neu erstellen?',
-      text: 'Tage und ausgewählte Mahlzeiten bleiben gleich. Alle Gerichte werden neu zusammengestellt.',
-      confirmLabel: 'Gesamten Plan erneuern',
-      onConfirm: regenerateWholePlan
+    overlay.querySelectorAll('[data-direction]').forEach((button) => button.addEventListener('click', async () => {
+      const direction = button.dataset.direction || null;
+      closeOverlay(overlay);
+      await replanWithDirection(root, { direction, scope: draft.scope, activeDate });
+    }));
+
+    overlay.querySelector('[data-edit-plan]').addEventListener('click', () => {
+      closeOverlay(overlay);
+      renderPlanEditor(root, createPlanEditDraft(getState()));
     });
-  });
 
-  overlay.querySelector('[data-edit-plan]').addEventListener('click', () => {
-    closeOverlay(overlay);
-    renderPlanEditor(root, createPlanEditDraft(state));
-  });
-
-  overlay.querySelector('[data-delete-plan]').addEventListener('click', () => {
-    closeOverlay(overlay);
-    openConfirmation(root, {
-      title: 'Plan löschen?',
-      text: 'Der aktuelle Plan verschwindet von der Heute-Seite und bleibt als früherer Plan in deiner Historie erhalten.',
-      confirmLabel: 'Plan löschen',
-      destructive: true,
-      onConfirm: deleteCurrentPlan
+    overlay.querySelector('[data-delete-plan]').addEventListener('click', () => {
+      closeOverlay(overlay);
+      openConfirmation(root, {
+        title: 'Plan l\u00f6schen?',
+        text: 'Der Plan verschwindet von der Heute-Seite und bleibt als fr\u00fcherer Plan in deiner Historie erhalten.',
+        confirmLabel: 'Plan l\u00f6schen',
+        destructive: true,
+        onConfirm: deleteCurrentPlan
+      });
     });
-  });
+  };
 
-  overlay.querySelector('[data-regenerate-day]')?.focus();
+  render();
 }
 
 function openProfileDecision(root) {

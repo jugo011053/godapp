@@ -138,3 +138,119 @@ export function getReturnOptions(state, today = new Date()) {
     ]
   };
 }
+
+/* --- Angepinnte Gerichte und Rueckgaengig ---------------------------------
+   Ein Pin heisst "das will ich" — eine Festlegung, keine Schutzmassnahme.
+   Wer selbst tauscht, pinnt automatisch; die Neuplanung respektiert das. */
+
+export function localToday(date = new Date()) {
+  const d = new Date(date);
+  d.setHours(12, 0, 0, 0);
+  return d.toISOString().slice(0, 10);
+}
+
+export function normalizePlanDays(plan) {
+  if (!plan) return [];
+  if (Array.isArray(plan.days)) return plan.days;
+  if (plan.days && typeof plan.days === 'object') {
+    return Object.entries(plan.days)
+      .map(([date, meals]) => ({ date, meals: meals || {} }))
+      .sort((a, b) => a.date.localeCompare(b.date));
+  }
+  return [];
+}
+
+export function setMealPinned(plan, date, category, pinned) {
+  const days = normalizePlanDays(plan).map((day) => {
+    if (day.date !== date) return day;
+    const meal = day.meals?.[category];
+    if (!meal) return day;
+    return { ...day, meals: { ...day.meals, [category]: { ...meal, pinned: Boolean(pinned) } } };
+  });
+  return { ...plan, days };
+}
+
+export function countPinnedMeals(plan) {
+  return normalizePlanDays(plan)
+    .reduce((sum, day) => sum + Object.values(day.meals || {}).filter((m) => m?.pinned).length, 0);
+}
+
+export function clearAllPins(plan) {
+  const days = normalizePlanDays(plan).map((day) => ({
+    ...day,
+    meals: Object.fromEntries(Object.entries(day.meals || {})
+      .map(([cat, meal]) => [cat, { ...meal, pinned: false }]))
+  }));
+  return { ...plan, days };
+}
+
+/* Ein Gericht bleibt stehen, wenn es angepinnt ist oder der Tag vorbei ist.
+   Vergangenes zu ersetzen ergibt nie Sinn — das ist keine Vermutung. */
+export function protectedMeals(plan, today = localToday()) {
+  const keep = [];
+  for (const day of normalizePlanDays(plan)) {
+    const past = day.date < today;
+    for (const [category, meal] of Object.entries(day.meals || {})) {
+      if (!meal) continue;
+      if (past || meal.pinned) keep.push({ date: day.date, category, meal, reason: past ? 'past' : 'pinned' });
+    }
+  }
+  return keep;
+}
+
+/* Legt die bewahrten Gerichte ueber einen frisch erzeugten Plan. */
+export function applyProtectedMeals(nextPlan, keep) {
+  if (!keep.length) return nextPlan;
+  const byDate = new Map(normalizePlanDays(nextPlan).map((day) => [day.date, { ...day, meals: { ...day.meals } }]));
+  for (const entry of keep) {
+    const day = byDate.get(entry.date);
+    if (!day) continue;
+    day.meals[entry.category] = entry.meal;
+  }
+  return { ...nextPlan, days: [...byDate.values()].sort((a, b) => a.date.localeCompare(b.date)) };
+}
+
+/* Rezepte der letzten Plaene — Grundlage fuer die Richtung "Immer dasselbe". */
+export function recentRecipeIds(state, limit = 3) {
+  const ids = new Set();
+  const families = new Set();
+  const entries = (state.planHistory || []).slice(0, limit);
+  for (const entry of entries) {
+    const meals = entry.meals && !Array.isArray(entry.meals)
+      ? Object.values(entry.meals).flatMap((m) => Object.values(m || {}))
+      : normalizePlanDays(entry).flatMap((day) => Object.values(day.meals || {}));
+    for (const meal of meals) {
+      const id = meal?.recipeId || meal?.recipe?.id;
+      if (id) ids.add(id);
+      const family = meal?.recipe?.familyKey;
+      if (family) families.add(family);
+    }
+  }
+  return { ids, families };
+}
+
+/* Stellt den zuletzt ersetzten Plan wieder her. */
+export function undoLastPlanChange(state) {
+  const history = state.planHistory || [];
+  if (!history.length) return state;
+  const [previous, ...rest] = history;
+  const restored = {
+    id: previous.id,
+    startDate: previous.startDate,
+    endDate: previous.endDate,
+    selectedDates: previous.selectedDates || [],
+    enabledMeals: previous.enabledMeals
+      || [...new Set(Object.values(previous.meals || {}).flatMap((m) => Object.keys(m || {})))],
+    days: Array.isArray(previous.days)
+      ? previous.days
+      : Object.entries(previous.meals || {})
+          .map(([date, meals]) => ({ date, meals: meals || {} }))
+          .sort((a, b) => a.date.localeCompare(b.date)),
+    restoredAt: new Date().toISOString()
+  };
+  return { ...state, currentPlan: restored, planHistory: rest };
+}
+
+export function canUndoPlan(state) {
+  return Boolean((state.planHistory || []).length);
+}
