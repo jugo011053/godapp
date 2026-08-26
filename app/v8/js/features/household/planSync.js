@@ -86,9 +86,16 @@ export function rowsToPlan(planRow, entryRows, { recipesById, scaleMeal }) {
     if (!byDate.has(row.day_date)) byDate.set(row.day_date, { date: row.day_date, meals: {} });
     const snapshot = row.recipe_snapshot || {};
     const recipe = recipesById.get(row.recipe_id);
-    if (!recipe) continue;
+    /* Ein Rezept, das der Katalog nicht mehr fuehrt — etwa weil es nicht mehr
+       planbar ist —, darf die Mahlzeit nicht verschwinden lassen. Dann steht
+       eben nur der Name da, statt dass der Tag still leer wird. */
+    const ersatz = recipe || (snapshot.name
+      ? { id: row.recipe_id, name: snapshot.name, kcal: 0, protein: 0, ingredients: [], steps: [] }
+      : null);
+    if (!ersatz) continue;
     byDate.get(row.day_date).meals[row.category] = {
-      ...scaleMeal(recipe, row.category),
+      ...scaleMeal(ersatz, row.category),
+      unavailable: !recipe,
       prepGroupId: snapshot.prepGroupId || null,
       prepSourceDate: snapshot.prepSourceDate || null,
       repeatedForMealPrep: Boolean(snapshot.repeatedForMealPrep),
