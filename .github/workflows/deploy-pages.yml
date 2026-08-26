@@ -1,13 +1,14 @@
 name: Deploy Preply to GitHub Pages
 
-# Publishes the contents of app/ as the site root, so the PWA is reachable at
-# https://jugo011053.github.io/godapp/ . All asset paths in the app are already
-# relative, so it works unchanged from that subpath.
+# Publishes the contents of app/ as the site root.
+#   /godapp/      -> app/index.html, the marketing page
+#   /godapp/v8/   -> the app itself (PWA)
+# Every path in both is relative, so the subpath deployment works unchanged.
+# Never switch to absolute paths (/sw.js, /manifest.json) - that breaks it.
 
 on:
   push:
     branches:
-      - claude/planner-app-setup-Tvjyj
       - main
     paths:
       - 'app/**'
