@@ -14,9 +14,10 @@ import {
 import { MEAL_OPTIONS, STEP_DEFINITIONS } from './features/onboarding/onboardingSteps.js';
 import { buildProfileSummary } from './features/profile/profileSummary.js';
 import { buildPlan, suggestForToday, replacementSuggestions } from './features/planner/plannerEngine.js';
-import { getReturnOptions, isPlanExpired, replaceCurrentPlan } from './features/history/history.js';
+import { getReturnOptions, isPlanExpired, replaceCurrentPlan, setMealPinned } from './features/history/history.js';
 import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
 import { haptic } from './core/feel.js';
+import { showToast } from './core/toast.js';
 const runtime = {
   recipes: [],
   catalogStatus: 'loading',
@@ -32,6 +33,8 @@ const runtime = {
   replaceMode: 'similar',
   viewMode: 'heute'
 };
+
+const PIN_ICON = '<svg viewBox="0 0 24 24"><path d="M9 3h6l-1 6 4 3v2H6v-2l4-3-1-6Z"/><path d="M12 14v7"/></svg>';
 
 const MEAL_LABELS = Object.fromEntries(MEAL_OPTIONS);
 const formatDay = new Intl.DateTimeFormat('de-DE', { weekday: 'short', day: '2-digit', month: '2-digit' });
@@ -69,17 +72,6 @@ function catalogStatusHtml() {
   if (runtime.catalogStatus === 'loading') return '<div class="v8-status">Rezepte werden geladen …</div>';
   if (runtime.catalogStatus === 'error') return `<div class="v8-status error">${escapeHtml(runtime.catalogError || 'Rezepte konnten nicht geladen werden.')}</div>`;
   return '';
-}
-
-function showToast(root, message) {
-  const existing = root.querySelector('.preply-toast');
-  if (existing) existing.remove();
-  const toast = document.createElement('div');
-  toast.className = 'preply-toast';
-  toast.textContent = message;
-  root.appendChild(toast);
-  requestAnimationFrame(() => toast.classList.add('visible'));
-  setTimeout(() => { toast.classList.remove('visible'); setTimeout(() => toast.remove(), 300); }, 2800);
 }
 
 function catalogNotReadyFeedback(root) {
@@ -185,12 +177,15 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex) {
     </div>`;
   }
 
-  return `<div class="preply-meal" data-meal-key="${escapeHtml(key)}">
+  const pinned = Boolean(meal.pinned);
+  const pinButton = `<button class="preply-pin${pinned ? ' pinned' : ''}" data-pin-meal data-pin-date="${escapeHtml(date)}" data-pin-cat="${escapeHtml(category)}" aria-pressed="${pinned}" aria-label="${pinned ? 'Gericht nicht mehr festhalten' : 'Dieses Gericht behalten'}">${PIN_ICON}</button>`;
+  return `<div class="preply-meal${pinned ? ' is-pinned' : ''}" data-meal-key="${escapeHtml(key)}">
     <button class="preply-meal-main ${tone(cardIndex)}" data-expand-meal="${escapeHtml(key)}" data-recipe-id="${escapeHtml(recipe.id || '')}">
       <span class="preply-meal-slot">${escapeHtml(MEAL_LABELS[category] || category)}</span>
       <strong>${escapeHtml(name)}</strong>
       <em>${kcal} kcal · ${protein} g Protein · ${time} Min</em>
     </button>
+    ${pinButton}
     ${isExpanded ? '' : `<button class="preply-swap" data-swap-meal data-swap-day="${dayIndex}" data-swap-cat="${escapeHtml(category)}" aria-label="${escapeHtml(MEAL_LABELS[category] || category)} tauschen">↻</button>`}
     ${isExpanded ? expandedHtml : ''}
   </div>`;
@@ -580,6 +575,9 @@ function renderReplacementDialog(root) {
         repeatedForMealPrep: false,
         estimatedKcalPerPerson: Math.round(replacement.kcal * factor),
         estimatedProteinPerPerson: Math.round(replacement.protein * factor),
+        /* Wer selbst waehlt, legt sich fest — eine Neuplanung darf das
+           nicht ueberschreiben. Der Pin wird sichtbar gesetzt. */
+        pinned: true,
         replacedAt: new Date().toISOString()
       };
       updated.days = updatedDays;
@@ -787,7 +785,7 @@ function bindPageEvents(root) {
   /* Expand/collapse meal cards */
   root.querySelectorAll('[data-expand-meal]').forEach((el) => el.addEventListener('click', async (event) => {
     /* Don't expand if clicking the swap button */
-    if (event.target.closest('[data-swap-meal]')) return;
+    if (event.target.closest('[data-swap-meal]') || event.target.closest('[data-pin-meal]')) return;
     const key = el.dataset.expandMeal;
     const recipeId = el.dataset.recipeId;
 
@@ -814,6 +812,18 @@ function bindPageEvents(root) {
   root.querySelectorAll('.preply-discover-card[data-recipe-id]').forEach((card) => card.addEventListener('click', () => {
     const id = card.dataset.recipeId;
     if (id) showRecipeDetail(root, id);
+  }));
+
+  /* Gericht festhalten */
+  root.querySelectorAll('[data-pin-meal]').forEach((button) => button.addEventListener('click', (event) => {
+    event.stopPropagation();
+    const date = button.dataset.pinDate;
+    const category = button.dataset.pinCat;
+    const state = getState();
+    const days = normalizeDays(state.currentPlan);
+    const current = Boolean(days.find((d) => d.date === date)?.meals?.[category]?.pinned);
+    haptic(current ? 'tap' : 'confirm');
+    updateState((s2) => ({ ...s2, currentPlan: setMealPinned(s2.currentPlan, date, category, !current) }));
   }));
 
   /* Swap meal button */

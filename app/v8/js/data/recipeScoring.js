@@ -118,6 +118,52 @@ function includesAny(recipe, values) {
   return values.some((value) => tags.has(value));
 }
 
+/* Richtungen sind Korrekturen an dem, was gerade im Plan steht — der Nutzer
+   sagt "so nicht, sondern eher ...". Sie veraendern nie, WAS erlaubt ist
+   (das entscheidet recipeEligible anhand von Profil und Allergien), sondern
+   nur, was bevorzugt wird. */
+export const DIRECTIONS = Object.freeze({
+  effort:  { label: 'Zu aufwendig',     hint: 'Kuerzer und einfacher' },
+  price:   { label: 'Zu teuer',         hint: 'Guenstigere Zutaten' },
+  protein: { label: 'Zu wenig Protein', hint: 'Mehr Eiweiss pro Portion' },
+  variety: { label: 'Immer dasselbe',   hint: 'Anderes als zuletzt' },
+  exotic:  { label: 'Zu ausgefallen',   hint: 'Vertraute Gerichte' },
+  heavy:   { label: 'Zu schwer',        hint: 'Leichter und weniger fett' }
+});
+
+function directionBonus(recipe, direction, context) {
+  if (!direction) return 0;
+  const recent = context.recentRecipeIds || new Set();
+  const recentFamilies = context.recentFamilies || new Set();
+
+  switch (direction) {
+    case 'effort':
+      return Math.max(-30, 30 - recipe.time * 0.9)
+        + (recipe.difficulty === 'easy' ? 18 : recipe.difficulty === 'hard' ? -22 : 0)
+        + (recipe.simplicity === 'simple' ? 14 : 0);
+    case 'price': {
+      const band = normalToken(recipe.costBand);
+      if (['low', 'budget', 'guenstig', 'günstig'].includes(band)) return 34;
+      if (['mittel', 'medium'].includes(band)) return 0;
+      return -30;
+    }
+    case 'protein':
+      return Math.min(45, recipe.protein * 1.5);
+    case 'variety':
+      /* Was zuletzt auf dem Tisch stand, tritt in den Hintergrund. */
+      return (recent.has(recipe.id) ? -60 : 12)
+        + (recipe.familyKey && recentFamilies.has(recipe.familyKey) ? -25 : 8);
+    case 'exotic':
+      /* Stufe 1 ist "vertraut" — je hoeher, desto ausgefallener. */
+      return 26 - Number(recipe.noveltyLevel || 1) * 12;
+    case 'heavy':
+      return Math.max(-25, 22 - Number(recipe.fat || 0) * 0.6)
+        + (recipe.kcal < targetForMeal(context.profile, context.category) ? 14 : -10);
+    default:
+      return 0;
+  }
+}
+
 export function scoreRecipe(recipe, context) {
   if (!recipeEligible(recipe, context)) return Number.NEGATIVE_INFINITY;
 
@@ -149,6 +195,8 @@ export function scoreRecipe(recipe, context) {
   if (priorities.has('quick')) score += Math.max(-15, 18 - recipe.time * 0.55);
   if (priorities.has('budget') && ['low', 'budget', 'günstig'].includes(normalToken(recipe.costBand))) score += 18;
   if (priorities.has('meal_prep')) score += Number(recipe.mealPrepScore || 0) * 4;
+
+  score += directionBonus(recipe, context.direction, context);
 
   if ((preferences.favoriteRecipeIds || []).includes(recipe.id)) score += 8;
   if (usedRecipeIds.has(recipe.id)) score -= 100;

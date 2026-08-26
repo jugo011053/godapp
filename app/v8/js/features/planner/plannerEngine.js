@@ -118,7 +118,12 @@ export function buildPlan(recipes, request, preferences = {}, options = {}) {
         profile,
         preferences,
         usedRecipeIds,
-        usedFamilies
+        usedFamilies,
+        /* Die Richtung aus dem Neuplanen-Dialog wirkt nur auf die Bewertung,
+           nie auf die Zulaessigkeit — Allergien und Ernaehrungsweise bleiben hart. */
+        direction: options.direction || null,
+        recentRecipeIds: options.recentRecipeIds,
+        recentFamilies: options.recentFamilies
       });
       const chosen = chooseAmongTop(ranked, random, 5);
       if (!chosen) {

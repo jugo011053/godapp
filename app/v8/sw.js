@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-23';
+const CACHE_NAME = 'preply-v8-shell-24';
 const SHELL = [
   './',
   './index.html',
@@ -22,6 +22,7 @@ const SHELL = [
   './js/core/events.js',
   './js/core/version.js',
   './js/core/feel.js',
+  './js/core/toast.js',
   './js/core/router.js',
   './js/core/store.js',
   './js/core/storage.js',
