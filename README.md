@@ -1,36 +1,31 @@
 # Preply
 
-Persönliche Essenspläne, passende Rezepte und eine automatisch erzeugte Einkaufsliste.
+Ein Essensplaner für zwei. Er stellt eine Woche Essen zusammen, die zum
+tatsächlichen Kalorien- und Proteinbedarf passt, und macht daraus die
+Einkaufsliste.
 
-**→ [App öffnen](https://jugo011053.github.io/godapp/)**
+- **Werbeseite:** https://jugo011053.github.io/godapp/
+- **App:** https://jugo011053.github.io/godapp/v8/
 
-Kurzes Profil ausfüllen, passenden Essensplan bekommen, Gerichte per Klick tauschen — die Einkaufsliste rechnet sich daraus selbst zusammen. Ohne Account nutzbar; ein Login gibt es nur für Cloud-Speicherung und den geteilten Haushalt.
+Eine PWA ohne Build und ohne Framework — reine ES-Module. Auf dem Handy über
+„Zum Home-Bildschirm" bzw. „App installieren" wie eine normale App nutzbar.
 
 ## Aufbau
 
 | Pfad | Inhalt |
 |---|---|
-| `app/` | **die App** — Single-File-PWA plus Manifest, Service Worker und Icons |
-| `docs/` | Produktvision, Backend-Struktur, Merge-Landkarte, Testliste |
-| `archive/` | alte Stände, nicht mehr gepflegt |
-| `CLAUDE.md` | Kontextdatei für die Arbeit mit Claude Code |
+| `app/index.html` | Werbeseite, liegt unter der Wurzel-Adresse |
+| `app/v8/` | die App |
+| `docs/` | Backend-Stand, Datenbank-Auftrag, Produktvision |
+| `.github/workflows/` | Deploy nach GitHub Pages, Syntaxprüfung für `app/v8/` |
 
-Die App ist bewusst eine einzelne HTML-Datei: kein Build, kein Framework, kein Paketmanager. Bearbeiten heißt `app/index.html` bearbeiten.
-
-## Lokal starten
-
-Ein Webserver ist nötig — per Doppelklick funktionieren Service Worker und einige Browser-APIs nicht.
+## Entwickeln
 
 ```bash
-cd app
-python3 -m http.server 8080
-# http://localhost:8080
+python3 -m http.server 8000 --directory app     # http://localhost:8000/v8/
 ```
 
-## Deployment
+Änderungen in `app/v8/**`, dabei `APP_BUILD` in `js/core/version.js` **und**
+`CACHE_NAME` in `sw.js` zusammen hochzählen. Push nach `main` deployt.
 
-Jeder Push nach `main`, der `app/**` verändert, veröffentlicht die App automatisch über GitHub Pages (`.github/workflows/deploy-pages.yml`).
-
-## Technik
-
-Vanilla HTML/CSS/JS als installierbare PWA, Supabase für Login, Cloud-Speicherung und den geteilten Haushalt. Der im Frontend enthaltene Supabase-Key ist der öffentliche `anon`-Key — die Daten sind über Row Level Security geschützt.
+Alles Weitere steht in [CLAUDE.md](CLAUDE.md).
