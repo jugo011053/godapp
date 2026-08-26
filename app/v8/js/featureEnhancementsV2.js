@@ -476,8 +476,15 @@ function normalizeDays(plan) {
 async function detailedPlan(plan) {
   const days = normalizeDays(plan);
   const ids = [...new Set(days.flatMap((day) => Object.values(day.meals || {}).map((meal) => meal.recipeId || meal.recipe?.id).filter(Boolean)))];
+  /* Faellt eine einzelne Abfrage aus, darf nicht der ganze Plan mitfallen —
+     die Zutaten stecken ohnehin schon im Plan und im Katalog. Genau daran
+     ist die Einkaufsliste ohne Netz zerbrochen. */
   await Promise.all(ids.map(async (id) => {
-    if (!ui.details.has(id)) ui.details.set(id, await getRecipe(id));
+    if (ui.details.has(id)) return;
+    try {
+      const detail = await getRecipe(id);
+      if (detail) ui.details.set(id, detail);
+    } catch { /* Rueckfall unten auf meal.recipe */ }
   }));
   return {
     ...plan,
