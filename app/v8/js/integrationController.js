@@ -35,8 +35,7 @@ const runtime = {
   expandedMeals: new Set(),
   detailCache: new Map(),
   replaceTarget: null,
-  replaceMode: 'similar',
-  viewMode: 'heute'
+  replaceMode: 'similar'
 };
 
 const PIN_ICON = '<svg viewBox="0 0 24 24"><path d="M9 3h6l-1 6 4 3v2H6v-2l4-3-1-6Z"/><path d="M12 14v7"/></svg>';
@@ -186,109 +185,132 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex) {
   </div>`;
 }
 
+/* --- Woche: planen und anpassen ---------------------------------------- */
+
 function renderPlanPage() {
   const state = getState();
   const plan = state.currentPlan;
-  if (plan && !isPlanExpired(plan)) {
-    const days = normalizeDays(plan);
-    if (!days.length) return renderEmptyPlan();
+  if (!plan || isPlanExpired(plan)) return renderEmptyPlan();
 
-    const today = localDate(0);
-    const activeDay = runtime.activePlanDay || today;
-    const dayData = days.find((d) => d.date === activeDay) || days[0];
-    const dayIndex = days.indexOf(dayData);
-    const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
+  const days = normalizeDays(plan);
+  if (!days.length) return renderEmptyPlan();
 
-    const profile = state.profile || {};
-    const kcalTarget = Math.round(resolveCalorieTarget(profile));
-    const proteinTarget = Math.round(resolveProteinTarget(profile));
-    const summary = dayData ? computeDaySummary(dayData) : { totalKcal: 0, totalProtein: 0, mealCount: 0 };
+  const today = localDate(0);
+  const profile = state.profile || {};
+  const kcalTarget = Math.round(resolveCalorieTarget(profile));
+  const proteinTarget = Math.round(resolveProteinTarget(profile));
+  /* Der aufgeklappte Tag ist zugleich der, auf den sich "nur dieser Tag"
+     beim Neuplanen bezieht. */
+  const openDate = days.some((d) => d.date === runtime.activePlanDay) ? runtime.activePlanDay : null;
 
-    const isWeekView = days.length > 1;
-    const viewMode = runtime.viewMode || 'heute';
-    const dayDate = dayData ? new Date(`${dayData.date}T12:00:00`) : new Date();
-    const dayName = dayData && dayData.date === today ? 'Heute' : (dayData ? new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(dayDate) : 'Heute');
-    const dayDateLabel = `${String(dayDate.getDate()).padStart(2, '0')}.${String(dayDate.getMonth() + 1).padStart(2, '0')}.`;
+  return `<section class="v8-page preply-page">
+    <div class="preply-kicker">Deine Woche</div>
+    <h1 class="preply-title">Gut essen,<br>ohne nachzudenken.</h1>
 
+    <div class="preply-target">
+      <div><span>Tagesziel</span><b>${kcalTarget} <small>kcal</small></b></div>
+      <div><span>Protein</span><b>${proteinTarget}<small> g</small></b></div>
+      <p>Passt die Woche? Tippe auf einen Tag, um ihn einzeln anzupassen.</p>
+    </div>
+
+    <div class="preply-section"><h2>Deine Tage</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
+
+    <div class="preply-week-list">
+      ${days.map((day, dayIndex) => {
+        const total = computeDaySummary(day);
+        const cats = Object.keys(day.meals || {}).filter((cat) => day.meals[cat]);
+        const isToday = day.date === today;
+        const isOpen = day.date === openDate;
+        const dayName = isToday ? 'Heute' : new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`));
+        const dateShort = new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(`${day.date}T12:00:00`));
+        const pinnedHere = cats.filter((cat) => day.meals[cat]?.pinned).length;
+
+        return `<div class="preply-week-card ${isToday ? 'today' : ''} ${isOpen ? 'expanded' : ''}"
+                     data-active-day-index="${dayIndex}" ${isOpen ? `data-active-day-date="${day.date}"` : ''}>
+          <button class="preply-week-head" data-plan-day="${day.date}" aria-expanded="${isOpen}">
+            <div>
+              <span>${escapeHtml(dayName)} · ${escapeHtml(dateShort)}</span>
+              <strong>${cats.length} ${cats.length === 1 ? 'Mahlzeit' : 'Mahlzeiten'}${pinnedHere ? ` · ${pinnedHere} fest` : ''}</strong>
+            </div>
+            <b>${total.totalKcal} kcal</b>
+          </button>
+          ${isOpen
+            ? `<div class="preply-week-body">${cats.map((cat, idx) =>
+                 renderMealCard(day.date, cat, day.meals[cat], dayIndex, idx)
+               ).join('')}</div>`
+            : `<div class="preply-week-meals">${cats.map((cat) =>
+                 `<div class="preply-week-meal"><span>${escapeHtml(MEAL_LABELS[cat] || cat)}</span><strong>${escapeHtml((day.meals[cat].recipe || day.meals[cat]).name)}</strong><b>›</b></div>`
+               ).join('')}</div>`}
+        </div>`;
+      }).join('')}
+    </div>
+
+    <button class="preply-outline" onclick="location.hash='recipes'">Alle Rezepte durchsehen <span>→</span></button>
+  </section>`;
+}
+
+/* --- Heute: kochen ----------------------------------------------------- */
+
+function renderTodayPage() {
+  const state = getState();
+  const plan = state.currentPlan;
+  const today = localDate(0);
+  const profile = state.profile || {};
+
+  if (!plan || isPlanExpired(plan)) {
     return `<section class="v8-page preply-page">
-      <!-- Kicker + Title -->
-      <div class="preply-kicker">Dein Plan</div>
-      <h1 class="preply-title">Gut essen,<br>ohne nachzudenken.</h1>
-
-      <!-- Goal card (dark bg, lime numbers) -->
-      <div class="preply-target">
-        <div><span>Tagesziel</span><b>${kcalTarget} <small>kcal</small></b></div>
-        <div><span>Protein</span><b>${proteinTarget}<small> g</small></b></div>
-        <p>Der Plan ist auf deinen Bedarf und deine Auswahl zugeschnitten.</p>
+      <div class="preply-kicker">Heute</div>
+      <h1 class="preply-title">Was kochst<br>du heute?</h1>
+      <p class="preply-copy">Noch kein Plan. Erstelle einen, dann steht hier jeden Tag, was ansteht.</p>
+      ${catalogStatusHtml()}
+      <div class="v8-start-grid" style="margin-top:18px">
+        <button class="v8-start-card primary" data-action="create-plan"><strong>Wochenplan erstellen</strong><span>Mehrere Tage planen, Einkaufsliste inklusive.</span></button>
+        <button class="v8-start-card" data-action="single-day-plan"><strong>Nur für heute</strong><span>Ein Tag, passende Gerichte, sofort los.</span></button>
       </div>
-
-      ${isWeekView ? `
-      <!-- Heute / Woche toggle -->
-      <div class="preply-view-toggle">
-        <button class="${viewMode === 'heute' ? 'active' : ''}" data-view-mode="heute">Heute</button>
-        <button class="${viewMode === 'woche' ? 'active' : ''}" data-view-mode="woche">Woche</button>
-      </div>
-      ` : ''}
-
-      ${viewMode === 'woche' && isWeekView ? `
-      <!-- Week view -->
-      <div class="preply-section"><h2>Deine Tage</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
-      <div class="preply-week-list">
-        ${days.map((day, i) => {
-          const total = computeDaySummary(day);
-          const cats = Object.keys(day.meals || {}).filter((cat) => day.meals[cat]);
-          const isToday = day.date === today;
-          const meals = cats.map((cat) => `<div class="preply-week-meal"><span>${escapeHtml(MEAL_LABELS[cat] || cat)}</span><strong>${escapeHtml((day.meals[cat].recipe || day.meals[cat]).name)}</strong><b>›</b></div>`).join('');
-          return `<button class="preply-week-card ${isToday ? 'today' : ''}" data-plan-day="${day.date}">
-            <header><div><span>${isToday ? 'Heute' : new Intl.DateTimeFormat('de-DE', { weekday: 'long' }).format(new Date(`${day.date}T12:00:00`))} · ${new Intl.DateTimeFormat('de-DE', { day: '2-digit', month: '2-digit' }).format(new Date(`${day.date}T12:00:00`))}</span><strong>${cats.length} Mahlzeiten</strong></div><b>${total.totalKcal} kcal</b></header>
-            <div class="preply-week-meals">${meals}</div>
-          </button>`;
-        }).join('')}
-      </div>
-      <button class="preply-outline" onclick="location.hash='recipes'">Weitere Rezepte entdecken <span>→</span></button>
-      ` : `
-      <!-- Day picker -->
-      <div class="preply-day-picker">
-        ${days.map((day) => {
-          const d = new Date(`${day.date}T12:00:00`);
-          const wd = WEEKDAY_SHORT[d.getDay()];
-          const isDayToday = day.date === today;
-          const isActive = day.date === (dayData ? dayData.date : '');
-          return `<button class="preply-day ${isActive ? 'active' : ''}" data-plan-day="${day.date}">
-            <span>${isDayToday ? 'Heute' : wd}</span>
-            <b>${d.getDate()}</b>
-          </button>`;
-        }).join('')}
-      </div>
-
-      <!-- Plan hint -->
-      <div class="preply-note"><i>i</i><p><b>${escapeHtml(dayName)}.</b> Tausche jedes Gericht direkt aus – Plan und Einkaufsliste werden gemeinsam aktualisiert.</p></div>
-
-      ${dayData ? `
-      <!-- Section heading -->
-      <div class="preply-section"><h2>Deine Mahlzeiten</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
-
-      <!-- Day card with meals -->
-      <div class="preply-plan-card" data-active-day-index="${dayIndex}" data-active-day-date="${dayData.date}">
-        <header>
-          <div>
-            <p>${escapeHtml(dayName)} · ${escapeHtml(dayDateLabel)}</p>
-            <h2>Einfach loskochen</h2>
-          </div>
-          <span class="preply-day-total">${summary.totalKcal} kcal</span>
-        </header>
-        ${Object.entries(dayData.meals || {}).map(([category, meal], idx) =>
-          renderMealCard(dayData.date, category, meal, dayIndex, idx)
-        ).join('')}
-      </div>
-
-      <button class="preply-outline" onclick="location.hash='recipes'">Weitere Rezepte entdecken <span>→</span></button>
-      ` : '<div class="preply-empty">Kein Plan für diesen Tag.</div>'}
-      `}
     </section>`;
   }
 
-  return renderEmptyPlan();
+  const days = normalizeDays(plan);
+  const dayData = days.find((d) => d.date === today);
+
+  if (!dayData) {
+    const next = days.find((d) => d.date > today);
+    return `<section class="v8-page preply-page">
+      <div class="preply-kicker">Heute</div>
+      <h1 class="preply-title">Heute ist<br>nichts geplant.</h1>
+      <p class="preply-copy">${next
+        ? `Der Plan beginnt am ${escapeHtml(new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' }).format(new Date(`${next.date}T12:00:00`)))}.`
+        : 'Dein Plan liegt in der Vergangenheit.'}</p>
+      <div class="v8-start-grid" style="margin-top:18px">
+        <button class="v8-start-card primary" data-action="single-day-plan"><strong>Tag für heute planen</strong><span>Passende Gerichte, sofort los.</span></button>
+      </div>
+    </section>`;
+  }
+
+  const summary = computeDaySummary(dayData);
+  const kcalTarget = Math.round(resolveCalorieTarget(profile));
+  const dayIndex = days.indexOf(dayData);
+  const cats = Object.keys(dayData.meals || {}).filter((cat) => dayData.meals[cat]);
+  const weekday = new Intl.DateTimeFormat('de-DE', { weekday: 'long', day: '2-digit', month: '2-digit' }).format(new Date(`${today}T12:00:00`));
+
+  return `<section class="v8-page preply-page">
+    <div class="preply-kicker">${escapeHtml(weekday)}</div>
+    <h1 class="preply-title">Heute<br>kochst du.</h1>
+
+    <div class="preply-target">
+      <div><span>Heute geplant</span><b>${summary.totalKcal} <small>von ${kcalTarget} kcal</small></b></div>
+      <div><span>Protein</span><b>${summary.totalProtein}<small> g</small></b></div>
+      <p>Tippe ein Gericht an, um Zutaten und Zubereitung zu sehen.</p>
+    </div>
+
+    <div class="preply-section"><h2>Deine Mahlzeiten</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
+
+    <div class="preply-plan-card" data-active-day-index="${dayIndex}" data-active-day-date="${today}">
+      ${cats.map((cat, idx) => renderMealCard(today, cat, dayData.meals[cat], dayIndex, idx)).join('')}
+    </div>
+
+    <button class="preply-outline" onclick="location.hash='shopping'">Zur Einkaufsliste <span>→</span></button>
+  </section>`;
 }
 
 function renderEmptyPlan() {
@@ -387,6 +409,7 @@ function renderProfilePage() {
 }
 
 function pageForRoute(route) {
+  if (route === 'today') return renderTodayPage();
   if (route === 'recipes') return renderRecipesPage();
   if (route === 'shopping') return renderShoppingPage();
   if (route === 'profile') return renderProfilePage();
@@ -793,7 +816,7 @@ function bindDialogEvents(root) {
   }));
 }
 
-function openOnboarding(root) {
+export function openOnboarding(root) {
   runtime.onboardingDraft = createOnboardingDraft(getState().profile);
   runtime.activeDialog = 'onboarding';
   renderDialog(root);
@@ -880,17 +903,11 @@ function bindPageEvents(root) {
     }
   }));
 
-  /* View mode toggle (Heute/Woche) */
-  root.querySelectorAll('[data-view-mode]').forEach((btn) => btn.addEventListener('click', () => {
-    runtime.viewMode = btn.dataset.viewMode;
-    renderApp(root);
-  }));
-
-  /* Plan day pills */
+  /* Tag in der Wochenansicht auf- und zuklappen */
   root.querySelectorAll('[data-plan-day]').forEach((pill) => pill.addEventListener('click', () => {
     haptic('tap');
-    runtime.activePlanDay = pill.dataset.planDay;
-    runtime.viewMode = 'heute';
+    const date = pill.dataset.planDay;
+    runtime.activePlanDay = runtime.activePlanDay === date ? null : date;
     renderApp(root);
   }));
 

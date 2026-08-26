@@ -187,3 +187,23 @@
 }
 
 .ob-actions { margin-top: 20px; }
+
+/* Zweitrangige Handlung auf der Profilseite. */
+.master-profile-secondary {
+  width: 100%;
+  margin-top: 9px;
+  padding: 13px 15px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--surface);
+  color: var(--ink);
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.master-profile-secondary strong { font-size: .70rem; font-weight: 900; }
+.master-profile-secondary small { color: var(--muted); font-size: .55rem; line-height: 1.35; }
+.master-profile-secondary:active { transform: scale(.98); }

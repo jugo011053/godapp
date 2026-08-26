@@ -4,6 +4,8 @@ import { loadCards } from './data/recipeStore.js';
 import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
 import { APP_BUILD, APP_BUILD_DATE } from './core/version.js';
 import { restoreRecipe } from './features/favorites/preferenceSignals.js';
+import { openOnboarding } from './integrationController.js';
+import { haptic } from './core/feel.js';
 
 const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
   '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;'
@@ -80,11 +82,27 @@ function renderProfile(root) {
       <button class="master-profile-row action" type="button" data-manage-excluded><span>Ausgeblendete Rezepte</span><strong>${excludedCount || 'Keine'}</strong></button>
     </section>
 
+    <section class="master-profile-section">
+      <h2>Mehr</h2>
+      <button class="master-profile-row action" type="button" onclick="location.hash='recipes'"><span>Alle Rezepte durchsehen</span><strong>›</strong></button>
+    </section>
+
     <button class="master-profile-edit-button" type="button" data-edit-profile>Profil bearbeiten</button>
+
+    <button class="master-profile-secondary" type="button" data-rerun-onboarding>
+      <strong>Einrichtung erneut durchlaufen</strong>
+      <small>Körperdaten, Ziel und Stil neu festlegen — Bedarf wird neu berechnet</small>
+    </button>
   </section>`;
 
   main.querySelector('[data-edit-profile]').addEventListener('click', () => openProfileEditor(root));
   main.querySelector('[data-manage-excluded]').addEventListener('click', () => openExcludedRecipes(root));
+  /* Ohne diesen Weg kaeme man nach der ersten Einrichtung nie wieder hinein —
+     und Gewichtsaenderungen wuerden den Bedarf nie neu berechnen. */
+  main.querySelector('[data-rerun-onboarding]').addEventListener('click', () => {
+    haptic('tap');
+    openOnboarding(root);
+  });
 }
 
 function option(value, label, current) {
