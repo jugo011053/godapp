@@ -1,6 +1,7 @@
 import { emit, on } from './core/events.js';
 import { getRoute, initializeRouter } from './core/router.js';
 import { APP_BUILD, APP_BUILD_DATE } from './core/version.js';
+import { initFeel } from './core/feel.js';
 import { getState, initializeStore, updateState } from './core/store.js';
 import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
 import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
@@ -27,6 +28,7 @@ async function renderAll() {
 try {
   initializeStore();
   initializePlanManagement();
+  initFeel(document.body);
   on('route:changed', () => void renderAll());
   on('state:changed', () => void renderAll());
   initializeRouter();

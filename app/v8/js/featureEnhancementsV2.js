@@ -5,6 +5,7 @@ import { createDefaultFilters, filterRecipes, sortRecipes } from './features/dis
 import { scoreRecipe } from './data/recipeScoring.js';
 import { toggleFavorite, excludeRecipe } from './features/favorites/preferenceSignals.js';
 import { buildShoppingList, copyShoppingText, toggleShoppingDate } from './features/shopping/shoppingEngine.js';
+import { haptic, enableSwipeToggle } from './core/feel.js';
 
 const ui = {
   recipes: [],
@@ -50,6 +51,8 @@ function appendSheet(root, className, content) {
   root.querySelector('.v8-overlay')?.remove();
   const overlay = document.createElement('div');
   overlay.className = `v8-overlay ${className}`;
+  /* Meldet dem Gesten-Beobachter: dieses Sheet darf weggewischt werden. */
+  overlay.dataset.dismissible = 'true';
   overlay.innerHTML = content;
   root.appendChild(overlay);
   overlay.addEventListener('click', (event) => {
@@ -278,6 +281,7 @@ function applyFavorite(root, id) {
     preferences: toggleFavorite(state.preferences || {}, id)
   }));
   const active = (next.preferences?.favoriteRecipeIds || []).includes(id);
+  haptic(active ? 'confirm' : 'tap');
 
   /* Dasselbe Rezept kann in "Für dich" und in der Liste stehen. */
   root.querySelectorAll(`[data-v8-favorite="${CSS.escape(id)}"]`).forEach((button) => {
@@ -654,12 +658,11 @@ async function renderShopping(root) {
     }));
 
     const openLabel = main.querySelector('[data-open-count]');
-    main.querySelectorAll('[data-v8-check]').forEach((button) => button.addEventListener('click', () => {
+    const applyCheck = (button, checked) => {
       const id = button.dataset.v8Check;
-      const checked = !Boolean(ui.checks[id]);
       ui.checks[id] = checked;
       button.classList.toggle('checked', checked);
-      button.textContent = checked ? '✓' : '';
+      button.textContent = checked ? '\u2713' : '';
       button.setAttribute('aria-label', checked ? 'Als offen markieren' : 'Als erledigt markieren');
       button.nextElementSibling?.classList.toggle('done', checked);
       if (openLabel) {
@@ -667,6 +670,19 @@ async function renderShopping(root) {
         openLabel.textContent = `${open} von ${list.items.length} offen`;
       }
       silentUpdate((current) => ({ ...current, shoppingChecks: { ...(current.shoppingChecks || {}), [id]: checked } }));
+    };
+
+    /* Waagerecht wischen hakt ab — senkrechtes Scrollen behaelt Vorrang. */
+    main.querySelectorAll('.master-shopping-row').forEach((row) => {
+      const button = row.querySelector('[data-v8-check]');
+      if (button) enableSwipeToggle(row, () => applyCheck(button, !Boolean(ui.checks[button.dataset.v8Check])));
+    });
+
+    main.querySelectorAll('[data-v8-check]').forEach((button) => button.addEventListener('click', () => {
+      const id = button.dataset.v8Check;
+      const checked = !Boolean(ui.checks[id]);
+      haptic(checked ? 'confirm' : 'tap');
+      applyCheck(button, checked);
     }));
 
     main.querySelector('[data-v8-copy]')?.addEventListener('click', async (event) => {

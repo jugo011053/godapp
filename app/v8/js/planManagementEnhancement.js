@@ -3,6 +3,7 @@ import { on } from './core/events.js';
 import { loadCards } from './data/recipeStore.js';
 import { buildPlan } from './features/planner/plannerEngine.js';
 import { replaceCurrentPlan } from './features/history/history.js';
+import { haptic } from './core/feel.js';
 
 let profileSignature;
 let pendingProfileDecision = false;
@@ -53,6 +54,7 @@ function closeOverlay(overlay) {
 }
 
 function bindOverlayDismiss(overlay) {
+  overlay.dataset.dismissible = 'true';
   overlay.addEventListener('click', (event) => {
     if (event.target === overlay) closeOverlay(overlay);
   });
@@ -126,6 +128,7 @@ function openConfirmation(root, { title, text, confirmLabel, destructive = false
   overlay.querySelector('[data-manage-confirm]').addEventListener('click', async (event) => {
     event.currentTarget.disabled = true;
     await onConfirm();
+    haptic('strong');
     closeOverlay(overlay);
   });
   overlay.querySelector('[data-manage-confirm]')?.focus();
