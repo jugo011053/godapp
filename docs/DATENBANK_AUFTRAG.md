@@ -16,42 +16,62 @@ sind Notverbände. Die Ursachen liegen alle in den Daten.
 
 ## 0. Die Struktur, bevor es um Inhalte geht
 
-Es gibt **zwei Kopien derselben Zutatendaten, ohne Verbindung zueinander**:
+Es gibt **drei Ebenen**, und die App liest ausgerechnet die schlechteste.
 
-| | `foods` | `recipe_catalog_v1.ingredients` (JSONB) |
+| Ebene | Was drin ist | Von der App gelesen |
 |---|---|---|
-| Zeilen | 846 Lebensmittel | 5 971 Vorkommen, 812 verschiedene Namen |
-| Felder | `category`, `pack_size`, `pack_unit`, `pack_price_eur`, `kcal_100`, … | `category`, `packSize`, `packUnit`, `packPrice`, … |
-| Verweis auf die andere Seite | — | **keiner** |
-| Wird von der App gelesen | **nein, gar nicht** | ja, ausschließlich |
+| Schema `catalog` | 14 normalisierte Tabellen: `recipes` (500), `recipe_ingredients` (5 403), `recipe_steps` (5 429), `foods` (846), `food_aliases` (1 692), `recipe_macros`, `recipe_allergens`, `recipe_tags`, `recipe_classification` … | nein |
+| `public.foods` | 846 Lebensmittel, Kopie von `catalog.foods` | **nein, gar nicht** |
+| `public.recipe_catalog_v1` | 600 Rezepte, flachgeklopft, Zutaten als JSONB | **ja, ausschließlich** |
 
-Nachprüfen:
+**Die entscheidende Nachricht: die saubere Struktur ist schon da.**
+`catalog.recipe_ingredients` hat eine Spalte `food_id`, und sie ist
+**vollständig gefüllt** — alle 5 403 Zutaten verweisen auf einen existierenden
+Eintrag in `catalog.foods`, keine einzige ins Leere:
 
 ```sql
--- Zutaten mit Verweis auf foods: 0
+select count(*) as gesamt,
+       count(food_id) as mit_food_id,
+       count(*) filter (where f.food_id is null and ri.food_id is not null) as ins_leere
+from catalog.recipe_ingredients ri
+left join catalog.foods f using (food_id);
+-- 5403 | 5403 | 0
+```
+
+Was fehlt, ist nicht die Verknüpfung, sondern ihre **Weitergabe nach `public`**.
+`recipe_catalog_v1` ist ein flacher Abzug, der beim Erzeugen das `food_id`
+weggelassen und stattdessen Kategorie, Packung und Preis in jedes Rezept
+hineinkopiert hat. Nachprüfen:
+
+```sql
+-- Zutaten in public mit Verweis auf foods: 0 von 5971
 select count(*) from recipe_catalog_v1 r,
   lateral jsonb_array_elements(r.ingredients) i
 where i ? 'foodId' or i ? 'food_id' or i ? 'ingredientId';
 ```
 
-Die Zutatendaten wurden beim Einpflegen einmal aus `foods` in jedes Rezept
-hineinkopiert. Seitdem driften beide auseinander, und `foods` ist toter
-Ballast — 846 gepflegte Zeilen, die nichts bewirken.
+Zwei Lücken, die dabei mitbedacht werden müssen:
 
-**Die gute Nachricht:** ein Abgleich über den Namen trifft zu 95 %.
-768 der 812 Zutatennamen entsprechen exakt einem `foods.canonical_name_de`.
+- **Die 100 Legacy-Rezepte fehlen im `catalog`-Schema.** Dort liegen nur die
+  500 aus `catalog_v5`. Die Legacy-Rezepte existieren ausschließlich als
+  flacher Eintrag in `recipe_catalog_v1` — und genau ihnen fehlen auch die
+  Kochschritte (siehe Punkt 5). Beides zusammen legt nahe, sie entweder
+  nachzuziehen oder auszumustern.
+- **`catalog.foods` und `public.foods` sind derselbe Bestand mit denselben
+  Fehlern** (beide 846 Zeilen, beide 419 mal `500 g / 1,79 €`). Korrigiert wird
+  also `catalog.foods`, und `public` bekommt den Abzug danach.
 
-**Erste Empfehlung, vor allen inhaltlichen Korrekturen:**
-`foods` wird die einzige Quelle. Jede Zutat im Rezept bekommt ein `food_id`.
-Kategorie, Packung und Preis stehen dann nur noch an einer Stelle. Wer das
-nicht macht, korrigiert jeden folgenden Fehler zweimal.
+**Erste Empfehlung, vor allen inhaltlichen Korrekturen:** den Abzug so ändern,
+dass jede Zutat in `recipe_catalog_v1` ihr `food_id` mitbekommt — oder besser,
+`recipe_catalog_v1` durch eine View über `catalog` ersetzen. Kategorie, Packung
+und Preis stehen dann nur noch an einer Stelle. Wer das nicht macht, korrigiert
+jeden folgenden Fehler zweimal und darf nach jeder Korrektur neu exportieren.
 
-Die 44 Namen ohne Treffer brauchen entweder einen neuen `foods`-Eintrag oder
-eine Zuordnung von Hand. Beispiele: `TK-Beerenmix`, `Magerquark`, `Eiklar`,
-`Spinat TK`, `Tofu natur`, `Vollkorn-Wrap`, `Milch 1,5 %`, `Putenbrust`,
-`Whey-Proteinpulver`, `Sojadrink ungesüßt`.
-
----
+Für die 44 Zutatennamen, die in `public` keinem `foods`-Eintrag entsprechen,
+lohnt ein Blick in `catalog.food_aliases` (1 692 Zeilen) — die Tabelle ist
+genau dafür da und deckt einen Teil davon vermutlich schon ab. Beispiele:
+`TK-Beerenmix`, `Magerquark`, `Eiklar`, `Spinat TK`, `Tofu natur`,
+`Vollkorn-Wrap`, `Milch 1,5 %`, `Putenbrust`, `Whey-Proteinpulver`.
 
 ## 1. Die Kategorien sind zur Hälfte ein Standardwert
 
@@ -217,7 +237,8 @@ Zwei Konsequenzen, die zusammengehören:
 
 Der Auftrag ist erledigt, wenn:
 
-- [ ] jede Rezeptzutat ein `food_id` trägt, das in `foods` existiert
+- [ ] jede Zutat in `recipe_catalog_v1` ihr `food_id` mitführt (in `catalog`
+      ist es bereits vollständig vorhanden — es geht nur beim Abzug verloren)
 - [ ] `category` in `foods` aus einer festen Gangliste stammt, keine Zeile
       mehr auf dem Standardwert steht, und Stichproben (Ei, Rosinen,
       Meeresfrüchte, Vanilleextrakt) im richtigen Gang landen
