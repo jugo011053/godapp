@@ -66,7 +66,13 @@ export class RecipeRepository {
         familyKey: recipe.familyKey,
         primaryProtein: recipe.primaryProtein,
         dishType: recipe.dishType,
-        ingredientNames: recipe.ingredientNames
+        ingredientNames: recipe.ingredientNames,
+        /* Zutaten und Schritte werden oben ohnehin mitgeholt und wurden hier
+           bisher weggeworfen. Ohne sie brauchte jede Einkaufsliste und jedes
+           aufgeklappte Gericht eine eigene Abfrage je Rezept — und ohne Netz
+           blieb beides leer. */
+        ingredients: recipe.ingredients || [],
+        steps: recipe.steps || []
       }));
   }
 
