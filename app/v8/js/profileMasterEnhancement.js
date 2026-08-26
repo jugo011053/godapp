@@ -14,9 +14,26 @@ const esc = (value) => String(value ?? '').replace(/[&<>'"]/g, (char) => ({
 const LABELS = {
   goal: { lose: 'Abnehmen', maintain: 'Gewicht halten', gain: 'Zunehmen' },
   diet: { omnivore: 'Mischkost', vegetarian: 'Vegetarisch', vegan: 'Vegan', pescatarian: 'Pescetarisch', halal: 'Halal' },
-  cooking: { simple: 'Einfach', mixed: 'Ausgewogen', ambitious: 'Abwechslungsreich' },
+  /* Vorher stand hier simple/mixed/ambitious — Werte, die der Planer gar
+     nicht kennt. Der Auswahlkasten schrieb sie trotzdem ins Profil, wo sie
+     wirkungslos versackten. Jetzt eine Frage, die man beantworten kann. */
+  prep: { 1: 'Nie, jeden Tag frisch', 2: 'Zwei Tage am Stück', 3: 'Drei Tage am Stück' },
   meals: { breakfast: 'Frühstück', lunch: 'Mittagessen', dinner: 'Abendessen', snack: 'Snack' }
 };
+
+/* Kochstil und prepDays beschreiben dasselbe aus zwei Richtungen. Nach aussen
+   gibt es nur noch eine Zahl: wie viele Tage hintereinander dasselbe Gericht. */
+export function prepDaysOf(profile = {}) {
+  if (profile.cookingStyle === 'fresh') return 1;
+  const days = Number(profile.prepDays);
+  return [1, 2, 3].includes(days) ? days : 2;
+}
+
+export function prepSettings(days) {
+  const value = [1, 2, 3].includes(Number(days)) ? Number(days) : 2;
+  if (value === 1) return { cookingStyle: 'fresh', prepDays: 1 };
+  return { cookingStyle: 'mixed', prepDays: value };
+}
 
 let recipes = [];
 
@@ -72,7 +89,7 @@ function renderProfile(root) {
       <h2>Planung</h2>
       <div class="master-profile-row"><span>Ziel</span><strong>${esc(LABELS.goal[profile.goal] || profile.goal || 'Nicht festgelegt')}</strong></div>
       <div class="master-profile-row"><span>Ernährungsweise</span><strong>${esc(LABELS.diet[profile.dietStyle] || profile.dietStyle || 'Nicht festgelegt')}</strong></div>
-      <div class="master-profile-row"><span>Kochstil</span><strong>${esc(LABELS.cooking[profile.cookingStyle] || profile.cookingStyle || 'Nicht festgelegt')}</strong></div>
+      <div class="master-profile-row"><span>Vorkochen</span><strong>${esc(LABELS.prep[prepDaysOf(profile)])}</strong></div>
       <div class="master-profile-row"><span>Mahlzeiten</span><strong>${esc(mealSummary(profile))}</strong></div>
     </section>
 
@@ -112,6 +129,7 @@ function option(value, label, current) {
 function openProfileEditor(root) {
   const profile = structuredClone(getState().profile || {});
   const enabledMeals = { breakfast: false, lunch: false, dinner: false, snack: false, ...(profile.enabledMeals || {}) };
+  let prepDays = prepDaysOf(profile);
   const overlay = appendSheet(root, `<section class="v8-dialog plan-menu-sheet" role="dialog" aria-modal="true" aria-labelledby="profile-edit-title">
     <div class="sheet-head"><h2 id="profile-edit-title">Profil bearbeiten</h2><button class="sheet-close" type="button" data-sheet-close aria-label="Schließen">×</button></div>
     <form class="master-profile-form" data-profile-form>
@@ -127,7 +145,14 @@ function openProfileEditor(root) {
         <div class="master-form-field"><label for="profile-diet">Ernährungsweise</label><select id="profile-diet" name="dietStyle">${Object.entries(LABELS.diet).map(([value, label]) => option(value, label, profile.dietStyle)).join('')}</select></div>
       </div>
 
-      <div class="master-form-field"><label for="profile-cooking">Kochstil</label><select id="profile-cooking" name="cookingStyle">${Object.entries(LABELS.cooking).map(([value, label]) => option(value, label, profile.cookingStyle)).join('')}</select></div>
+      <fieldset class="master-form-group">
+        <legend>Vorkochen</legend>
+        <p class="master-form-hint">Wie viele Tage hintereinander darf dasselbe Gericht auf dem Tisch stehen? Einmal kochen spart Zeit, jeden Tag frisch bringt Abwechslung.</p>
+        <div class="master-meal-options">
+          ${[[1, 'Nie'], [2, '2 Tage'], [3, '3 Tage']].map(([value, label]) =>
+            `<button class="master-meal-option ${prepDays === value ? 'active' : ''}" type="button" data-prep-days="${value}" aria-pressed="${prepDays === value}">${label}</button>`).join('')}
+        </div>
+      </fieldset>
 
       <fieldset class="master-form-group">
         <legend>Mahlzeiten</legend>
@@ -140,6 +165,15 @@ function openProfileEditor(root) {
       <button class="sheet-action primary" type="submit">Speichern</button>
     </form>
   </section>`);
+
+  overlay.querySelectorAll('[data-prep-days]').forEach((button) => button.addEventListener('click', () => {
+    prepDays = Number(button.dataset.prepDays);
+    overlay.querySelectorAll('[data-prep-days]').forEach((other) => {
+      const active = Number(other.dataset.prepDays) === prepDays;
+      other.classList.toggle('active', active);
+      other.setAttribute('aria-pressed', String(active));
+    });
+  }));
 
   overlay.querySelectorAll('[data-profile-meal]').forEach((button) => button.addEventListener('click', () => {
     const meal = button.dataset.profileMeal;
@@ -168,7 +202,7 @@ function openProfileEditor(root) {
         proteinTarget: Math.max(20, Number(form.get('proteinTarget') || 130)),
         goal: String(form.get('goal') || 'maintain'),
         dietStyle: String(form.get('dietStyle') || 'omnivore'),
-        cookingStyle: String(form.get('cookingStyle') || 'mixed'),
+        ...prepSettings(prepDays),
         enabledMeals,
         excludedIngredients
       },

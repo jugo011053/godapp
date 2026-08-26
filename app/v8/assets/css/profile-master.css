@@ -123,6 +123,15 @@
   gap: 6px;
 }
 .master-form-field > label,
+/* Erklaerender Satz unter einer Ueberschrift im Formular. Ohne ihn muesste
+   der Nutzer raten, was die Zahl bewirkt. */
+.master-form-hint {
+  margin: 6px 0 10px;
+  color: var(--ink-secondary);
+  font-size: .74rem;
+  line-height: 1.45;
+}
+
 .master-form-group > legend {
   color: var(--ink-secondary);
   font-size: .57rem;
