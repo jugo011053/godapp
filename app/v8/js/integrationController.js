@@ -23,6 +23,7 @@ import { getReturnOptions, isPlanExpired, replaceCurrentPlan, setMealPinned } fr
 import { resolveCalorieTarget, resolveProteinTarget } from './data/recipeScoring.js';
 import { haptic } from './core/feel.js';
 import { showToast } from './core/toast.js';
+import { formatAmount } from './features/shopping/shoppingEngine.js';
 const runtime = {
   recipes: [],
   catalogStatus: 'loading',
@@ -83,7 +84,7 @@ function catalogNotReadyFeedback(root) {
   return false;
 }
 
-async function showRecipeDetail(root, recipeId) {
+export async function showRecipeDetail(root, recipeId) {
   try {
     let recipe = runtime.detailCache.get(recipeId);
     if (!recipe) {
@@ -106,7 +107,7 @@ async function showRecipeDetail(root, recipeId) {
       </div>
       <h3>Zutaten</h3>
       <div class="meal-ing-list">${(recipe.ingredients || []).map((item) =>
-        `<div class="meal-ing-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(item.amount ?? item.quantity ?? '')} ${escapeHtml(item.unit || '')}</b></div>`
+        `<div class="meal-ing-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(zutatenMenge(item))}</b></div>`
       ).join('')}</div>
       <h3>Zubereitung</h3>
       ${stepsHtml}
@@ -141,6 +142,15 @@ function computeDaySummary(dayData) {
     totalProtein += meal.estimatedProteinPerPerson || Math.round(recipe.protein || 0);
   }
   return { totalKcal, totalProtein, mealCount: meals.length };
+}
+
+/* Die Rezeptansicht zeigte rohe Zahlen: "1.5 g" mit englischem Punkt, "4 ml"
+   fuer einen Spritzer Oel. Dieselbe Formatierung wie in der Einkaufsliste —
+   aber `exact`, denn ein Rezept meint 120 g und nicht "ungefaehr 120". */
+function zutatenMenge(item) {
+  const menge = item.amount ?? item.quantity;
+  const text = formatAmount(menge, item.unit, { exact: true });
+  return text || String(item.unit || '');
 }
 
 /* --- Vorkochen sichtbar machen ------------------------------------------
@@ -204,7 +214,7 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex, groupDates) {
     const steps = detail?.steps || recipe.steps || [];
     expandedHtml = `<div class="meal-expanded">
       ${ingredients.length ? `<div class="meal-ing-list">${ingredients.map((item) =>
-        `<div class="meal-ing-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(item.amount ?? item.quantity ?? '')} ${escapeHtml(item.unit || '')}</b></div>`
+        `<div class="meal-ing-row"><span>${escapeHtml(item.name)}</span><b>${escapeHtml(zutatenMenge(item))}</b></div>`
       ).join('')}</div>` : ''}
       ${steps.length ? `<div class="meal-steps-list">${steps.map((step, index) =>
         `<div class="meal-step"><span class="step-num">${index + 1}</span><span>${escapeHtml(step)}</span></div>`
