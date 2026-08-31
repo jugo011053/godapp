@@ -3,12 +3,13 @@ import { getRoute, initializeRouter } from './core/router.js';
 import { APP_BUILD, APP_BUILD_DATE } from './core/version.js';
 import { initFeel } from './core/feel.js';
 import { getState, initializeStore, updateState } from './core/store.js';
-import { rerenderIntegratedApp, startIntegratedApp } from './integrationController.js';
+import { rerenderIntegratedApp, startIntegratedApp, showRecipeDetail } from './integrationController.js';
 import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
 import { appendBuildStamp, refreshProfileMaster } from './profileMasterEnhancement.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
 import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
 import { initializeAccount, refreshAccount } from './accountEnhancement.js';
+import { refreshPantry } from './pantryEnhancement.js';
 
 const appRoot = document.getElementById('app');
 
@@ -44,6 +45,7 @@ async function renderAll() {
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   refreshPlanManagement(appRoot);
+  refreshPantry(appRoot, (id) => showRecipeDetail(appRoot, id));
   appendBuildStamp(appRoot);
 
   if (routeChanged) {
@@ -84,6 +86,7 @@ try {
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
   refreshPlanManagement(appRoot);
+  refreshPantry(appRoot, (id) => showRecipeDetail(appRoot, id));
   appendBuildStamp(appRoot);
   renderedRoute = getRoute();
 

@@ -14,7 +14,7 @@ import {
   pushPlan, pullPlan, pullShoppingChecks, pushShoppingChecks, mergeChecks
 } from './features/household/planSync.js';
 import { planMealFor } from './features/planner/plannerEngine.js';
-import { getCards } from './data/recipeStore.js';
+import { getCards, loadCards } from './data/recipeStore.js';
 
 /* Konto und Haushalt sitzen im Profil, also im Nebenmenue — die Hauptseiten
    bleiben gross und einfach. Ohne Konto funktioniert die App unveraendert
@@ -243,7 +243,11 @@ async function syncHouseholdPlan() {
   const household = ui.household;
   if (!household?.id) return;
   const state = getState();
-  const cards = getCards();
+  /* Ohne Katalog laesst sich kein Plan uebernehmen — aber abbrechen waere
+     falsch: dann haenge der Nutzer bis zum naechsten Rundlauf, also bis zu
+     einer halben Minute, ohne den Plan des anderen. Aus dem Cache kostet das
+     Warten nichts. */
+  const cards = getCards().length ? getCards() : await loadCards().catch(() => []);
   if (!cards.length) return;
 
   const recipesById = new Map(cards.map((recipe) => [recipe.id, recipe]));
