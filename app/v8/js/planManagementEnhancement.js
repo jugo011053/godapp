@@ -479,6 +479,13 @@ function enhancePlanMenu(root) {
   });
 }
 
+/* Der Plan-Editor war nur ueber das Neuplanen-Blatt erreichbar. Jetzt haengt
+   auch die Zeile ueber der Tagesliste daran: Einstellungen neben dem
+   Ergebnis, nicht davor. */
+export function openPlanEditorFrom(root) {
+  renderPlanEditor(root, createPlanEditDraft(getState()));
+}
+
 export function initializePlanManagement() {
   if (initialized) return;
   initialized = true;
@@ -495,6 +502,12 @@ export function initializePlanManagement() {
 }
 
 export function refreshPlanManagement(root) {
+  root.querySelectorAll('[data-plan-settings]').forEach((button) => {
+    if (button.dataset.bound === 'true') return;
+    button.dataset.bound = 'true';
+    button.addEventListener('click', () => openPlanEditorFrom(root));
+  });
+
   const state = getState();
   const plan = state.currentPlan;
   if (!plan || !Array.isArray(plan.days)) return;
