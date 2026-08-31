@@ -680,3 +680,22 @@
 .pantry-fehlt { color: var(--ink-secondary); font-size: .72rem; }
 .pantry-komplett { color: var(--accent-strong); font-size: .72rem; font-weight: 700; }
 .pantry-leer { margin-top: 18px; color: var(--ink-secondary); font-size: .85rem; line-height: 1.5; }
+.pantry-label {
+  display: flex !important;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+}
+.pantry-leeren {
+  padding: 2px 0;
+  border: 0;
+  background: transparent;
+  color: var(--ink-secondary);
+  font: inherit;
+  font-size: .7rem;
+  font-weight: 800;
+  letter-spacing: .02em;
+  text-transform: none;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}

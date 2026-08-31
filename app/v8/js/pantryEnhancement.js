@@ -63,10 +63,13 @@ export function openPantrySheet(root, onRecipe) {
     </div>
     <p class="account-copy">Schreib auf, was im Kühlschrank liegt — mit Komma getrennt. Wir suchen, was sich daraus kochen lässt.</p>
 
-    <label class="master-form-field">
-      <span>Vorhandene Zutaten</span>
-      <textarea data-pantry-input rows="2" placeholder="Eier, Spinat, Feta">${esc(ui.text)}</textarea>
-    </label>
+    <div class="master-form-field">
+      <span class="pantry-label">
+        Vorhandene Zutaten
+        <button class="pantry-leeren" type="button" data-pantry-clear hidden>Alles löschen</button>
+      </span>
+      <textarea data-pantry-input rows="2" placeholder="Eier, Spinat, Feta" aria-label="Vorhandene Zutaten">${esc(ui.text)}</textarea>
+    </div>
 
     <div class="pantry-chips">${VORSCHLAEGE.map((wort) =>
       `<button class="pantry-chip" type="button" data-pantry-add="${esc(wort)}">${esc(wort)}</button>`).join('')}</div>
@@ -81,6 +84,10 @@ export function openPantrySheet(root, onRecipe) {
 
   const feld = overlay.querySelector('[data-pantry-input]');
   const ausgabe = overlay.querySelector('[data-pantry-results]');
+  const leeren = overlay.querySelector('[data-pantry-clear]');
+
+  /* "Alles löschen" erscheint nur, wenn es etwas zu löschen gibt. */
+  const knopfPflegen = () => { leeren.hidden = !feld.value.trim(); };
 
   const suchen = () => {
     ui.text = feld.value;
@@ -110,13 +117,32 @@ export function openPantrySheet(root, onRecipe) {
       : [...vorhanden, wort];
     feld.value = neu.join(', ');
     chip.classList.toggle('active');
+    knopfPflegen();
     haptic('tap');
   }));
 
+  leeren.addEventListener('click', () => {
+    feld.value = '';
+    ui.text = '';
+    ui.ergebnisse = null;
+    ausgabe.innerHTML = '';
+    overlay.querySelectorAll('.pantry-chip.active').forEach((chip) => chip.classList.remove('active'));
+    knopfPflegen();
+    feld.focus();
+    haptic('tap');
+  });
+
+  feld.addEventListener('input', knopfPflegen);
   overlay.querySelector('[data-pantry-search]').addEventListener('click', suchen);
   feld.addEventListener('keydown', (event) => {
     if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) suchen();
   });
+  /* Was im Feld steht, soll auch an den Vorschlaegen zu sehen sein. */
+  const gesetzt = parsePantryInput(feld.value).map((e) => e.toLowerCase());
+  overlay.querySelectorAll('[data-pantry-add]').forEach((chip) => {
+    if (gesetzt.includes(chip.dataset.pantryAdd.toLowerCase())) chip.classList.add('active');
+  });
+  knopfPflegen();
   binden();
   return overlay;
 }
