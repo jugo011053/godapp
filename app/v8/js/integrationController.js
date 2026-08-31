@@ -29,7 +29,6 @@ const runtime = {
   catalogError: null,
   suggestions: [],
   onboardingDraft: null,
-  planDraft: null,
   activeDialog: null,
   activePlanDay: null,
   expandedMeals: new Set(),
@@ -231,6 +230,20 @@ function renderMealCard(date, category, meal, dayIndex, cardIndex, groupDates) {
   </div>`;
 }
 
+/* Was am Plan eingestellt ist, in einer Zeile — direkt ueber dem Ergebnis
+   statt in einem Assistenten davor. */
+function planSettingsLine(plan, profile) {
+  const days = normalizeDays(plan);
+  const meals = [...new Set(days.flatMap((day) => Object.keys(day.meals || {})))]
+    .map((meal) => MEAL_LABELS[meal] || meal);
+  const persons = Math.max(1, Number(profile.persons) || 1);
+  return [
+    `${days.length} ${days.length === 1 ? 'Tag' : 'Tage'}`,
+    meals.join(', '),
+    `${persons} ${persons === 1 ? 'Person' : 'Personen'}`
+  ].filter(Boolean).join(' · ');
+}
+
 /* --- Woche: planen und anpassen ---------------------------------------- */
 
 function renderPlanPage() {
@@ -259,6 +272,10 @@ function renderPlanPage() {
       <div><span>Protein</span><b>${proteinTarget}<small> g</small></b></div>
       <p>Passt die Woche? Tippe auf einen Tag, um ihn einzeln anzupassen.</p>
     </div>
+
+    <button class="preply-plan-settings" type="button" data-plan-settings>
+      <span>${planSettingsLine(plan, profile)}</span><b>ändern</b>
+    </button>
 
     <div class="preply-section"><h2>Deine Tage</h2><button data-action="create-plan">Neu zusammenstellen</button></div>
 
@@ -560,68 +577,6 @@ function onboardingBody(draft) {
     ${sliderField('persons', 'Personen', Math.max(1, Number(p.persons) || 1), { min: 1, max: 8, step: 1, unit: '' })}`;
 }
 
-function createPlanDraft(profile) {
-  return {
-    step: 0,   /* 0 = days, 1 = meals, 2 = confirm */
-    selectedDates: [localDate(0), localDate(1), localDate(2)],
-    enabledMeals: Object.entries(profile.enabledMeals || {}).filter(([, enabled]) => enabled).map(([meal]) => meal),
-    error: null
-  };
-}
-
-function renderPlanDialog(root) {
-  const draft = runtime.planDraft;
-  const overlay = document.createElement('div');
-  overlay.className = 'v8-overlay';
-  overlay.dataset.owner = 'integration';
-  const stepLabels = ['Zeitraum', 'Mahlzeiten', 'Fertig'];
-  const WEEKDAY_SHORT = ['So','Mo','Di','Mi','Do','Fr','Sa'];
-
-  let body = '';
-  if (draft.step === 0) {
-    body = `
-      <h2>Wie viele Tage?</h2>
-      <p style="color:var(--muted);font-size:var(--text-sm);margin-bottom:var(--space-3)">Wähle einen Zeitraum für deinen Plan.</p>
-      <div class="chip-row" style="justify-content:center;margin-bottom:var(--space-4)">
-        ${[3,5,7].map((n) => `<button class="chip ${draft.selectedDates.length === n ? 'active' : ''}" data-plan-preset="${n}" style="padding:var(--space-3) var(--space-5);font-size:var(--text-sm)">${n} Tage</button>`).join('')}
-      </div>
-      <div class="chip-row" style="justify-content:center">
-        ${draft.selectedDates.map((date) => {
-          const d = new Date(`${date}T12:00:00`);
-          return `<span class="chip active" style="pointer-events:none">${WEEKDAY_SHORT[d.getDay()]} ${String(d.getDate()).padStart(2,'0')}</span>`;
-        }).join('')}
-      </div>`;
-  } else if (draft.step === 1) {
-    body = `
-      <h2>Welche Mahlzeiten?</h2>
-      <p style="color:var(--muted);font-size:var(--text-sm);margin-bottom:var(--space-3)">Was soll geplant werden?</p>
-      <div class="option-grid">${MEAL_OPTIONS.map(([key, label]) =>
-        `<button class="option-card ${draft.enabledMeals.includes(key) ? 'selected' : ''}" data-plan-meal="${key}"><strong>${escapeHtml(label)}</strong></button>`
-      ).join('')}</div>`;
-  } else {
-    body = `
-      <h2>Alles klar!</h2>
-      <div class="v8-status" style="text-align:center;font-size:var(--text-base)">
-        <strong>${draft.selectedDates.length}</strong> Tage · <strong>${draft.enabledMeals.length}</strong> Mahlzeiten<br>
-        <span style="font-size:var(--text-sm);color:var(--muted)">${draft.selectedDates.length * draft.enabledMeals.length} Gerichte werden für dich zusammengestellt</span>
-      </div>`;
-  }
-
-  overlay.innerHTML = `<section class="v8-dialog" role="dialog" aria-modal="true">
-    <p class="eyebrow">Schritt ${draft.step + 1} / 3 · ${stepLabels[draft.step]}</p>
-    <div class="v8-progress"><div style="width:${((draft.step + 1) / 3) * 100}%"></div></div>
-    ${body}
-    <p class="v8-status error" data-plan-error ${draft.error ? '' : 'hidden'}>${escapeHtml(draft.error || '')}</p>
-    <div class="v8-actions" style="margin-top:var(--space-5)">
-      <button class="v8-button ghost" data-plan-action="close">Abbrechen</button>
-      ${draft.step > 0 ? '<button class="v8-button" data-plan-action="back">Zurück</button>' : ''}
-      <button class="v8-button primary" data-plan-action="${draft.step === 2 ? 'create' : 'next'}">${draft.step === 2 ? 'Plan erstellen' : 'Weiter'}</button>
-    </div>
-  </section>`;
-  root.appendChild(overlay);
-  bindPlanDialogEvents(root);
-}
-
 function renderReplacementDialog(root) {
   const target = runtime.replaceTarget;
   if (!target) return;
@@ -718,7 +673,6 @@ function renderDialog(root) {
      Bedienung verschwanden. */
   root.querySelector('.v8-overlay[data-owner="integration"]')?.remove();
   if (runtime.activeDialog === 'replace' && runtime.replaceTarget) { renderReplacementDialog(root); return; }
-  if (runtime.activeDialog === 'plan' && runtime.planDraft) { renderPlanDialog(root); return; }
   if (runtime.activeDialog !== 'onboarding' || !runtime.onboardingDraft) return;
   const draft = runtime.onboardingDraft;
   const total = ONBOARDING_STEPS.length;
@@ -738,45 +692,6 @@ function renderDialog(root) {
   </section>`;
   root.appendChild(overlay);
   bindDialogEvents(root);
-}
-
-function bindPlanDialogEvents(root) {
-  const draft = runtime.planDraft;
-
-  /* Step 0: day presets */
-  root.querySelectorAll('[data-plan-preset]').forEach((button) => button.addEventListener('click', () => {
-    const count = Number(button.dataset.planPreset);
-    draft.selectedDates = Array.from({ length: count }, (_, i) => localDate(i));
-    draft.error = null;
-    renderDialog(root);
-  }));
-
-  /* Step 1: meal toggles */
-  root.querySelectorAll('[data-plan-meal]').forEach((button) => button.addEventListener('click', () => {
-    const meal = button.dataset.planMeal;
-    draft.enabledMeals = draft.enabledMeals.includes(meal)
-      ? draft.enabledMeals.filter((m) => m !== meal)
-      : [...draft.enabledMeals, meal];
-    draft.error = null;
-    renderDialog(root);
-  }));
-
-  /* Navigation */
-  root.querySelectorAll('[data-plan-action]').forEach((button) => button.addEventListener('click', () => {
-    const action = button.dataset.planAction;
-    if (action === 'close') { runtime.activeDialog = null; runtime.planDraft = null; renderApp(root); return; }
-    if (action === 'back') { draft.step = Math.max(0, draft.step - 1); draft.error = null; renderDialog(root); return; }
-    if (action === 'next') {
-      if (draft.step === 0 && !draft.selectedDates.length) { draft.error = 'Wähle mindestens einen Zeitraum.'; renderDialog(root); return; }
-      if (draft.step === 1 && !draft.enabledMeals.length) { draft.error = 'Wähle mindestens eine Mahlzeit.'; renderDialog(root); return; }
-      draft.step += 1;
-      draft.error = null;
-      renderDialog(root);
-      return;
-    }
-    /* action === 'create' */
-    createConfiguredPlan(root);
-  }));
 }
 
 function bindDialogEvents(root) {
@@ -876,36 +791,36 @@ export function openOnboarding(root) {
   renderDialog(root);
 }
 
-function openPlanDialog(root) {
-  runtime.planDraft = createPlanDraft(getState().profile);
-  runtime.activeDialog = 'plan';
-  renderDialog(root);
-}
+/* Frueher fuehrten hier drei Bildschirme hin: Tage, Mahlzeiten, bestaetigen —
+   bevor man ueberhaupt gesehen hat, ob die App etwas taugt. Und beim ersten
+   Mal weiss niemand, ob er drei oder sieben Tage will. Jetzt entsteht die
+   Woche mit einem Tipp; Zeitraum, Mahlzeiten und Personen stehen danach ueber
+   der Tagesliste. */
+function createWeekPlan(root) {
+  const state = getState();
+  const profile = state.profile || {};
+  const enabledMeals = Object.entries(profile.enabledMeals || {})
+    .filter(([, an]) => an).map(([mahlzeit]) => mahlzeit);
+  const selectedDates = Array.from({ length: 7 }, (_, index) => localDate(index));
 
-function createConfiguredPlan(root) {
-  const draft = runtime.planDraft;
-  if (!draft.selectedDates.length) { draft.error = 'Wähle mindestens einen Tag aus.'; renderDialog(root); return; }
-  if (!draft.enabledMeals.length) { draft.error = 'Wähle mindestens eine Mahlzeit aus.'; renderDialog(root); return; }
-  if (draft.selectedDates.length > 14) { draft.error = 'Ein einzelner Plan ist auf 14 Tage begrenzt.'; renderDialog(root); return; }
+  if (!enabledMeals.length) {
+    showToast(root, 'Wähle im Profil mindestens eine Mahlzeit aus.');
+    return;
+  }
 
   try {
-    const state = getState();
     const plan = buildPlan(runtime.recipes, {
-      startDate: draft.selectedDates[0],
-      selectedDates: draft.selectedDates,
-      enabledMeals: draft.enabledMeals,
-      mode: draft.selectedDates.length === 1 ? 'single_day' : 'multi_day',
-      profile: state.profile
+      startDate: selectedDates[0],
+      selectedDates,
+      enabledMeals,
+      mode: 'multi_day',
+      profile
     }, state.preferences, { seed: Date.now() % 100000 });
-
     updateState((current) => replaceCurrentPlan(current, plan));
-    runtime.activeDialog = null;
-    runtime.planDraft = null;
     haptic('strong');
     renderApp(root);
   } catch (error) {
-    draft.error = error.message;
-    renderDialog(root);
+    showToast(root, error.message);
   }
 }
 
@@ -929,7 +844,7 @@ function bindPageEvents(root) {
   root.querySelectorAll('[data-action="create-plan"]').forEach((button) => button.addEventListener('click', () => {
     if (!getState().onboardingCompleted) { openOnboarding(root); return; }
     if (catalogNotReadyFeedback(root)) return;
-    openPlanDialog(root);
+    createWeekPlan(root);
   }));
 
   /* Create single-day plan (quick "Nur für heute") */

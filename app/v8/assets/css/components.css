@@ -1309,3 +1309,29 @@
 ::-webkit-scrollbar { width: 4px; }
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--border); border-radius: var(--radius-full); }
+
+/* Was am Plan eingestellt ist — steht ueber der Tagesliste, nicht in einem
+   Assistenten davor. Zurueckhaltend: es ist eine Auskunft, kein Aufruf. */
+.preply-plan-settings {
+  width: 100%;
+  margin: 14px 0 4px;
+  padding: 11px 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  background: var(--card);
+  color: var(--ink-secondary);
+  font-size: .78rem;
+  font-weight: 600;
+  text-align: left;
+}
+.preply-plan-settings b {
+  flex: 0 0 auto;
+  color: var(--accent-strong);
+  font-size: .75rem;
+  font-weight: 800;
+}
+.preply-plan-settings:active { opacity: .8; }
