@@ -43,25 +43,44 @@ export function parsePantryInput(text) {
 
 /* Ein Treffer, wenn sich die Wortstaemme ueberschneiden. "Passierte Tomaten"
    trifft auf "Tomate", "Rote Zwiebeln" auf "Zwiebel". */
-/* Deutsch klebt Woerter zusammen: "Rinderhackfleisch" ist Hackfleisch,
-   "Kirschtomaten" sind Tomaten, "Basmatireis" ist Reis. Ein reiner
-   Wortvergleich findet davon nichts. Also zusaetzlich pruefen, ob ein Wort im
-   anderen steckt — aber erst ab vier Zeichen, sonst passt "Ei" auf alles. */
-const TEILWORT_AB = 4;
+/* Deutsch klebt Woerter zusammen, und der gemeinsame Teil steht oft in der
+   Mitte: Rinder-HACK und HACK-fleisch. Ein "steckt das eine im anderen"
+   findet das nicht — "rinderhack" enthaelt "hackfleisch" ja gerade nicht.
+   Also drei Wege, alle ab vier Zeichen (darunter passt "Ei" auf alles):
+     1. gleich
+     2. das eine ist Anfang oder Ende des anderen  (Nudel / Vollkornnudel)
+     3. das Ende des einen ist der Anfang des anderen  (RinderHACK / HACKfleisch)
+   Absichtlich kein freies "enthaelt": sonst waere "Reis" in "Preiselbeere". */
+const KERN_AB = 4;
+
+function gemeinsamerKern(a, b) {
+  for (let n = Math.min(a.length, b.length); n >= KERN_AB; n -= 1) {
+    if (a.endsWith(b.slice(0, n))) return true;
+  }
+  return false;
+}
+
+function verwandt(a, b) {
+  if (a === b) return true;
+  if (a.length >= KERN_AB && (b.startsWith(a) || b.endsWith(a))) return true;
+  if (b.length >= KERN_AB && (a.startsWith(b) || a.endsWith(b))) return true;
+  return gemeinsamerKern(a, b) || gemeinsamerKern(b, a);
+}
 
 function matches(ingredientName, itemTokenSets) {
   const zutat = tokens(ingredientName);
   if (!zutat.length) return false;
-  return itemTokenSets.some((item) => [...item].some((wort) => zutat.some((z) => (
-    z === wort
-    || (z.length >= TEILWORT_AB && wort.length >= TEILWORT_AB && (z.includes(wort) || wort.includes(z)))
-  ))));
+  return itemTokenSets.some((item) => [...item].some((wort) => zutat.some((z) => verwandt(z, wort))));
 }
 
-export function matchPantry(recipes, items, { limit = 12, minCoverage = 0.34 } = {}) {
+export function matchPantry(recipes, items, { limit = 12, minCoverage } = {}) {
   const list = parsePantryInput(Array.isArray(items) ? items.join(',') : items);
   if (!list.length) return [];
   const itemTokenSets = list.map((item) => new Set(tokens(item)));
+  /* Die Schwelle passt sich an: wer eine einzige Zutat nennt, kann ein Rezept
+     gar nicht zu einem Drittel abdecken — dann zaehlt, dass sie ueberhaupt
+     vorkommt, und die Reihenfolge macht den Rest. */
+  const schwelle = minCoverage ?? (list.length >= 3 ? 0.34 : 0.15);
 
   const treffer = [];
   for (const recipe of recipes) {
@@ -74,7 +93,7 @@ export function matchPantry(recipes, items, { limit = 12, minCoverage = 0.34 } =
     if (!vorhanden.length) continue;
 
     const abdeckung = vorhanden.length / zutaten.length;
-    if (abdeckung < minCoverage) continue;
+    if (abdeckung < schwelle) continue;
 
     treffer.push({
       recipe,
