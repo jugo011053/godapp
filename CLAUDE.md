@@ -113,7 +113,13 @@ Alle Tokens in `app/v8/assets/css/tokens.css`.
 
 **600 Rezepte** in `recipe_catalog_v1`, bei jedem Start aus Supabase geladen
 (kein lokaler Cache — ohne Netz startet die App nicht).
-100 Legacy-Rezepte (`legacy_v1`, ohne Kochschritte) und 500 aus `catalog_v5`.
+100 Legacy-Rezepte (`legacy_v1`) und 500 aus `catalog_v5`. Die Legacy-Rezepte
+waren bis 2026-09-01 mit `is_plan_eligible = false` gesperrt, weil ihnen die
+Kochschritte fehlten — die App sah dadurch nur 459 statt 559 Rezepte, und
+ausgerechnet die kurzen, zutatenarmen Gerichte fehlten der Vorratssuche.
+Sie haben jetzt Schritte und sind frei. **41 Rezepte bleiben gesperrt**:
+Haupt­gerichte unter 180 kcal, die `qualityAssessment()` in
+`recipeNormalizer.js` als kritisch einstuft.
 87 Frühstück · 194 Mittag · 282 Abend · 30 Snack · 7 Shake (letztere sind
 **nicht planbar**, die Planung kennt nur die ersten vier).
 
@@ -237,5 +243,6 @@ Nutzer: Janik und seine Freundin, geteilter Haushalt, unterschiedlicher Bedarf.
 
 *Zuletzt aktualisiert: 2026-09-01 — Zutatennamen vereinheitlicht (811 → 455),
 Halal-Filter ergänzt, Regale und Preise bereinigt (zutat_master),
+100 Legacy-Rezepte mit Kochschritten versehen und freigeschaltet (459 → 559),
 16 tote Tabellen entfernt (49 → 33) und RLS auf den Werkzeugtabellen aktiviert. Davor: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
 und 19 Branches entfernt; die Werbeseite ist jetzt die Wurzel-Adresse.*
