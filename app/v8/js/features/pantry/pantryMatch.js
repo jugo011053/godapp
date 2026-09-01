@@ -77,10 +77,17 @@ export function matchPantry(recipes, items, { limit = 12, minCoverage } = {}) {
   const list = parsePantryInput(Array.isArray(items) ? items.join(',') : items);
   if (!list.length) return [];
   const itemTokenSets = list.map((item) => new Set(tokens(item)));
-  /* Die Schwelle passt sich an: wer eine einzige Zutat nennt, kann ein Rezept
-     gar nicht zu einem Drittel abdecken — dann zaehlt, dass sie ueberhaupt
-     vorkommt, und die Reihenfolge macht den Rest. */
-  const schwelle = minCoverage ?? (list.length >= 3 ? 0.34 : 0.15);
+  /* Frueher war die Huerde ein Anteil an den Rezeptzutaten: 15 % bei ein bis
+     zwei genannten Zutaten, 34 % ab drei. Beides geht an der Wirklichkeit
+     vorbei, weil ein echtes Rezept 8 bis 16 Zutaten hat. Eine davon sind
+     hoechstens 12 % — "Hackfleisch" fand deshalb nichts, obwohl neun
+     Gerichte welches enthalten. Und 34 % hiessen vier Treffer; wer fuenf
+     Sachen nennt, von denen drei zu seiner Ernaehrung passen, konnte das
+     nie erreichen.
+     Gezaehlt wird jetzt, wie viele der GENANNTEN Zutaten vorkommen: eine
+     reicht, ab drei genannten muessen es zwei sein. Der Anteil entscheidet
+     weiterhin die Reihenfolge und steht als Quote auf der Karte. */
+  const noetig = list.length >= 3 ? 2 : 1;
 
   const treffer = [];
   for (const recipe of recipes) {
@@ -92,8 +99,14 @@ export function matchPantry(recipes, items, { limit = 12, minCoverage } = {}) {
     for (const name of zutaten) (matches(name, itemTokenSets) ? vorhanden : fehlend).push(name);
     if (!vorhanden.length) continue;
 
+    /* Nicht wie viele Rezeptzutaten getroffen wurden, sondern wie viele der
+       genannten — zwei Zutaten des Rezepts koennen dieselbe Angabe meinen. */
+    const getroffen = itemTokenSets.filter((item) =>
+      zutaten.some((name) => matches(name, [item]))).length;
+    if (getroffen < noetig) continue;
+
     const abdeckung = vorhanden.length / zutaten.length;
-    if (abdeckung < schwelle) continue;
+    if (minCoverage != null && abdeckung < minCoverage) continue;
 
     treffer.push({
       recipe,
@@ -102,7 +115,9 @@ export function matchPantry(recipes, items, { limit = 12, minCoverage } = {}) {
       coverage: abdeckung,
       /* Was zaehlt, ist wenig nachkaufen zu muessen — und dass moeglichst
          viel von dem wegkommt, was da ist. */
-      score: abdeckung * 100 - fehlend.length * 6 + Math.min(vorhanden.length, 6) * 2
+      /* Was zaehlt: viele der genannten Zutaten unterbringen, wenig
+         nachkaufen muessen. */
+      score: getroffen * 25 + abdeckung * 100 - fehlend.length * 6
     });
   }
 
