@@ -1,7 +1,7 @@
 import { getRoute } from './core/router.js';
 import { getState, updateState, silentUpdate } from './core/store.js';
-import { emit } from './core/events.js';
-import { loadCards, getRecipe } from './data/recipeStore.js';
+import { emit, on } from './core/events.js';
+import { loadCards, getCards, getRecipe } from './data/recipeStore.js';
 import { createDefaultFilters, filterRecipes, sortRecipes } from './features/discover/discoverEngine.js';
 import { scoreRecipe } from './data/recipeScoring.js';
 import { toggleFavorite, excludeRecipe } from './features/favorites/preferenceSignals.js';
@@ -864,6 +864,19 @@ export async function initializeFeatureEnhancements() {
     console.error('[Preply V8] Erweiterungskatalog', error);
     ui.catalogError = error.message || 'Rezepte konnten nicht geladen werden.';
   }
+}
+
+/* `catalog:updated` wurde seit v8.35 ausgeloest und von niemandem gehoert.
+   Wer beim Start die zwischengespeicherten Karten sah, behielt sie bis zum
+   naechsten Seitenwechsel — auch wenn im Hintergrund laengst neue da waren.
+   Nach der Regal- und Preisbereinigung hiess das: alte Preise auf dem
+   Schirm, waehrend die richtigen schon im Speicher lagen. */
+export function watchCatalogUpdates(root) {
+  on('catalog:updated', () => {
+    ui.recipes = getCards();
+    if (getRoute() === 'recipes') renderRecipes(root);
+    if (getRoute() === 'shopping') renderShopping(root);
+  });
 }
 
 export async function refreshFeatureEnhancements(root) {

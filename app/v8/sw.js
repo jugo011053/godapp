@@ -1,4 +1,4 @@
-const CACHE_NAME = 'preply-v8-shell-46';
+const CACHE_NAME = 'preply-v8-shell-47';
 const SHELL = [
   './',
   './index.html',

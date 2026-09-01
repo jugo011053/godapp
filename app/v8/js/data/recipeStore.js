@@ -45,8 +45,18 @@ export async function loadCards() {
      haette die neuen Filter fuer kaputt gehalten. Ein Buildwechsel wirft
      den Cache deshalb weg, statt ihn im Hintergrund nachzuziehen. */
   if (cached?.cards?.length && cached.build !== APP_BUILD) {
-    await idbSet(CACHE_KEY, null);
-    return refresh();
+    /* Erst holen, dann wegwerfen. Andersherum stand die App bei einem
+       Buildwechsel ohne Netz voellig leer da — kein Rezept, kein Filter,
+       keine Vorratssuche —, wo sie vorher wenigstens die alten Karten
+       hatte. Der alte Cache ist das schlechtere, aber nicht das schlechte
+       Ergebnis. */
+    try {
+      return await refresh();
+    } catch (error) {
+      console.warn('[Preply] Neuer Build, aber kein Netz — alte Karten', error);
+      cards = cached.cards;
+      return cards;
+    }
   }
 
   if (cached?.cards?.length) {

@@ -4,7 +4,7 @@ import { APP_BUILD, APP_BUILD_DATE } from './core/version.js';
 import { initFeel } from './core/feel.js';
 import { getState, initializeStore, updateState } from './core/store.js';
 import { rerenderIntegratedApp, startIntegratedApp, showRecipeDetail } from './integrationController.js';
-import { initializeFeatureEnhancements, refreshFeatureEnhancements } from './featureEnhancementsV2.js';
+import { initializeFeatureEnhancements, refreshFeatureEnhancements, watchCatalogUpdates } from './featureEnhancementsV2.js';
 import { appendBuildStamp, refreshProfileMaster } from './profileMasterEnhancement.js';
 import { refreshHistoryEnhancement } from './historyEnhancement.js';
 import { initializePlanManagement, refreshPlanManagement } from './planManagementEnhancement.js';
@@ -82,6 +82,7 @@ try {
   initializeRouter();
   await startIntegratedApp(appRoot);
   await initializeFeatureEnhancements();
+  watchCatalogUpdates(appRoot);
   await refreshFeatureEnhancements(appRoot);
   renderProfileLayer();
   refreshHistoryEnhancement(appRoot);
