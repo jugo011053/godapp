@@ -177,8 +177,12 @@ gelistet. Details in `docs/DATENBANK_AUFTRAG.md`.
 
 ## Supabase
 
-- **Katalog:** `recipe_catalog_v1` (600), `foods` (846), Schema `catalog` (14
-  normalisierte Tabellen, von der App **nicht** gelesen)
+- **Katalog:** `recipe_catalog_v1` (600) · `zutat_master` (455, die eine
+  Wahrheit zu Regal/Packung/Preis) · `zutat_alias` (368 Schreibweisen)
+- **Nicht von der App gelesen:** Schema `catalog` (19 Tabellen, Arbeitsbereich
+  des Parallel-Chats) und die zwei `backup_recipe_catalog_v1_*`.
+  Alle vier Werkzeugtabellen im `public`-Schema haben RLS an und **keine**
+  Policy — nur die Service-Rolle kommt dran, der anon-Key nicht
 - **Persönlich:** `profiles`, `user_state`, `favorites`, `recipe_feedback`
 - **Haushalt:** `households`, `household_members`, `meal_plans`,
   `meal_plan_entries`, `shopping_items`; RPCs `create_household`, `join_household`
@@ -213,6 +217,10 @@ Die Arbeitsdokumente des Parallel-Chats liegen daneben: `DATABASE_MASTERPLAN_V2.
   Configuration beide Redirect-URLs: `…/godapp/v8/` **und** `…/godapp/v8/index.html`.
 
 ### 🟡 Aufräumen
+- **`shopping_items` ist tot** — leer, und die Haken liegen in
+  `households.settings`. Kann weg, sobald jemand ja sagt.
+- **`catalog`-Schema (19 Tabellen)** gehört dem Parallel-Chat. 14 davon leer.
+  Nicht ohne Absprache anfassen.
 - Interne Namen (`godapp*`, Supabase-Projekt „D1 DayOne") passen nicht zum
   Produktnamen. Den Zustandsschlüssel dabei **nicht** anfassen.
 
@@ -228,5 +236,6 @@ Nutzer: Janik und seine Freundin, geteilter Haushalt, unterschiedlicher Bedarf.
 ---
 
 *Zuletzt aktualisiert: 2026-09-01 — Zutatennamen vereinheitlicht (811 → 455),
-Halal-Filter ergänzt, Regale und Preise bereinigt (zutat_master). Davor: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
+Halal-Filter ergänzt, Regale und Preise bereinigt (zutat_master),
+16 tote Tabellen entfernt (49 → 33) und RLS auf den Werkzeugtabellen aktiviert. Davor: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
 und 19 Branches entfernt; die Werbeseite ist jetzt die Wurzel-Adresse.*
