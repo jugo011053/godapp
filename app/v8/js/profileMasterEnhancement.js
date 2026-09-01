@@ -89,6 +89,7 @@ function renderProfile(root) {
       <h2>Planung</h2>
       <div class="master-profile-row"><span>Ziel</span><strong>${esc(LABELS.goal[profile.goal] || profile.goal || 'Nicht festgelegt')}</strong></div>
       <div class="master-profile-row"><span>Ernährungsweise</span><strong>${esc(LABELS.diet[profile.dietStyle] || profile.dietStyle || 'Nicht festgelegt')}</strong></div>
+      <div class="master-profile-row"><span>Halal</span><strong>${profile.halal ? 'Ja' : 'Nein'}</strong></div>
       <div class="master-profile-row"><span>Vorkochen</span><strong>${esc(LABELS.prep[prepDaysOf(profile)])}</strong></div>
       <div class="master-profile-row"><span>Mahlzeiten</span><strong>${esc(mealSummary(profile))}</strong></div>
     </section>
@@ -144,6 +145,14 @@ function openProfileEditor(root) {
         <div class="master-form-field"><label for="profile-goal">Ziel</label><select id="profile-goal" name="goal">${Object.entries(LABELS.goal).map(([value, label]) => option(value, label, profile.goal)).join('')}</select></div>
         <div class="master-form-field"><label for="profile-diet">Ernährungsweise</label><select id="profile-diet" name="dietStyle">${Object.entries(LABELS.diet).map(([value, label]) => option(value, label, profile.dietStyle)).join('')}</select></div>
       </div>
+
+      <fieldset class="master-form-group">
+        <legend>Halal</legend>
+        <p class="master-form-hint">Blendet alles mit Schwein, Alkohol und Gelatine aus. Ob Rind und Geflügel geschächtet wurden, steht nicht in den Daten — das können wir nicht zusagen.</p>
+        <div class="master-form-field">
+          <label><input type="checkbox" name="halal" value="1" ${profile.halal ? 'checked' : ''}> Nur halal planen</label>
+        </div>
+      </fieldset>
 
       <fieldset class="master-form-group">
         <legend>Vorkochen</legend>
@@ -202,6 +211,7 @@ function openProfileEditor(root) {
         proteinTarget: Math.max(20, Number(form.get('proteinTarget') || 130)),
         goal: String(form.get('goal') || 'maintain'),
         dietStyle: String(form.get('dietStyle') || 'omnivore'),
+        halal: form.get('halal') === '1',
         ...prepSettings(prepDays),
         enabledMeals,
         excludedIngredients

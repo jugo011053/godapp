@@ -54,6 +54,7 @@ export function createDefaultFilters() {
     costBand: '',
     minMealPrepScore: null,
     diet: '',
+    halalOnly: false,
     excludedAllergens: [],
     cuisine: '',
     favoritesOnly: false,
@@ -78,6 +79,7 @@ export function filterRecipes(recipes, filters = {}, preferences = {}) {
     if (!inRange(recipe.protein, f.minProtein, null)) return false;
     if (!inRange(recipe.kcal, f.minKcal, f.maxKcal)) return false;
     if (!matchesDiet(recipe, f.diet)) return false;
+    if (f.halalOnly && recipe.halal === false) return false;
     if (!avoidsAllergens(recipe, f.excludedAllergens)) return false;
     if (!matchesCuisine(recipe, f.cuisine)) return false;
     if (!includesText(recipe, f.query)) return false;

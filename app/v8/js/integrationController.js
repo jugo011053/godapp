@@ -473,6 +473,7 @@ function renderProfilePage() {
       <h2>Ernährungsprofil</h2>
       ${profileRow('Personen', `${profile.persons || 1}`)}
       ${profileRow('Ernährung', DIET_LABELS[profile.dietStyle])}
+      ${profile.halal ? profileRow('Zusätzlich', 'Halal (ohne Schwein und Alkohol)') : ''}
       ${profileRow('Kochstil', COOK_LABELS[profile.cookingStyle])}
       ${profileRow('Komplexität', SIMPLE_LABELS[profile.simplicity])}
       ${profileRow('Ziel', GOAL_LABELS[profile.goal])}
@@ -563,6 +564,11 @@ function onboardingBody(draft) {
     const allergies = new Set(p.allergies || []);
     return `${heading}
       ${choiceCards('dietStyle', DIET_OPTIONS, p.dietStyle, 2)}
+      <div class="ob-chips" style="margin-top:12px">
+        <button type="button" class="ob-chip ${p.halal ? 'selected' : ''}"
+                data-halal="1" aria-pressed="${Boolean(p.halal)}">Halal</button>
+      </div>
+      <p class="ob-note">Halal blendet alles mit Schwein, Alkohol oder Gelatine aus. Ob Rind und Geflügel geschächtet wurden, steht nicht in den Daten — das können wir nicht zusagen.</p>
       <p class="ob-label">Was soll nie im Plan auftauchen?</p>
       <div class="ob-chips">
         ${ALLERGEN_OPTIONS.map(([value, label]) => `
@@ -752,6 +758,14 @@ function bindDialogEvents(root) {
     current.has(value) ? current.delete(value) : current.add(value);
     haptic('tap');
     runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, { allergies: [...current] });
+    renderDialog(root);
+  }));
+
+  root.querySelectorAll('[data-halal]').forEach((button) => button.addEventListener('click', () => {
+    haptic('tap');
+    runtime.onboardingDraft = updateDraft(runtime.onboardingDraft, {
+      halal: !runtime.onboardingDraft.profile.halal
+    });
     renderDialog(root);
   }));
 

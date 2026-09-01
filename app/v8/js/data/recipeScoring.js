@@ -87,6 +87,7 @@ export function recipeEligible(recipe, context) {
   if (minimum && (recipe.kcal < minimum.kcal || recipe.protein < minimum.protein)) return false;
 
   if (!dietCompatible(recipe, profile.dietStyle)) return false;
+  if (profile.halal && recipe.halal === false) return false;
 
   const userAllergens = normalizedAllergens(profile.allergies || []);
   const recipeAllergens = normalizedAllergens(recipe.allergens || []);

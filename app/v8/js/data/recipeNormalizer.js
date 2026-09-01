@@ -81,11 +81,31 @@ export function noveltyLevel(classification = {}) {
    sich jemand verlaesst, darf ein Label nicht das letzte Wort haben — die
    Zutatenliste schon. */
 
-const MEAT = /(^|[\s-])(rind|kalb|schwein|lamm|hammel|wild|hirsch|ente|gans|kanin)|h(ä|ae)hnchen|h(ü|ue)hner|hühnchen|pute|truthahn|bacon|speck|schinken|salami|chorizo|prosciutto|pancetta|bratwurst|wurst|hackfleisch|hack$|fleisch|gyros|d(ö|oe)ner|leber|gelatine|lardo|gu?anciale/i;
+const MEAT = /(^|[\s-])(rind|kalb|schwein|lamm|hammel|wild|hirsch|ente|gans|kanin)|h(ä|ae)hnchen|h(ü|ue)hner|hühnchen|huhn|steak|pute|truthahn|bacon|speck|schinken|salami|chorizo|prosciutto|pancetta|bratwurst|wurst|hackfleisch|hack$|fleisch|gyros|d(ö|oe)ner|leber|gelatine|lardo|gu?anciale/i;
 
-const FISH = /fisch|lachs|thunfisch|kabeljau|dorsch|seelachs|forelle|hering|makrele|sardin|sardell|anchovis|wolfsbarsch|dorade|scholle|garnel|shrimp|krabbe|hummer|muschel|tintenfisch|calamari|oktopus|surimi|meeresfr(ü|ue)cht|r(ä|ae)ucherlachs/i;
+const FISH = /fisch|lachs|thunfisch|kabeljau|dorsch|seelachs|forelle|hering|makrele|sardin|sardell|anchovis|wolfsbarsch|dorade|scholle|garnel|shrimp|krabbe|hummer|muschel|tintenfisch|calamari|oktopus|surimi|meeresfr(ü|ue)cht|r(ä|ae)ucherlachs|auster|seehecht|hecht|worcester|krebs|jakobsmuschel/i;
 
-const DAIRY_EGG = /(^|[\s-])(ei|eier|eigelb|eiwei(ß|ss))([\s-]|$)|milch|sahne|rahm|k(ä|ae)se|parmesan|mozzarella|feta|gouda|cheddar|ricotta|mascarpone|frischk(ä|ae)se|quark|joghurt|skyr|schmand|cr(è|e)me.?fra(î|i)che|buttermilch|molke|whey|honig|ghee|butter/i;
+const DAIRY_EGG = /(^|[\s-])(ei|eier|eigelb|eiwei(ß|ss))([\s-]|$)|milch|sahne|rahm|k(ä|ae)se|parmesan|mozzarella|feta|gouda|cheddar|ricotta|mascarpone|frischk(ä|ae)se|quark|joghurt|skyr|schmand|cr(è|e)me.?fra(î|i)che|buttermilch|molke|whey|honig|ghee|butter|halloumi|paneer|burrata|h(ü|ue)ttenk|creme.?double|einzelcreme|doppelrahm|mayonnaise|a(ï|i)oli|tzatziki|raita|tortellini|eiernudel|pesto|ricotta|mascarpone/i;
+
+/* --- Halal ---------------------------------------------------------------
+   Halal laesst sich aus diesen Daten nur als Ausschluss bestimmen, nicht als
+   Zusage: ob Rind oder Huhn geschaechtet wurden, steht nirgends. Was hier
+   herausfaellt, ist deshalb sicher nicht halal — was uebrig bleibt, ist
+   "ohne Schwein und ohne Alkohol", und genau so ist es beschriftet.
+   Gelatine faellt mit, weil ihre Herkunft im Katalog nirgends steht. */
+const HARAM = /(^|[\s-])schwein|schinken|speck|bacon|pancetta|prosciutto|guanciale|lardo|chorizo|salami|bratwurst|mortadella|serrano|parmaschinken|schmalz|gelatine|blutwurst|leberwurst|mirin|sake|rotwein|wei(ß|ss)wein|rum|likö|likoe|cognac|brandy|whisk|wodka|vodka|sherry|marsala|portwein|bier(?![a-z])|amaretto|calvados|grappa|weinbrand/i;
+
+/* Weinstein ist Weinsaeure-Salz, kein Wein — sonst faengt "wein" ihn mit. */
+const HARAM_AUSNAHME = /weinstein|weines?sig|weinessig|rotweinessig|wei(ß|ss)weinessig|weintraub/i;
+
+export function containsHaram(recipe) {
+  for (const raw of ingredientNamesOf(recipe)) {
+    const name = raw.toLowerCase();
+    if (HARAM_AUSNAHME.test(name)) continue;
+    if (HARAM.test(name)) return true;
+  }
+  return false;
+}
 
 /* Falsche Freunde: pflanzliche Erzeugnisse, die ein tierisches Wort tragen. */
 const PLANT_OVERRIDE = /soja|hafer|mandel|kokos|cashew|erdnuss|reis(milch|drink)|pflanzlich|vegan|lupine|hanf|erbsenprotein|butterbohne|buttern(u|ü)ss|kichererbse|butternut/i;
@@ -135,7 +155,7 @@ export function allowedDietTags(claimLevel, evidenceLevel) {
 
 const ALLERGEN_PATTERNS = [
   ['gluten', /weizen|dinkel|roggen|gerste|graupen|bulgur|couscous|seitan|semmelbr(ö|oe)sel|panko|nudel|pasta|spaghetti|linguine|penne|fusilli|makkaroni|tortellini|gnocchi|brot(?!aufstrich)|br(ö|oe)tchen|baguette|pita|wrap|tortilla|croutons|paniermehl|mehl/],
-  ['dairy',  /k(ä|ae)se|milch|sahne|rahm|joghurt|quark|skyr|parmesan|mozzarella|feta|gouda|cheddar|ricotta|mascarpone|frischk(ä|ae)se|schmand|cr(è|e)me.?fra(î|i)che|butter|molke|whey|ghee/],
+  ['dairy',  /k(ä|ae)se|milch|sahne|rahm|joghurt|quark|skyr|parmesan|mozzarella|feta|gouda|cheddar|ricotta|mascarpone|frischk(ä|ae)se|schmand|cr(è|e)me.?fra(î|i)che|butter|molke|whey|ghee|halloumi|paneer|burrata|h(ü|ue)ttenk|einzelcreme|doppelrahm/],
   ['eggs',   /(^|[\s-])(ei|eier|eigelb|eiwei(ß|ss))([\s-]|$)|mittelgro(ß|ss)es ei|gro(ß|ss)es ei|mayonnaise|aioli/],
   ['nuts',   /nuss|n(ü|ue)sse|mandel|cashew|walnuss|haseln|pistazie|pekan|macadamia|paran(u|ü)ss|nussmus|marzipan/],
   ['soy',    /soja|tofu|edamame|miso|tempeh|sojasauce|sojaso(ß|ss)e/],
@@ -306,7 +326,8 @@ export function normalizeCatalogRecipe(recipe) {
     familyKey: familyKey(recipe),
     primaryProtein: primaryProtein(recipe),
     dishType: dishTypeToken(classification) || null,
-    ingredientNames: (recipe.ingredients || []).map((ingredient) => ingredient.name).filter(Boolean)
+    ingredientNames: (recipe.ingredients || []).map((ingredient) => ingredient.name).filter(Boolean),
+    halal: !containsHaram(recipe)
   };
 }
 

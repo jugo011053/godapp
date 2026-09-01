@@ -105,7 +105,7 @@ Alle Tokens in `app/v8/assets/css/tokens.css`.
 | Heute | Mahlzeiten des heutigen Tages, Zutaten und Schritte beim Antippen |
 | Einkauf | Liste nach Regal **oder** nach Gericht, beides abhakbar |
 | Rezepte | über „Alle Rezepte durchsehen", mit Suche und Filtern |
-| Profil | Ziele, Bedarf, Vorkochen, Ausschlüsse, **Konto und Haushalt** |
+| Profil | Ziele, Bedarf, Vorkochen, Ausschlüsse, Halal, **Konto und Haushalt** |
 
 ---
 
@@ -119,6 +119,14 @@ Alle Tokens in `app/v8/assets/css/tokens.css`.
 
 Jedes Rezept trägt Nährwerte, Zeiten, Tags, Allergene, Diät-Etiketten,
 Kochschritte, `classification` und `ingredients[]` mit Einkaufsdaten.
+
+**Die Zutatennamen sind vereinheitlicht: 811 Schreibweisen wurden auf 455
+Namen zusammengelegt** (2026-09-01, 513 Rezepte betroffen). „Zwiebeln" und
+„Zwiebel", „Kirschtomaten"/„Cherrytomaten"/„Babytomaten", „Rinderhack mager"
+und „Rinderhackfleisch" sind jetzt jeweils dasselbe. Die Zuordnung steht in
+der Tabelle `zutat_alias` (alt → neu) und muss bei jedem Import erneut
+angewendet werden, sonst wuchert es wieder. Der Stand davor liegt in
+`backup_recipe_catalog_v1_20260831`.
 
 **Den Etiketten für Diät und Allergene wird nicht vertraut.** Beides wird in
 `recipeNormalizer.js` aus den Zutaten abgeleitet; das Etikett darf nur strenger
@@ -134,6 +142,7 @@ gelistet. Details in `docs/DATENBANK_AUFTRAG.md`.
 | `buildPlan()` | `features/planner/plannerEngine.js` | Wochenplan, inkl. Vorkoch-Gruppen |
 | `rankRecipes()` / `recipeEligible()` | `data/recipeScoring.js` | Auswahl und harte Filter |
 | `dietFromIngredients()` | `data/recipeNormalizer.js` | Diät aus den Zutaten |
+| `containsHaram()` | `data/recipeNormalizer.js` | Schwein, Alkohol, Gelatine |
 | `allergensFromIngredients()` | `data/recipeNormalizer.js` | Allergene aus den Zutaten |
 | `buildShoppingList()` | `features/shopping/shoppingEngine.js` | Liste, Packungen, Preise |
 | `formatAmount()` | `features/shopping/shoppingEngine.js` | „80 g" statt „82,2 g" |
@@ -164,7 +173,8 @@ Advisor erneut laufen lassen.
 
 ### 🔴 Daten — eigener Arbeitsstrang, läuft in einem Parallel-Chat
 Auftrag und Zahlen: **`docs/DATENBANK_AUFTRAG.md`**. Kurz:
-359 von 812 Zutaten pauschal als „Gemüse" abgelegt · 419 Lebensmittel mit
+359 von 812 Zutaten pauschal als „Gemüse" abgelegt (die Namen sind seit
+2026-09-01 vereinheitlicht, die Kategorien noch nicht) · 419 Lebensmittel mit
 demselben Platzhalterpreis 500 g / 1,79 € · Nährwerte teils am falschen
 USDA-Eintrag (Ei = *Egg, white, dried*) · 491 der 600 Rezepte sind Übersetzungen
 von bbcgoodfood.com, was Bilder und Texte zu einer Rechtsfrage macht.
@@ -195,5 +205,6 @@ Nutzer: Janik und seine Freundin, geteilter Haushalt, unterschiedlicher Bedarf.
 
 ---
 
-*Zuletzt aktualisiert: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
+*Zuletzt aktualisiert: 2026-09-01 — Zutatennamen vereinheitlicht (811 → 455),
+Halal-Filter ergänzt. Davor: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
 und 19 Branches entfernt; die Werbeseite ist jetzt die Wurzel-Adresse.*
