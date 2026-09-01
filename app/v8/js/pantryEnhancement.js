@@ -24,17 +24,62 @@ function closeOverlay(overlay) { overlay?.remove(); }
 
 /* Was der Nutzer nicht essen darf, taucht auch hier nicht auf. Der Abgleich
    ist eine Suchhilfe, keine Umgehung der Ausschluesse. */
-function erlaubt(recipe, state) {
-  return recipeEligible(recipe, {
-    category: recipe.category,
-    profile: state.profile || {},
-    preferences: state.preferences || {}
-  });
+function erlaubt(recipe, profile, preferences = {}) {
+  return recipeEligible(recipe, { category: recipe.category, profile, preferences });
 }
 
-function ergebnisHtml(treffer) {
+/* --- Warum nichts gefunden wurde ----------------------------------------
+   "Hackfleisch" eingeben und "Versuch es mit anderen Begriffen" zu lesen,
+   waehrend im Profil "vegetarisch" steht, ist die falsche Auskunft: es liegt
+   nicht an der Eingabe. Wir lockern deshalb jede Einstellung einzeln und
+   schauen, welche die Treffer zurueckbringt. */
+
+const DIET_WORT = {
+  vegetarian: 'vegetarisch', vegan: 'vegan', pescatarian: 'pescetarisch'
+};
+
+const LOCKERUNGEN = [
+  { locker: (p) => ({ ...p, dietStyle: 'omnivore' }),
+    gilt: (p) => p.dietStyle && p.dietStyle !== 'omnivore',
+    wort: (p) => `deiner Ernährungsweise (${DIET_WORT[p.dietStyle] || p.dietStyle})` },
+  { locker: (p) => ({ ...p, halal: false }),
+    gilt: (p) => Boolean(p.halal),
+    wort: () => 'dem Halal-Filter' },
+  { locker: (p) => ({ ...p, allergies: [] }),
+    gilt: (p) => (p.allergies || []).length > 0,
+    wort: (p) => `deinen Ausschlüssen (${(p.allergies || []).join(', ')})` },
+  { locker: (p) => ({ ...p, maxCookingTime: 600 }),
+    gilt: (p) => Number(p.maxCookingTime) > 0,
+    wort: (p) => `der Zeitgrenze von ${Math.round(p.maxCookingTime)} Minuten` }
+];
+
+function warumNichts(text, profile, preferences) {
+  const alle = getCards();
+  /* Ohne jede Einstellung ueberhaupt etwas? Wenn nicht, lag es wirklich an
+     der Eingabe, und die alte Auskunft war richtig. */
+  if (!matchPantry(alle, text).length) return null;
+
+  for (const regel of LOCKERUNGEN) {
+    if (!regel.gilt(profile)) continue;
+    const gelockert = regel.locker(profile);
+    const pool = alle.filter((r) => erlaubt(r, gelockert, preferences));
+    const treffer = matchPantry(pool, text);
+    if (treffer.length) {
+      return { wort: regel.wort(profile), anzahl: treffer.length };
+    }
+  }
+  return null;
+}
+
+function ergebnisHtml(treffer, grund) {
   if (!treffer) return '';
   if (!treffer.length) {
+    if (grund) {
+      const zahl = grund.anzahl === 1 ? '1 Gericht' : `${grund.anzahl} Gerichte`;
+      return `<p class="pantry-leer">Dazu findet sich nichts — das liegt an ${esc(grund.wort)},
+        nicht an deiner Eingabe. Ohne diese Einstellung wären es ${zahl}.
+        Ändern kannst du sie im Profil.</p>`;
+    }
     return `<p class="pantry-leer">Dazu findet sich nichts. Versuch es mit weniger Zutaten oder anderen Begriffen — oder schau unter „Alle Rezepte durchsehen“.</p>`;
   }
   return `<div class="pantry-treffer">${treffer.map((t) => `
@@ -92,9 +137,12 @@ export function openPantrySheet(root, onRecipe) {
   const suchen = () => {
     ui.text = feld.value;
     const state = getState();
-    const katalog = getCards().filter((recipe) => erlaubt(recipe, state));
+    const profile = state.profile || {};
+    const preferences = state.preferences || {};
+    const katalog = getCards().filter((recipe) => erlaubt(recipe, profile, preferences));
     ui.ergebnisse = matchPantry(katalog, ui.text);
-    ausgabe.innerHTML = ergebnisHtml(ui.ergebnisse);
+    const grund = ui.ergebnisse.length ? null : warumNichts(ui.text, profile, preferences);
+    ausgabe.innerHTML = ergebnisHtml(ui.ergebnisse, grund);
     binden();
     haptic('tap');
   };
