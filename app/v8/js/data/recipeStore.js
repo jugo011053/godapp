@@ -2,6 +2,7 @@ import { RecipeRepository } from './recipeRepository.js';
 import { SUPABASE_URL, SUPABASE_ANON_KEY } from '../core/supabaseConfig.js';
 import { idbGet, idbSet } from '../core/idb.js';
 import { emit } from '../core/events.js';
+import { APP_BUILD } from '../core/version.js';
 
 export const repository = new RecipeRepository({ supabaseUrl: SUPABASE_URL, anonKey: SUPABASE_ANON_KEY });
 
@@ -24,7 +25,7 @@ async function refresh() {
   refreshPromise = repository.listCards()
     .then(async (fresh) => {
       cards = fresh;
-      await idbSet(CACHE_KEY, { at: Date.now(), cards: fresh });
+      await idbSet(CACHE_KEY, { at: Date.now(), build: APP_BUILD, cards: fresh });
       emit('catalog:updated', { count: fresh.length });
       return fresh;
     })
@@ -36,10 +37,23 @@ export async function loadCards() {
   if (cards.length) return cards;
 
   const cached = await idbGet(CACHE_KEY);
+
+  /* Aus einem anderen Build ist der Cache nicht bloss alt, sondern anders
+     gebaut: nach der Regal- und Preisbereinigung trugen die alten Karten
+     weder shelfRank noch pieceWeight noch halal. Wer die eine Stunde
+     Haltbarkeit noch nicht ueberschritten hatte, sah die alten Daten und
+     haette die neuen Filter fuer kaputt gehalten. Ein Buildwechsel wirft
+     den Cache deshalb weg, statt ihn im Hintergrund nachzuziehen. */
+  if (cached?.cards?.length && cached.build !== APP_BUILD) {
+    await idbSet(CACHE_KEY, null);
+    return refresh();
+  }
+
   if (cached?.cards?.length) {
     cards = cached.cards;
-    /* Veraltet? Im Hintergrund nachziehen, ohne den Start aufzuhalten.
-       Ein Fehlschlag ist hier belanglos — wir haben ja etwas zu zeigen. */
+    /* Nur alt, gleicher Build: im Hintergrund nachziehen, ohne den Start
+       aufzuhalten. Ein Fehlschlag ist hier belanglos — wir haben ja etwas
+       zu zeigen. */
     if (Date.now() - (cached.at || 0) > MAX_AGE_MS) refresh().catch(() => {});
     return cards;
   }
