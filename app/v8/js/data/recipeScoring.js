@@ -64,14 +64,26 @@ function dietCompatible(recipe, dietStyle) {
   return true;
 }
 
+/* Der Abgleich lief ueber includes() auf einem zusammengeklebten Text. Zwei
+   Folgen, beide still: ein leerer Eintrag passte auf jedes Rezept und sperrte
+   damit den ganzen Katalog — kein Plan, keine Vorschlaege, keine Meldung —,
+   und "Ei" auszuschliessen entfernte auch jedes Gericht mit R-EI-s.
+   Jetzt wird Wort fuer Wort verglichen: kurze Ausschluesse muessen genau
+   passen, ab vier Zeichen darf es auch im Wortinneren stecken, damit
+   "Hackfleisch" weiter auf "Rinderhackfleisch" trifft. */
 function containsExcludedIngredient(recipe, excludedIngredients = []) {
-  if (!excludedIngredients.length) return false;
-  const searchable = [
+  const ausschluesse = excludedIngredients.map(normalToken).filter(Boolean);
+  if (!ausschluesse.length) return false;
+
+  const woerter = [
     recipe.name,
     ...(recipe.ingredientNames || []),
     ...(recipe.tags || [])
-  ].map(normalToken).join(' ');
-  return excludedIngredients.some((value) => searchable.includes(normalToken(value)));
+  ].map(normalToken).join(' ').split(/[^a-zà-ÿ0-9]+/i).filter(Boolean);
+
+  return ausschluesse.some((ausschluss) => woerter.some((wort) => (
+    ausschluss.length >= 4 ? wort.includes(ausschluss) : wort === ausschluss
+  )));
 }
 
 export function recipeEligible(recipe, context) {
