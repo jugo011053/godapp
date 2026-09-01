@@ -128,6 +128,27 @@ der Tabelle `zutat_alias` (alt → neu) und muss bei jedem Import erneut
 angewendet werden, sonst wuchert es wieder. Der Stand davor liegt in
 `backup_recipe_catalog_v1_20260831`.
 
+**Kategorien und Preise sind vereinheitlicht** (2026-09-01). Die Kategorie war
+per Textsuche im Namen geraten — daher lagen „Butterbohnen" unter Fette/Öle,
+„Schalotte" unter Obst und 236 von 455 Zutaten pauschal unter „Gemüse". Sie
+sind jetzt **13 Regale in Ladenreihenfolge** (`shelfRank` 1–13: Obst & Gemüse ·
+Brot · Kühlregal · Fleisch · Fisch · Tiefkühl · Nudeln/Reis · Konserven ·
+Öl/Essig/Saucen · Gewürze · Backen · Getränke · Sonstiges); die Einkaufsliste
+sortiert danach statt alphabetisch.
+
+Die 189 Zutaten mit dem Platzhalter 500 g / 1,79 € haben echte Packungsgrößen
+und Preise. Woher ein Preis stammt, steht in `priceSource`
+(`geschaetzt_de_2026` = von Hand geschätzte deutsche Supermarktpreise,
+`katalog` = aus dem Import übernommen). Ausserdem trägt jede Zutat, die in
+Stück gemessen wird, ein `pieceWeight` — vorher bekamen 3 617 der 5 992
+Zutatenzeilen (Stück, EL, TL, Handvoll) gar keinen Preis.
+
+**Die eine Wahrheit steht in `zutat_master`** (455 Zeilen: Regal, Packung,
+Preis, Stückgewicht, `food_id`). Von dort wird in `recipe_catalog_v1`
+zurückgeschrieben, damit dieselbe Zutat überall identisch ist — vorher trugen
+209 Namen zwei verschiedene Lebensmittel-IDs. Bei jedem Import erneut anwenden.
+Stand davor: `backup_recipe_catalog_v1_20260901`.
+
 **Den Etiketten für Diät und Allergene wird nicht vertraut.** Beides wird in
 `recipeNormalizer.js` aus den Zutaten abgeleitet; das Etikett darf nur strenger
 sein, nie lockerer. Grund: 21 Gerichte mit Fleisch oder Fisch waren als vegan
@@ -146,6 +167,7 @@ gelistet. Details in `docs/DATENBANK_AUFTRAG.md`.
 | `allergensFromIngredients()` | `data/recipeNormalizer.js` | Allergene aus den Zutaten |
 | `buildShoppingList()` | `features/shopping/shoppingEngine.js` | Liste, Packungen, Preise |
 | `formatAmount()` | `features/shopping/shoppingEngine.js` | „80 g" statt „82,2 g" |
+| `grammFuer()` | `features/shopping/shoppingEngine.js` | EL · TL · Stück → Gramm |
 | `calorieTargetFor()` | `features/onboarding/nutrition.js` | Mifflin-St Jeor |
 | `signIn()` / `signInWithGoogle()` | `features/auth/account.js` | Anmeldung (PKCE) |
 | `syncNow()` | `features/sync/userSync.js` | Zusammenführen, nicht ersetzen |
@@ -172,19 +194,19 @@ Advisor erneut laufen lassen.
 ## Offene Punkte
 
 ### 🔴 Daten — eigener Arbeitsstrang, läuft in einem Parallel-Chat
-Auftrag und Zahlen: **`docs/DATENBANK_AUFTRAG.md`**. Kurz:
-359 von 812 Zutaten pauschal als „Gemüse" abgelegt (die Namen sind seit
-2026-09-01 vereinheitlicht, die Kategorien noch nicht) · 419 Lebensmittel mit
-demselben Platzhalterpreis 500 g / 1,79 € · Nährwerte teils am falschen
-USDA-Eintrag (Ei = *Egg, white, dried*) · 491 der 600 Rezepte sind Übersetzungen
-von bbcgoodfood.com, was Bilder und Texte zu einer Rechtsfrage macht.
+Auftrag und Zahlen: **`docs/DATENBANK_AUFTRAG.md`**. Namen, Regale und Preise
+sind seit 2026-09-01 erledigt (siehe oben). Offen bleibt: Nährwerte teils am
+falschen USDA-Eintrag (Ei = *Egg, white, dried*) · 491 der 600 Rezepte sind
+Übersetzungen von bbcgoodfood.com, was Bilder und Texte zu einer Rechtsfrage
+macht. Die Preise sind Schätzungen, keine erhobenen Marktpreise —
+`priceSource` sagt, welche.
 Die Arbeitsdokumente des Parallel-Chats liegen daneben: `DATABASE_MASTERPLAN_V2.md`,
 `FOOD_MASTER_AUDIT_QUEUE.md`, `PROPOSAL_MIGRATION_CATALOG_DEDUP_AB.sql`,
 `DATABASE_FIXES_IMPLEMENTED_2026-08-26.md`. **Nicht anfassen.**
 
 ### 🟠 Funktional
-- **Kein Offline-Betrieb.** Der Rezeptkatalog wird bei jedem Start neu geladen.
-  Ein IndexedDB-Cache wäre der nächste sinnvolle Schritt.
+- **Preise sind geschätzt**, nicht erhoben. 189 der 455 Zutaten tragen
+  `priceSource: geschaetzt_de_2026`. Wer echte Zahlen will, braucht eine Quelle.
 - **Keine Bilder** zu den Rezepten. Der Katalog hat kein Bildfeld.
 - **Leaked-Password-Schutz** ist aus; nur im Dashboard einschaltbar.
 - **Google-Anmeldung** braucht in Supabase unter Authentication → URL
@@ -206,5 +228,5 @@ Nutzer: Janik und seine Freundin, geteilter Haushalt, unterschiedlicher Bedarf.
 ---
 
 *Zuletzt aktualisiert: 2026-09-01 — Zutatennamen vereinheitlicht (811 → 455),
-Halal-Filter ergänzt. Davor: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
+Halal-Filter ergänzt, Regale und Preise bereinigt (zutat_master). Davor: 2026-08-26 — Repo aufgeräumt: v7-App, Archiv, alte Tests
 und 19 Branches entfernt; die Werbeseite ist jetzt die Wurzel-Adresse.*

@@ -134,15 +134,45 @@ function scaledIngredientAmount(ingredient, meal) {
 
 const WEIGHT_UNITS = new Set(['g', 'kg', 'ml', 'l']);
 
-function unitsCompatible(ingredientUnit, packUnit) {
+/* --- Kuechenmasse in Gramm ----------------------------------------------
+   Der Preis wurde nur fuer 2375 der 5971 Zutatenzeilen berechnet: alles in
+   Stueck, EL, TL oder Handvoll galt als "nicht vergleichbar mit der
+   Packungseinheit" und blieb ohne Zahl. Eine Einkaufsschaetzung braucht
+   keine Laborgenauigkeit — sie braucht ueberhaupt einen Wert. Ein EL Oel
+   wiegt 12 g, ein EL Mehl 8 g; 15 g liegt dazwischen und die Liste rundet
+   ohnehin auf 5-g-Schritte. */
+const KUECHENMASS_G = {
+  el: 15, esslöffel: 15, essloeffel: 15,
+  tl: 5, teelöffel: 5, teeloeffel: 5,
+  prise: 0.5, prisen: 0.5,
+  handvoll: 30, bund: 25, zweig: 3, blatt: 2,
+  scheibe: 25, scheiben: 25, zehe: 4, zehen: 4,
+  kopf: 250, dose: 400, dosen: 400, glas: 350
+};
+
+/* Stueck und Packung haengen an der Zutat, nicht an der Einheit. */
+function grammFuer(unit, ingredient) {
+  const u = String(unit || '').trim().toLowerCase();
+  if (KUECHENMASS_G[u]) return KUECHENMASS_G[u];
+  if (u === 'stück' || u === 'stueck' || u === 'stk') {
+    return Number(ingredient?.pieceWeight || ingredient?.piece_weight || 0) || null;
+  }
+  if (u === 'packung' || u === 'packungen') {
+    return Number(ingredient?.packSize || ingredient?.pack_size || 0) || null;
+  }
+  return null;
+}
+
+function unitsCompatible(ingredientUnit, packUnit, ingredient) {
   const a = (ingredientUnit || '').toLowerCase();
   const b = (packUnit || '').toLowerCase();
   if (a === b) return true;
   if (WEIGHT_UNITS.has(a) && WEIGHT_UNITS.has(b)) return true;
+  if (WEIGHT_UNITS.has(b) && grammFuer(a, ingredient)) return true;
   return false;
 }
 
-function convertToPackUnit(amount, ingredientUnit, packUnit) {
+function convertToPackUnit(amount, ingredientUnit, packUnit, ingredient) {
   const from = (ingredientUnit || '').toLowerCase();
   const to = (packUnit || '').toLowerCase();
   if (from === to) return amount;
@@ -150,6 +180,11 @@ function convertToPackUnit(amount, ingredientUnit, packUnit) {
   if (from === 'g' && to === 'kg') return amount / 1000;
   if (from === 'l' && to === 'ml') return amount * 1000;
   if (from === 'ml' && to === 'l') return amount / 1000;
+  const gramm = grammFuer(from, ingredient);
+  if (gramm && WEIGHT_UNITS.has(to)) {
+    const inGramm = amount * gramm;
+    return (to === 'kg' || to === 'l') ? inGramm / 1000 : inGramm;
+  }
   return amount;
 }
 
@@ -159,10 +194,10 @@ function packEstimate(amount, ingredient) {
   const packUnit = (ingredient.packUnit || ingredient.pack_unit || '').toLowerCase();
   const ingredientUnit = (ingredient.unit || '').toLowerCase();
 
-  if (!packSize || amount <= 0 || !unitsCompatible(ingredientUnit, packUnit)) {
+  if (!packSize || amount <= 0 || !unitsCompatible(ingredientUnit, packUnit, ingredient)) {
     return { packs: null, buyAmount: round(amount), estimatedPrice: null };
   }
-  const converted = convertToPackUnit(amount, ingredientUnit, packUnit);
+  const converted = convertToPackUnit(amount, ingredientUnit, packUnit, ingredient);
   const packs = Math.ceil(converted / packSize);
   return {
     packs,
@@ -223,6 +258,10 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
             /* Ohne packUnit hält packEstimate() die Einheiten für unvereinbar und
                liefert nie Packungen oder Preise. */
             packUnit: ingredient.packUnit || ingredient.pack_unit || null,
+            /* Ohne Stueckgewicht bleibt "2 Zwiebeln" ohne Preis. */
+            pieceWeight: Number(ingredient.pieceWeight || ingredient.piece_weight || 0) || null,
+            /* Die Liste laeuft in Ladenreihenfolge, nicht alphabetisch. */
+            shelfRank: Number(ingredient.shelfRank || ingredient.shelf_rank || 0) || 99,
             sources: [],
             checked: Boolean(previousChecks[key])
           });
@@ -258,7 +297,7 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
        daran, dass man eine Flasche kauft. */
     const units = Object.entries(item.byUnit);
     const packUnit = String(item.packUnit || '').toLowerCase();
-    const buyable = units.find(([u]) => unitsCompatible(u, packUnit) && item.packSize);
+    const buyable = units.find(([u]) => unitsCompatible(u, packUnit, item) && item.packSize);
     const [chosenUnit, chosenAmount] = buyable
       || units.slice().sort((a, b) => b[1] - a[1])[0]
       || [item.unit, item.amount];
@@ -283,16 +322,18 @@ export function buildShoppingList(plan, selectedDates, previousChecks = {}) {
         .map(([u, v]) => ({ unit: u, amount: round(v) })),
       ...estimate
     };
-  }).sort((a, b) => a.category.localeCompare(b.category) || a.name.localeCompare(b.name));
+  }).sort((a, b) => a.shelfRank - b.shelfRank
+    || a.category.localeCompare(b.category)
+    || a.name.localeCompare(b.name));
 
   const staples = items.filter((item) => item.staple);
   const regular = items.filter((item) => !item.staple);
 
   const groups = Object.values(regular.reduce((acc, item) => {
-    if (!acc[item.category]) acc[item.category] = { category: item.category, items: [] };
+    if (!acc[item.category]) acc[item.category] = { category: item.category, shelfRank: item.shelfRank, items: [] };
     acc[item.category].items.push(item);
     return acc;
-  }, {}));
+  }, {})).sort((a, b) => a.shelfRank - b.shelfRank || a.category.localeCompare(b.category));
 
   return {
     selectedDates: activeDates,
