@@ -57,6 +57,7 @@ export class RecipeRepository {
         tags: recipe.tags || [],
         allergens: recipe.allergens,
         dietTags: recipe.dietTags,
+        halal: recipe.halal,
         planEligible: recipe.planEligible,
         /* Ohne dieses Feld fällt sortRecipes('recommended') auf alphabetisch
            zurück — "Für dich" zeigte dann immer dieselben Rezepte von A. */

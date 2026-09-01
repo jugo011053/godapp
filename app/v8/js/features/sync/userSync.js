@@ -68,6 +68,9 @@ export function profileToRow(profile = {}, userId) {
     excluded_ingredients: Array.isArray(profile.excludedIngredients) ? profile.excludedIngredients : [],
     enabled_meals: mealsToArray(profile.enabledMeals),
     onboarding_done: Boolean(profile.calorieTarget),
+    /* Es gibt keine halal-Spalte; settings ist der vorgesehene Platz fuer
+       Merkmale, die kein eigenes Feld haben. */
+    settings: { halal: Boolean(profile.halal) },
     updated_at: new Date().toISOString()
   };
 }
@@ -91,6 +94,7 @@ export function rowToProfile(row = {}) {
     simplicity: row.simplicity || 'balanced',
     priorities: row.priorities || [],
     excludedIngredients: row.excluded_ingredients || [],
+    halal: Boolean(row.settings?.halal),
     enabledMeals: mealsToObject(row.enabled_meals)
   };
 }

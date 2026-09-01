@@ -42,6 +42,9 @@ export function createDefaultProfile() {
     calorieTarget: null,
     proteinTarget: null,
     dietStyle: 'omnivore',
+    /* Quer zur Ernaehrungsweise: halal schliesst Schwein und Alkohol aus,
+       unabhaengig davon, ob jemand Mischkost oder vegetarisch isst. */
+    halal: false,
     allergies: [],
     excludedIngredients: [],
     excludedRecipes: [],

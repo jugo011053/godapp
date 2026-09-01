@@ -124,7 +124,7 @@ function recipeRow(recipe, preferences) {
 }
 
 function hasAdvancedFilters() {
-  return Boolean(ui.filters.maxTime || ui.filters.diet || ui.filters.simplicity || ui.filters.difficulty);
+  return Boolean(ui.filters.maxTime || ui.filters.diet || ui.filters.simplicity || ui.filters.difficulty || ui.filters.halalOnly);
 }
 
 const PAGE_SIZE = 40;
@@ -143,6 +143,7 @@ function activeFilterLabels() {
   if (ui.filters.maxTime) labels.push(`bis ${ui.filters.maxTime} Min.`);
   if (ui.filters.diet) labels.push(DIET_DE[ui.filters.diet] || ui.filters.diet);
   if (ui.filters.simplicity) labels.push('Simpel');
+  if (ui.filters.halalOnly) labels.push('Halal');
   return labels;
 }
 
@@ -363,6 +364,10 @@ function openFilterSheet(root) {
       <div><p class="eyebrow">Ernährung</p><div class="master-filter-grid">
         ${[['', 'Alles'], ['vegetarian', 'Vegetarisch'], ['vegan', 'Vegan'], ['pescatarian', 'Pescetarisch']].map(([value, label]) => `<button class="selection-card ${draft.diet === value ? 'selected' : ''}" type="button" data-filter-diet="${value}">${label}</button>`).join('')}
       </div></div>
+      <div><p class="eyebrow">Halal</p><div class="master-filter-grid">
+        ${[['', 'Egal'], ['1', 'Nur halal']].map(([value, label]) => `<button class="selection-card ${(draft.halalOnly ? '1' : '') === value ? 'selected' : ''}" type="button" data-filter-halal="${value}">${label}</button>`).join('')}
+      </div>
+      <p class="master-form-hint">Ohne Schwein, Alkohol und Gelatine. Über die Schlachtung sagen die Daten nichts.</p></div>
       <div><p class="eyebrow">Kochzeit</p><div class="master-filter-grid">
         ${[[0, 'Beliebig'], [15, 'Bis 15 Min.'], [30, 'Bis 30 Min.'], [45, 'Bis 45 Min.']].map(([value, label]) => `<button class="selection-card ${Number(draft.maxTime || 0) === value ? 'selected' : ''}" type="button" data-filter-time="${value}">${label}</button>`).join('')}
       </div></div>
@@ -383,18 +388,20 @@ function openFilterSheet(root) {
 
   overlay.querySelectorAll('[data-filter-diet]').forEach((button) => button.addEventListener('click',
     () => select('[data-filter-diet]', 'diet', button, button.dataset.filterDiet)));
+  overlay.querySelectorAll('[data-filter-halal]').forEach((button) => button.addEventListener('click',
+    () => select('[data-filter-halal]', 'halalOnly', button, button.dataset.filterHalal === '1')));
   overlay.querySelectorAll('[data-filter-time]').forEach((button) => button.addEventListener('click',
     () => select('[data-filter-time]', 'maxTime', button, Number(button.dataset.filterTime) || null)));
   overlay.querySelectorAll('[data-filter-simple]').forEach((button) => button.addEventListener('click',
     () => select('[data-filter-simple]', 'simplicity', button, button.dataset.filterSimple)));
   overlay.querySelector('[data-filter-apply]').addEventListener('click', () => {
-    ui.filters = { ...ui.filters, diet: draft.diet, maxTime: draft.maxTime, simplicity: draft.simplicity };
+    ui.filters = { ...ui.filters, diet: draft.diet, maxTime: draft.maxTime, simplicity: draft.simplicity, halalOnly: draft.halalOnly };
     ui.visibleCount = PAGE_SIZE;
     closeOverlay(overlay);
     renderRecipes(root);
   });
   overlay.querySelector('[data-filter-reset]').addEventListener('click', () => {
-    ui.filters = { ...ui.filters, diet: '', maxTime: null, simplicity: '', difficulty: '' };
+    ui.filters = { ...ui.filters, diet: '', maxTime: null, simplicity: '', difficulty: '', halalOnly: false };
     ui.visibleCount = PAGE_SIZE;
     closeOverlay(overlay);
     renderRecipes(root);

@@ -207,3 +207,12 @@
 .master-profile-secondary strong { font-size: .70rem; font-weight: 900; }
 .master-profile-secondary small { color: var(--muted); font-size: .55rem; line-height: 1.35; }
 .master-profile-secondary:active { transform: scale(.98); }
+
+/* Einschraenkender Hinweis unter einer Auswahl — etwa wofuer "Halal" hier
+   einsteht und wofuer nicht. */
+.ob-note {
+  margin: 8px 0 0;
+  color: var(--ink-secondary);
+  font-size: .72rem;
+  line-height: 1.45;
+}
