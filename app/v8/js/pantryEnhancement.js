@@ -48,6 +48,9 @@ const LOCKERUNGEN = [
   { locker: (p) => ({ ...p, allergies: [] }),
     gilt: (p) => (p.allergies || []).length > 0,
     wort: (p) => `deinen Ausschlüssen (${(p.allergies || []).join(', ')})` },
+  { locker: (p) => ({ ...p, excludedIngredients: [] }),
+    gilt: (p) => (p.excludedIngredients || []).length > 0,
+    wort: (p) => `deinen ausgeschlossenen Zutaten (${(p.excludedIngredients || []).join(', ')})` },
   { locker: (p) => ({ ...p, maxCookingTime: 600 }),
     gilt: (p) => Number(p.maxCookingTime) > 0,
     wort: (p) => `der Zeitgrenze von ${Math.round(p.maxCookingTime)} Minuten` }
@@ -62,7 +65,10 @@ function warumNichts(text, profile, preferences) {
   for (const regel of LOCKERUNGEN) {
     if (!regel.gilt(profile)) continue;
     const gelockert = regel.locker(profile);
-    const pool = alle.filter((r) => erlaubt(r, gelockert, preferences));
+    /* Ausschluesse stehen an zwei Stellen; beide muessen weichen, sonst
+       findet die Lockerung nichts und der Grund bleibt unentdeckt. */
+    const ohnePref = { ...preferences, excludedIngredients: gelockert.excludedIngredients };
+    const pool = alle.filter((r) => erlaubt(r, gelockert, ohnePref));
     const treffer = matchPantry(pool, text);
     if (treffer.length) {
       return { wort: regel.wort(profile), anzahl: treffer.length };

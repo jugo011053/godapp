@@ -296,6 +296,33 @@
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 8px;
 }
+/* Die Filterknoepfe hatten ueberhaupt keine Gestaltung: der Code setzt beim
+   Antippen die Klasse `selected`, im CSS gab es dazu nie eine Regel. Der
+   Knopf sah vorher und nachher gleich aus, und der Filter wirkte tot —
+   obwohl er beim Anwenden griff. */
+.selection-card {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 10px 12px;
+  border: 1.5px solid var(--border);
+  border-radius: var(--radius-sm, 12px);
+  background: var(--card);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  touch-action: manipulation;
+}
+.selection-card:active { transform: scale(.96); }
+.selection-card.selected {
+  border-color: var(--accent);
+  background: var(--accent);
+  color: #fff;
+}
+
 .master-filter-grid .selection-card {
   min-height: 50px;
   font-size: .68rem;
